@@ -10,7 +10,7 @@ export async function POST(request: NextRequest) {
     try {
         const body = await request.json();
         const { currentStory, userPrompt, modelId, apiKey: clientApiKey, context } = body as {
-            currentStory: string;
+            currentStory: any;
             userPrompt: string;
             modelId: DraftModelId;
             apiKey: string;
