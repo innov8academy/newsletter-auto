@@ -203,7 +203,7 @@ ${story.whatsNext.map(p => `• ${p}`).join('\n')}
 
     // Regenerate ENTIRE story via API
     async function handleRegenerateStory(storyIndex: number) {
-        if (!draft || !apiKey || !storyRegenPrompt.trim()) return;
+        if (!draft || !storyRegenPrompt.trim()) return;
 
         setRegeneratingStoryIndex(storyIndex);
 
@@ -275,7 +275,7 @@ ${story.whatsNext.map(p => `• ${p}`).join('\n')}
 
     // Generate newsletter draft
     async function generateDraft() {
-        if (selectedReports.length === 0 || !apiKey) return;
+        if (selectedReports.length === 0) return;
 
         setIsGenerating(true);
         setError(null);
