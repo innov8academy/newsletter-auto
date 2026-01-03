@@ -181,7 +181,7 @@ export default function StudioPage() {
 
     // Generate Prompt for a Story
     async function generatePrompt(index: number) {
-        if (!draft || !apiKey) return;
+        if (!draft) return;
         setGeneratingStates(prev => ({ ...prev, [index]: true }));
 
         const story = draft.stories[index];
@@ -210,7 +210,7 @@ export default function StudioPage() {
 
     // Generate Image using STYLED pipeline
     async function generateImage(index: number) {
-        if (!draft || !apiKey) return;
+        if (!draft) return;
 
         setGeneratingStates(prev => ({ ...prev, [index]: true }));
 

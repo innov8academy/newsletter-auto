@@ -334,7 +334,7 @@ export default function ResearchPage() {
                                     />
                                     <Button
                                         onClick={researchCustomTopic}
-                                        disabled={!customTopic.trim() || !apiKey || isEnhancing}
+                                        disabled={!customTopic.trim() || isEnhancing}
                                         size="sm"
                                         className="bg-amber-500/20 hover:bg-amber-500/30 text-amber-400 border border-amber-500/30 shrink-0"
                                     >
