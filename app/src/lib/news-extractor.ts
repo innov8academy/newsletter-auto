@@ -1,5 +1,5 @@
 import { NewsItem, ExtractedStory } from './types';
-import { NEWS_EXTRACTION_PROMPT } from './config';
+import { SMART_CURATION_PROMPT } from './config';
 
 interface ExtractedStoryRaw {
     headline: string;
@@ -89,7 +89,7 @@ export async function extractStoriesFromNewsletter(
         }];
     }
 
-    const prompt = `${NEWS_EXTRACTION_PROMPT}
+    const prompt = `${SMART_CURATION_PROMPT}
 
 NEWSLETTER SOURCE: ${newsletter.sourceName}
 NEWSLETTER TITLE: ${newsletter.title}
