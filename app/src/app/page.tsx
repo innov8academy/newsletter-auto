@@ -47,6 +47,7 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [apiKey, setApiKey] = useState('');
+  const [serverHasKey, setServerHasKey] = useState(false);
   const [showApiInput, setShowApiInput] = useState(false);
   const [progress, setProgress] = useState('');
   const [hasSearched, setHasSearched] = useState(false);
@@ -84,6 +85,16 @@ export default function Home() {
     if (savedReports.length > 0) setResearchReports(savedReports);
     if (savedTime) setLastUpdated(savedTime);
     if (savedFeeds.length > 0) setCustomFeeds(savedFeeds);
+
+    // Check if server has API key configured
+    fetch('/api/status')
+      .then(res => res.json())
+      .then(data => {
+        if (data.configured) {
+          setServerHasKey(true);
+        }
+      })
+      .catch(err => console.error('Failed to check server status', err));
   }, []);
 
   // Persist stories when they change
@@ -295,17 +306,25 @@ export default function Home() {
               </DialogContent>
             </Dialog>
 
-            <Button
-              variant="ghost"
-              className="text-white/50 hover:text-amber-400 hover:bg-white/5 transition-all text-sm font-medium tracking-wide"
-              onClick={() => setShowApiInput(!showApiInput)}
-            >
-              {apiKey ? 'API Connected' : 'Connect API'}
-            </Button>
+            {/* Only show Connect button if NO key is present (client or server) */}
+            {(apiKey || serverHasKey) ? (
+              <div className="flex items-center gap-2 text-xs text-teal-400 bg-teal-400/10 border border-teal-400/20 px-3 py-1.5 rounded-full">
+                <div className="w-1.5 h-1.5 rounded-full bg-teal-400 animate-pulse"></div>
+                System Online
+              </div>
+            ) : (
+              <Button
+                variant="ghost"
+                className="text-white/50 hover:text-amber-400 hover:bg-white/5 transition-all text-sm font-medium tracking-wide"
+                onClick={() => setShowApiInput(!showApiInput)}
+              >
+                Connect API
+              </Button>
+            )}
           </div>
         </nav>
 
-        {/* API Input Overlay */}
+        {/* API Input Overlay - Only usable if user explicitly wants to override or connect */}
         <Dialog open={showApiInput} onOpenChange={setShowApiInput}>
           <DialogContent className="bg-[#0B0B0F] border border-white/10 text-white max-w-sm">
             <DialogHeader>
