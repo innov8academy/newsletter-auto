@@ -146,10 +146,7 @@ export default function Home() {
   }
 
   async function findNews() {
-    if (!apiKey) {
-      setShowApiInput(true);
-      return;
-    }
+    // We allow empty apiKey here because the server might have it in env vars
 
     setLoading(true);
     setProgress('Starting curation engine...');
@@ -174,6 +171,9 @@ export default function Home() {
         if (data.stats) setCurationStats(data.stats);
         setProgress(`Curated ${data.stories.length} high-impact stories`);
       } else {
+        if (data.error === 'API key required') {
+          setShowApiInput(true);
+        }
         setProgress(`Error: ${data.error}`);
       }
     } catch (error) {
