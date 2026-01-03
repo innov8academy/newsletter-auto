@@ -1,0 +1,329 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Editorial Noir Color Palette */
+    --background: 240 10% 4%;
+    --foreground: 0 0% 98%;
+
+    --card: 240 6% 8%;
+    --card-foreground: 0 0% 98%;
+
+    --popover: 240 6% 8%;
+    --popover-foreground: 0 0% 98%;
+
+    --primary: 29 77% 67%;
+    --primary-foreground: 240 10% 4%;
+
+    --secondary: 240 4% 14%;
+    --secondary-foreground: 0 0% 98%;
+
+    --muted: 240 4% 14%;
+    --muted-foreground: 240 5% 65%;
+
+    --accent: 12 76% 61%;
+    --accent-foreground: 0 0% 98%;
+
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 98%;
+
+    --success: 168 76% 50%;
+    --success-foreground: 240 10% 4%;
+
+    --border: 240 4% 16%;
+    --input: 240 4% 16%;
+    --ring: 29 77% 67%;
+    --radius: 0.75rem;
+
+    /* Custom tokens */
+    --amber: 29 77% 67%;
+    --coral: 12 76% 61%;
+    --teal: 168 76% 50%;
+    --surface: 240 6% 8%;
+    --surface-elevated: 240 6% 11%;
+  }
+
+  .dark {
+    --background: 240 10% 4%;
+    --foreground: 0 0% 98%;
+    --card: 240 6% 8%;
+    --card-foreground: 0 0% 98%;
+    --popover: 240 6% 8%;
+    --popover-foreground: 0 0% 98%;
+    --primary: 29 77% 67%;
+    --primary-foreground: 240 10% 4%;
+    --secondary: 240 4% 14%;
+    --secondary-foreground: 0 0% 98%;
+    --muted: 240 4% 14%;
+    --muted-foreground: 240 5% 65%;
+    --accent: 12 76% 61%;
+    --accent-foreground: 0 0% 98%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 240 4% 16%;
+    --input: 240 4% 16%;
+    --ring: 29 77% 67%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-[#0B0B0F] text-foreground font-sans;
+    font-feature-settings: "rlig" 1, "calt" 1;
+    background-image:
+      radial-gradient(ellipse 80% 50% at 50% -20%, rgba(244, 162, 97, 0.08) 0%, transparent 50%),
+      radial-gradient(ellipse 60% 40% at 100% 0%, rgba(231, 111, 81, 0.04) 0%, transparent 40%);
+  }
+
+  /* Font family assignments */
+  .font-display {
+    font-family: var(--font-playfair), Georgia, serif;
+  }
+
+  .font-sans {
+    font-family: var(--font-jakarta), system-ui, sans-serif;
+  }
+
+  .font-mono {
+    font-family: var(--font-mono), monospace;
+  }
+}
+
+/* Premium Utility Classes */
+@layer utilities {
+
+  /* Text effects */
+  .text-glow {
+    text-shadow: 0 0 30px rgba(244, 162, 97, 0.4);
+  }
+
+  .text-glow-subtle {
+    text-shadow: 0 0 20px rgba(244, 162, 97, 0.2);
+  }
+
+  /* Gradient text */
+  .text-gradient-warm {
+    background: linear-gradient(135deg, #FAFAFA 0%, #F4A261 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .text-gradient-editorial {
+    background: linear-gradient(180deg, #FAFAFA 0%, rgba(250, 250, 250, 0.6) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  /* Noise texture overlay */
+  .noise-overlay {
+    position: relative;
+  }
+
+  .noise-overlay::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+    opacity: 0.03;
+    pointer-events: none;
+    mix-blend-mode: overlay;
+  }
+
+  /* Art deco decorative elements */
+  .deco-corner-tl {
+    position: relative;
+  }
+
+  .deco-corner-tl::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 40px;
+    height: 40px;
+    border-left: 2px solid rgba(244, 162, 97, 0.3);
+    border-top: 2px solid rgba(244, 162, 97, 0.3);
+  }
+
+  .deco-corner-br {
+    position: relative;
+  }
+
+  .deco-corner-br::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    right: 0;
+    width: 40px;
+    height: 40px;
+    border-right: 2px solid rgba(244, 162, 97, 0.3);
+    border-bottom: 2px solid rgba(244, 162, 97, 0.3);
+  }
+
+  /* Glow effects */
+  .glow-amber {
+    box-shadow: 0 0 40px -10px rgba(244, 162, 97, 0.4);
+  }
+
+  .glow-amber-sm {
+    box-shadow: 0 0 20px -5px rgba(244, 162, 97, 0.3);
+  }
+
+  .glow-teal {
+    box-shadow: 0 0 30px -10px rgba(45, 212, 191, 0.4);
+  }
+
+  /* Border accent */
+  .border-accent-left {
+    border-left: 3px solid rgba(244, 162, 97, 0.5);
+  }
+
+  /* Animations */
+  .animate-in-up {
+    animation: fadeInUp 0.6s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+    opacity: 0;
+  }
+
+  .animate-in-left {
+    animation: slideInLeft 0.5s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+    opacity: 0;
+  }
+
+  .animate-in-right {
+    animation: slideInRight 0.5s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+    opacity: 0;
+  }
+
+  .animate-pulse-slow {
+    animation: pulseSlow 4s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+
+  .animate-shimmer {
+    animation: shimmer 2s linear infinite;
+    background-size: 200% 100%;
+  }
+
+  .animate-glow-pulse {
+    animation: glowPulse 3s ease-in-out infinite;
+  }
+
+  /* Hover lift effect */
+  .hover-lift {
+    transition: transform 0.3s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.3s ease;
+  }
+
+  .hover-lift:hover {
+    transform: translateY(-2px);
+  }
+}
+
+/* Keyframes */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideInLeft {
+  from {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes pulseSlow {
+
+  0%,
+  100% {
+    opacity: 0.4;
+  }
+
+  50% {
+    opacity: 0.7;
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+@keyframes glowPulse {
+
+  0%,
+  100% {
+    box-shadow: 0 0 20px -5px rgba(244, 162, 97, 0.3);
+  }
+
+  50% {
+    box-shadow: 0 0 40px -5px rgba(244, 162, 97, 0.5);
+  }
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background-color: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: rgba(244, 162, 97, 0.2);
+  border-radius: 9999px;
+  transition: background-color 0.2s;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(244, 162, 97, 0.4);
+}
+
+/* Focus ring style */
+*:focus-visible {
+  outline: 2px solid rgba(244, 162, 97, 0.5);
+  outline-offset: 2px;
+}
+
+/* Selection style */
+::selection {
+  background-color: rgba(244, 162, 97, 0.2);
+  color: #F4A261;
+}
