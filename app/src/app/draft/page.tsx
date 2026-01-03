@@ -25,6 +25,7 @@ import {
     loadResearchReports,
     getApiKey,
 } from '@/lib/storage';
+import { addCost } from '@/lib/cost-tracker';
 import {
     Sparkles,
     FileText,
@@ -71,9 +72,16 @@ export default function DraftPage() {
     useEffect(() => {
         const reports = loadResearchReports();
         const key = getApiKey();
+
+        // Flow protection: redirect to Research if no reports
+        if (reports.length === 0) {
+            router.push('/research');
+            return;
+        }
+
         setAllReports(reports);
         setApiKey(key || '');
-    }, []);
+    }, [router]);
 
     // Auto-save draft to localStorage for Studio access
     useEffect(() => {
@@ -173,6 +181,17 @@ ${story.whatsNext.map(p => `• ${p}`).join('\n')}
         });
         const data = await response.json();
         if (!data.success) throw new Error(data.error);
+
+        // Track cost
+        if (data.cost) {
+            addCost({
+                source: data.costSource || 'regen-section',
+                model: data.model || model,
+                cost: data.cost,
+                description: `Regen ${sectionType}`,
+            });
+        }
+
         return data.content;
     }
 
@@ -198,6 +217,17 @@ ${story.whatsNext.map(p => `• ${p}`).join('\n')}
         });
         const data = await response.json();
         if (!data.success) throw new Error(data.error);
+
+        // Track cost
+        if (data.cost) {
+            addCost({
+                source: data.costSource || 'regen-section',
+                model: data.model || model,
+                cost: data.cost,
+                description: `Regen ${sectionType} bullets`,
+            });
+        }
+
         return data.isArray ? data.content : data.content.split('\n').filter((l: string) => l.trim());
     }
 
@@ -231,6 +261,16 @@ ${story.whatsNext.map(p => `• ${p}`).join('\n')}
                 replaceStory(storyIndex, data.story);
                 setStoryPopoverOpen(null);
                 setStoryRegenPrompt('');
+
+                // Track cost
+                if (data.cost) {
+                    addCost({
+                        source: data.costSource || 'regen-story',
+                        model: data.model || storyRegenModel,
+                        cost: data.cost,
+                        description: `Regen story: ${currentStory.title.substring(0, 30)}...`,
+                    });
+                }
             } else {
                 console.error("Failed to regenerate story:", data.error);
                 // Ideally show a toast or error message here
@@ -291,6 +331,16 @@ ${story.whatsNext.map(p => `• ${p}`).join('\n')}
 
             if (data.success && data.draft) {
                 setDraft(data.draft);
+
+                // Track cost
+                if (data.cost) {
+                    addCost({
+                        source: data.costSource || 'draft',
+                        model: data.model || selectedModel,
+                        cost: data.cost,
+                        description: `Generated draft from ${selectedReports.length} reports`,
+                    });
+                }
             } else {
                 setError(data.error || 'Failed to generate draft');
             }

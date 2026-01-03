@@ -23,6 +23,7 @@ import {
     getApiKey,
     getLastUpdated,
 } from '@/lib/storage';
+import { addCost } from '@/lib/cost-tracker';
 import {
     Sparkles,
     FileText,
@@ -91,6 +92,12 @@ export default function ResearchPage() {
         const loadedKey = getApiKey();
         const loadedTime = getLastUpdated();
 
+        // Flow protection: redirect to Home if no selected stories
+        if (loadedIds.length === 0 && loadedReports.length === 0) {
+            router.push('/');
+            return;
+        }
+
         setStories(loadedStories);
         setSelectedIds(new Set(loadedIds));
         setResearchReports(loadedReports);
@@ -111,7 +118,7 @@ export default function ResearchPage() {
 
         // Mark as mounted for client-side only rendering
         setIsMounted(true);
-    }, []);
+    }, [router]);
 
     // Get selected stories
     const selectedStories = stories.filter(s => selectedIds.has(s.id));
@@ -158,6 +165,16 @@ export default function ResearchPage() {
                 });
 
                 setActiveReportId(story.id);
+
+                // Track cost
+                if (data.cost) {
+                    addCost({
+                        source: data.costSource || 'research',
+                        model: data.model || selectedModel,
+                        cost: data.cost,
+                        description: `Research: ${story.headline.substring(0, 50)}...`,
+                    });
+                }
             } else {
                 setResearchStates(prev => ({
                     ...prev,
@@ -194,6 +211,16 @@ export default function ResearchPage() {
                 const data = await response.json();
                 if (data.success && data.enhancedPrompt) {
                     enhancedSummary = data.enhancedPrompt;
+
+                    // Track enhance cost
+                    if (data.cost) {
+                        addCost({
+                            source: data.costSource || 'enhance',
+                            model: data.model || 'google/gemini-flash-1.5',
+                            cost: data.cost,
+                            description: `Enhanced topic: ${customTopic.substring(0, 30)}...`,
+                        });
+                    }
                 }
             } catch (error) {
                 console.error('Failed to enhance prompt:', error);

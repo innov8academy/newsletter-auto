@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { calculateCost } from '@/lib/cost-tracker';
 
 export const runtime = 'edge';
 
@@ -53,7 +54,16 @@ The output must be a single coherent paragraph starting with "Research the lates
         const data = await response.json();
         const enhancedPrompt = data.choices[0]?.message?.content || topic;
 
-        return NextResponse.json({ success: true, enhancedPrompt });
+        // Estimate cost: ~300 input tokens, ~200 output tokens
+        const cost = calculateCost('google/gemini-flash-1.5', 300, 200);
+
+        return NextResponse.json({
+            success: true,
+            enhancedPrompt,
+            cost,
+            costSource: 'enhance',
+            model: 'google/gemini-flash-1.5',
+        });
     } catch (error) {
         console.error('Prompt enhancement failed:', error);
         return NextResponse.json(

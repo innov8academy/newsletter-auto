@@ -3,6 +3,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { DraftModelId } from '@/lib/draft-generator';
+import { calculateCost } from '@/lib/cost-tracker';
 
 const OPENROUTER_API_URL = 'https://openrouter.ai/api/v1/chat/completions';
 
@@ -129,9 +130,15 @@ Rewrite the full story as a JSON object. Return ONLY the valid JSON, no markdown
             newStory.whyItMatters = newStory.whyItMatters.slice(0, 3);
             newStory.whatsNext = newStory.whatsNext.slice(0, 3);
 
+            // Estimate cost: ~2000 input tokens, ~2000 output tokens
+            const cost = calculateCost(modelId, 2000, 2000);
+
             return NextResponse.json({
                 success: true,
                 story: newStory,
+                cost,
+                costSource: 'regen-story',
+                model: modelId,
             });
         } catch (e) {
             console.error('JSON Parse Error:', e);

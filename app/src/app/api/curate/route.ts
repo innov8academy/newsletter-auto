@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { curateNews } from '@/lib/smart-curator';
+import { calculateCost } from '@/lib/cost-tracker';
 
 export async function POST(request: Request) {
     try {
@@ -17,11 +18,21 @@ export async function POST(request: Request) {
         // Run the smart curation
         const result = await curateNews(apiKey, undefined, customFeeds);
 
+        // Estimate cost: ~2000 input tokens and ~500 output tokens per article processed
+        // The curation processes up to 20 articles
+        const articlesProcessed = result.stats?.articlesProcessed || 20;
+        const estimatedInputTokens = articlesProcessed * 2000;
+        const estimatedOutputTokens = articlesProcessed * 500;
+        const cost = calculateCost('google/gemini-2.0-flash-001', estimatedInputTokens, estimatedOutputTokens);
+
         return NextResponse.json({
             success: true,
             count: result.stories.length,
             stories: result.stories,
-            stats: result.stats
+            stats: result.stats,
+            cost,
+            costSource: 'curate',
+            model: 'google/gemini-2.0-flash-001',
         });
     } catch (error) {
         console.error('Curation error:', error);

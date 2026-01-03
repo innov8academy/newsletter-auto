@@ -4,6 +4,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { generateResearchReport, ResearchModelId } from '@/lib/researcher';
 import { CuratedStory } from '@/lib/types';
+import { calculateCost } from '@/lib/cost-tracker';
 
 export async function POST(request: NextRequest) {
     try {
@@ -15,6 +16,7 @@ export async function POST(request: NextRequest) {
         };
 
         const apiKey = clientApiKey || process.env.OPENROUTER_API_KEY || '';
+        const selectedModel = modelId || 'perplexity/sonar-deep-research';
 
         if (!story) {
             return NextResponse.json(
@@ -30,7 +32,7 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        console.log(`[Research] Starting deep dive on: ${story.headline} (model: ${modelId || 'default'})`);
+        console.log(`[Research] Starting deep dive on: ${story.headline} (model: ${selectedModel})`);
         const startTime = Date.now();
 
         const result = await generateResearchReport(story, apiKey, modelId);
@@ -38,11 +40,19 @@ export async function POST(request: NextRequest) {
         const duration = ((Date.now() - startTime) / 1000).toFixed(1);
         console.log(`[Research] Completed in ${duration}s - Success: ${result.success}`);
 
+        // Estimate cost: ~1500 input tokens (prompt + story) and ~2000 output tokens (research report)
+        const estimatedInputTokens = 1500;
+        const estimatedOutputTokens = 2000;
+        const cost = calculateCost(selectedModel, estimatedInputTokens, estimatedOutputTokens);
+
         if (result.success) {
             return NextResponse.json({
                 success: true,
                 report: result.report,
                 duration: parseFloat(duration),
+                cost,
+                costSource: 'research',
+                model: selectedModel,
             });
         } else {
             return NextResponse.json(

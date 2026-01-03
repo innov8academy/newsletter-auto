@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { loadStyleReferences, buildMultimodalContent, generateCreativePrompt } from '@/lib/image-pipeline';
+import { calculateCost } from '@/lib/cost-tracker';
 
 export async function POST(request: NextRequest) {
     console.log('API: generate-styled-image called');
@@ -104,11 +105,17 @@ Now create an image in THIS EXACT STYLE that visualizes: ${finalPrompt}`,
             }
         }
 
+        // Calculate cost for image generation (per-image pricing)
+        const cost = calculateCost(selectedModel, 0, 0, 1);
+
         return NextResponse.json({
             success: true,
             imageUrl,
             prompt: finalPrompt,
-            styleRefsUsed: styleImages.length
+            styleRefsUsed: styleImages.length,
+            cost,
+            costSource: 'image-gen',
+            model: selectedModel,
         });
 
     } catch (error) {

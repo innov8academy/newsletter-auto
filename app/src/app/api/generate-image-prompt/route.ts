@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { calculateCost } from '@/lib/cost-tracker';
 
 export async function POST(request: NextRequest) {
     console.log('API: generate-image-prompt called');
@@ -68,7 +69,16 @@ ${newsletterContext ? `Newsletter Context: ${newsletterContext}` : ''}
         const data = await response.json();
         const generatedPrompt = data.choices?.[0]?.message?.content?.trim();
 
-        return NextResponse.json({ success: true, prompt: generatedPrompt });
+        // Estimate cost: ~500 input tokens, ~200 output tokens
+        const cost = calculateCost('google/gemini-2.0-flash-001', 500, 200);
+
+        return NextResponse.json({
+            success: true,
+            prompt: generatedPrompt,
+            cost,
+            costSource: 'image-prompt',
+            model: 'google/gemini-2.0-flash-001',
+        });
 
     } catch (error) {
         console.error('Image Prompt Error:', error);

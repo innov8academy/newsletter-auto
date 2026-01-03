@@ -4,6 +4,8 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { NewsletterDraft, StoryBlock } from '@/lib/draft-generator';
 import { getApiKey } from '@/lib/storage';
+import { addCost } from '@/lib/cost-tracker';
+import { CostTracker } from '@/components/CostTracker';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -50,14 +52,16 @@ export default function StudioPage() {
     useEffect(() => {
         const storedDraft = localStorage.getItem('currentDraft');
         const key = getApiKey();
-        if (storedDraft) {
-            setDraft(JSON.parse(storedDraft));
-        } else {
-            // Redirect if no draft found?
-            // router.push('/draft');
+
+        // Flow protection: redirect to Draft if no draft found
+        if (!storedDraft) {
+            router.push('/draft');
+            return;
         }
+
+        setDraft(JSON.parse(storedDraft));
         setApiKey(key || '');
-    }, []);
+    }, [router]);
 
     // Save draft update
     function updateDraft(newDraft: NewsletterDraft) {
@@ -200,6 +204,16 @@ export default function StudioPage() {
             if (!promptRes.ok) throw new Error('Prompt API failed');
             const data = await promptRes.json();
             setGeneratedPrompts(prev => ({ ...prev, [index]: data.prompt }));
+
+            // Track cost
+            if (data.cost) {
+                addCost({
+                    source: data.costSource || 'image-prompt',
+                    model: data.model || 'google/gemini-2.0-flash-001',
+                    cost: data.cost,
+                    description: `Prompt for story ${index + 1}`,
+                });
+            }
         } catch (err) {
             console.error(err);
             alert('Failed to generate prompt');
@@ -249,6 +263,16 @@ export default function StudioPage() {
                 // Only update prompt if we DIDN'T have a custom one (i.e., it was auto-generated)
                 if (!hasCustomPrompt && data.prompt) {
                     setGeneratedPrompts(prev => ({ ...prev, [index]: data.prompt }));
+                }
+
+                // Track cost
+                if (data.cost) {
+                    addCost({
+                        source: data.costSource || 'image-gen',
+                        model: data.model || globalModel,
+                        cost: data.cost,
+                        description: `Image for story ${index + 1}`,
+                    });
                 }
             } else {
                 throw new Error('No image URL returned');
@@ -445,6 +469,9 @@ export default function StudioPage() {
                     </div>
                 </div>
             </div>
+
+            {/* Cost Tracker */}
+            <CostTracker />
         </div>
     );
 }

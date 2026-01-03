@@ -3,8 +3,10 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { DraftModelId } from '@/lib/draft-generator';
+import { calculateCost } from '@/lib/cost-tracker';
 
 const OPENROUTER_API_URL = 'https://openrouter.ai/api/v1/chat/completions';
+
 
 export async function POST(request: NextRequest) {
     try {
@@ -145,17 +147,29 @@ Rewrite the ${sectionType} according to the user's request. Return ONLY the rewr
                 .map((line: string) => line.replace(/^[•\-\*\d\.]+\s*/, '').trim())
                 .filter((line: string) => line.length > 0 && !line.match(/^(Key Points|Why This Matters|What's Next)/i));
 
+            // Estimate cost: ~1000 input tokens, ~500 output tokens
+            const cost = calculateCost(modelId, 1000, 500);
+
             return NextResponse.json({
                 success: true,
                 content: items.slice(0, 4), // Max 4 items
                 isArray: true,
+                cost,
+                costSource: 'regen-section',
+                model: modelId,
             });
         }
+
+        // Estimate cost: ~1000 input tokens, ~500 output tokens
+        const cost = calculateCost(modelId, 1000, 500);
 
         return NextResponse.json({
             success: true,
             content: content.trim(),
             isArray: false,
+            cost,
+            costSource: 'regen-section',
+            model: modelId,
         });
 
     } catch (error) {

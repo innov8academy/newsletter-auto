@@ -4,6 +4,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { generateNewsletterDraft, DraftModelId } from '@/lib/draft-generator';
 import { ResearchReport } from '@/lib/types';
+import { calculateCost } from '@/lib/cost-tracker';
 
 export async function POST(request: NextRequest) {
     try {
@@ -15,6 +16,7 @@ export async function POST(request: NextRequest) {
         };
 
         const apiKey = clientApiKey || process.env.OPENROUTER_API_KEY || '';
+        const selectedModel = modelId || 'anthropic/claude-sonnet-4';
 
         if (!reports || reports.length === 0) {
             return NextResponse.json(
@@ -31,7 +33,7 @@ export async function POST(request: NextRequest) {
         }
 
         // Generate full newsletter draft
-        console.log(`[Draft] Generating newsletter from ${reports.length} reports (model: ${modelId || 'default'})`);
+        console.log(`[Draft] Generating newsletter from ${reports.length} reports (model: ${selectedModel})`);
         const startTime = Date.now();
 
         const result = await generateNewsletterDraft(reports, apiKey, modelId);
@@ -39,11 +41,19 @@ export async function POST(request: NextRequest) {
         const duration = ((Date.now() - startTime) / 1000).toFixed(1);
         console.log(`[Draft] Completed in ${duration}s - Success: ${result.success}`);
 
+        // Estimate cost: ~3000 input tokens per report + 500 base, ~4000 output tokens
+        const estimatedInputTokens = 500 + (reports.length * 3000);
+        const estimatedOutputTokens = 4000;
+        const cost = calculateCost(selectedModel, estimatedInputTokens, estimatedOutputTokens);
+
         if (result.success) {
             return NextResponse.json({
                 success: true,
                 draft: result.draft,
                 duration: parseFloat(duration),
+                cost,
+                costSource: 'draft',
+                model: selectedModel,
             });
         } else {
             return NextResponse.json(
