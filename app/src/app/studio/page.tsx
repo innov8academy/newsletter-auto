@@ -29,6 +29,7 @@ import {
     Sparkles,
     Trash2,
     Wand2,
+    Upload,
 } from 'lucide-react';
 
 const IMAGE_MODELS = [
@@ -334,8 +335,12 @@ export default function StudioPage() {
                         Style Refs {useStyleRefs ? 'ON' : 'OFF'}
                     </button>
 
-                    <Button className="bg-gradient-to-r from-purple-500 to-pink-500 text-white border-0">
-                        Export Newsletter
+                    <Button
+                        onClick={() => router.push('/upload')}
+                        className="bg-gradient-to-r from-purple-500 to-pink-500 text-white border-0 shadow-glow-purple"
+                    >
+                        <Upload className="w-4 h-4 mr-2" />
+                        Finish & Upload
                     </Button>
                 </div>
             </header>

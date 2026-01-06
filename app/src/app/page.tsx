@@ -162,6 +162,14 @@ export default function Home() {
   async function findNews() {
     // We allow empty apiKey here because the server might have it in env vars
 
+    // RESET STATE: Clear previous session data (Drafts, Reports, Selections) for a fresh start
+    clearPersistedState();
+    setSelectedIds(new Set());
+    setResearchReports([]);
+    setStories([]);
+    // also clear "currentDraft" from localStorage if manually accessible, 
+    // but clearPersistedState() should handle the bulk of it.
+
     setLoading(true);
     setProgress('Starting curation engine...');
     setHasSearched(true);

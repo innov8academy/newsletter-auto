@@ -46,14 +46,8 @@ export const defaultConfig: NewsletterConfig = {
             tier: 1
         },
         {
-            name: "Futurepedia",
-            url: "https://rss.app/feeds/x8T02B3GXYy18pNy.xml",
-            category: "newsletter",
-            tier: 1
-        },
-        {
-            name: "TAAFT Newsletter",
-            url: "https://rss.beehiiv.com/feeds/22I6c0vJXV.xml",
+            name: "Techspresso",
+            url: "https://www.dupple.com/techpresso-archives/rss.xml",
             category: "newsletter",
             tier: 1
         },

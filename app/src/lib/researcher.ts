@@ -26,7 +26,7 @@ export const RESEARCH_MODELS = [
 
 export type ResearchModelId = typeof RESEARCH_MODELS[number]['id'];
 
-const DEFAULT_MODEL: ResearchModelId = 'perplexity/sonar-deep-research';
+const DEFAULT_MODEL: ResearchModelId = 'x-ai/grok-4.1-fast';
 
 interface ResearchResult {
     success: boolean;

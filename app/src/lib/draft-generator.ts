@@ -170,13 +170,17 @@ PLUS: [Short teaser for story 2] | [Short teaser for story 3]
 
 ## 🎭 MEME IDEAS (For intro image - based on main story)
 
-Generate 2-3 meme template ideas. For each:
-- **Template:** [Famous meme template name, e.g., "Distracted Boyfriend", "Drake Hotline Bling", "This is Fine", "Surprised Pikachu"]
-- **Top Text:** [What goes on top]
-- **Bottom Text:** [What goes on bottom]
-- **Angle:** [The joke/commentary - what makes it funny]
+Generate 3 DISTINCT meme concepts. Do not just use "Drake" or "Distracted Boyfriend" unless perfect.
+Consider these templates: "Expanding Brain", "Two Buttons", "Change My Mind", "Buff Doge vs Cheems", "Leonardo DiCaprio Laughing", "They Don't Know", "Trade Offer", "Panik Kalm Panik", "Anakin Padme", "X, X Everywhere".
+
+For each idea:
+- **Template:** [Name of the meme template]
+- **Top Text:** [Setup]
+- **Bottom Text:** [Punchline]
+- **Angle:** [Why it's funny/ironic]
 
 Focus on: irony, relatable reactions, tech industry absurdity, or the "Alex" perspective.
+Make them actually funny for a 25-year-old.
 
 ---
 
@@ -493,4 +497,66 @@ function extractFromResearch(research: string, type: 'key' | 'matters' | 'next')
     // If no bullets found, try to extract first few sentences
     const sentences = research.split(/[.!?]+/).filter(s => s.trim().length > 20);
     return sentences.slice(0, 3).map(s => s.trim());
+}
+
+// Helper for standalone meme generation (Regenerate button)
+export async function generateStandaloneMemeIdeas(
+    storyHeadline: string,
+    storySummary: string,
+    apiKey: string,
+    modelId?: DraftModelId
+) {
+    const selectedModel = modelId || 'x-ai/grok-4.1-fast'; // Default to fast model for memes
+
+    const prompt = `You are a viral meme generator for a Gen Z/Millennial AI newsletter.
+    
+    Story: ${storyHeadline}
+    Context: ${storySummary}
+    
+    Task: Generate 3 DISTINCT meme concepts about this story.
+    Target Audience: Tech-savvy 25-year-olds.
+    Tone: Ironic, funny, maybe a bit cynical but ultimately excited about AI.
+    
+    Use these templates for inspiration: "Expanding Brain", "Two Buttons", "Change My Mind", "Buff Doge vs Cheems", "Leonardo DiCaprio Laughing", "They Don't Know", "Trade Offer", "Panik Kalm Panik", "Anakin Padme", "X, X Everywhere".
+
+    Return ONLY a JSON array with this structure:
+    [
+      { "templateName": "string", "topText": "string", "bottomText": "string", "angle": "string" }
+    ]
+    `;
+
+    try {
+        const response = await fetch(OPENROUTER_API_URL, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${apiKey}`,
+                'HTTP-Referer': 'https://innov8ai.local',
+                'X-Title': 'Innov8 AI Meme Gen',
+            },
+            body: JSON.stringify({
+                model: selectedModel,
+                messages: [
+                    { role: 'system', content: "You are a creative meme generator. Return JSON only." },
+                    { role: 'user', content: prompt },
+                ],
+                temperature: 0.9, // High creativity
+            }),
+        });
+
+        if (!response.ok) throw new Error('API Error');
+
+        const data = await response.json();
+        const content = data.choices?.[0]?.message?.content;
+
+        // Clean markdown code blocks if present
+        const cleanContent = content.replace(/```json\n?|\n?```/g, '').trim();
+
+        const ideas = JSON.parse(cleanContent);
+        return { success: true, ideas };
+
+    } catch (error) {
+        console.error('Meme generation error:', error);
+        return { success: false, error: 'Failed to generate memes' };
+    }
 }
