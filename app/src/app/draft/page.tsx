@@ -68,7 +68,7 @@ export default function DraftPage() {
     const [storyRegenModel, setStoryRegenModel] = useState<DraftModelId>('anthropic/claude-sonnet-4');
     const [storyPopoverOpen, setStoryPopoverOpen] = useState<number | null>(null);
 
-    // Load reports on mount
+    // Load reports on mount AND restore draft if available
     useEffect(() => {
         const reports = loadResearchReports();
         const key = getApiKey();
@@ -81,6 +81,30 @@ export default function DraftPage() {
 
         setAllReports(reports);
         setApiKey(key || '');
+
+        // Restore draft from localStorage if available
+        try {
+            const savedDraft = localStorage.getItem('currentDraft');
+            if (savedDraft) {
+                const parsedDraft = JSON.parse(savedDraft) as NewsletterDraft;
+                setDraft(parsedDraft);
+            }
+
+            // Restore selected reports from localStorage
+            const savedSelectedReports = localStorage.getItem('selectedReports');
+            if (savedSelectedReports) {
+                const reportIds = JSON.parse(savedSelectedReports) as string[];
+                // Match saved IDs with available reports
+                const restoredReports = reportIds
+                    .map(id => reports.find(r => r.story.id === id))
+                    .filter((r): r is ResearchReport => r !== undefined);
+                if (restoredReports.length > 0) {
+                    setSelectedReports(restoredReports);
+                }
+            }
+        } catch (error) {
+            console.error('Failed to restore draft/reports from localStorage:', error);
+        }
     }, [router]);
 
     // Auto-save draft to localStorage for Studio access
@@ -89,6 +113,14 @@ export default function DraftPage() {
             localStorage.setItem('currentDraft', JSON.stringify(draft));
         }
     }, [draft]);
+
+    // Auto-save selected reports order to localStorage
+    useEffect(() => {
+        if (selectedReports.length > 0) {
+            const reportIds = selectedReports.map(r => r.story.id);
+            localStorage.setItem('selectedReports', JSON.stringify(reportIds));
+        }
+    }, [selectedReports]);
 
     // Update draft field
     function updateDraft(field: keyof NewsletterDraft, value: string) {

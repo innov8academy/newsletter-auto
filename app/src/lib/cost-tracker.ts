@@ -54,6 +54,9 @@ export const MODEL_PRICING: Record<string, { input: number; output: number; perI
     'perplexity/sonar-pro': { input: 3.00, output: 15.00 },
     'perplexity/sonar': { input: 1.00, output: 1.00 },
 
+    // xAI Grok models (with reasoning)
+    'x-ai/grok-4.1-fast': { input: 0.20, output: 0.50 },
+
     // Image generation models (per image pricing)
     'google/imagen-3': { input: 0, output: 0, perImage: 0.03 },
     'google/imagen-3-fast': { input: 0, output: 0, perImage: 0.02 },

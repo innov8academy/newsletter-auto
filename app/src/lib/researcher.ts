@@ -9,6 +9,7 @@ const OPENROUTER_API_URL = 'https://openrouter.ai/api/v1/chat/completions';
 // Updated 2025: Organized by specialty
 export const RESEARCH_MODELS = [
     // Deep Research Specialists (have web access or agentic research capability)
+    { id: 'x-ai/grok-4.1-fast', name: 'Grok 4.1 Fast (Reasoning)', description: '🚀 10x cheaper! Deep reasoning + 2M context', category: 'research', reasoning: true },
     { id: 'perplexity/sonar-deep-research', name: 'Perplexity Sonar Deep Research', description: '🔥 Best for deep web research', category: 'research' },
     { id: 'google/gemini-3-pro-preview', name: 'Gemini 3 Pro', description: 'Google flagship - 1M context', category: 'research' },
     { id: 'alibaba/tongyi-deepresearch-30b-a3b', name: 'Tongyi DeepResearch', description: 'Alibaba deep research agent', category: 'research' },
@@ -122,6 +123,26 @@ async function callOpenRouter(
     systemPrompt: string,
     userPrompt: string
 ): Promise<Response> {
+    // Check if the model supports reasoning (Grok models)
+    const modelConfig = RESEARCH_MODELS.find(m => m.id === model);
+    const enableReasoning = modelConfig && 'reasoning' in modelConfig && modelConfig.reasoning;
+
+    // Build request body
+    const requestBody: Record<string, unknown> = {
+        model,
+        messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: userPrompt },
+        ],
+        temperature: 0.3, // Lower for more factual output
+        max_tokens: 4000,
+    };
+
+    // Enable reasoning for supported models (xAI Grok)
+    if (enableReasoning) {
+        requestBody.reasoning = { enabled: true };
+    }
+
     return fetch(OPENROUTER_API_URL, {
         method: 'POST',
         headers: {
@@ -130,15 +151,7 @@ async function callOpenRouter(
             'HTTP-Referer': 'https://innov8ai.local',
             'X-Title': 'Innov8 AI Research Agent',
         },
-        body: JSON.stringify({
-            model,
-            messages: [
-                { role: 'system', content: systemPrompt },
-                { role: 'user', content: userPrompt },
-            ],
-            temperature: 0.3, // Lower for more factual output
-            max_tokens: 4000,
-        }),
+        body: JSON.stringify(requestBody),
     });
 }
 
