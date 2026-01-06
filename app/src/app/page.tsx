@@ -19,6 +19,8 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { ResearchPanel } from '@/components/ResearchPanel';
+import BeehiveImporter from '@/components/BeehiveImporter';
+
 import {
   saveCuratedStories,
   loadCuratedStories,
@@ -501,6 +503,27 @@ export default function Home() {
               </DialogContent>
             </Dialog>
 
+            {/* TRAIN AI BUTTON (RAG) */}
+            <Dialog>
+              <DialogTrigger asChild>
+                <Button variant="ghost" size="sm" className="text-white/40 hover:text-purple-400 hover:bg-purple-500/10 transition-colors">
+                  <Sparkles className="w-4 h-4 mr-2" />
+                  Train Style
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="bg-[#0B0B0F] border border-white/10 text-white max-w-lg">
+                <DialogHeader>
+                  <DialogTitle>Train Your AI Writer</DialogTitle>
+                  <DialogDescription>
+                    Upload past newsletters so the AI mimics your voice perfectly.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="pt-4">
+                  <BeehiveImporter />
+                </div>
+              </DialogContent>
+            </Dialog>
+
             <Dialog open={showStatsDialog} onOpenChange={setShowStatsDialog}>
               <DialogTrigger asChild>
                 <Button variant="ghost" size="sm" className={`text-white/40 hover:text-white hover:bg-white/5 ${!curationStats ? 'hidden' : ''}`}>
@@ -566,233 +589,235 @@ export default function Home() {
         </div>
       </header>
 
-      {loading ? (
-        <div className="h-[calc(100vh-64px)] flex flex-col items-center justify-center relative overflow-hidden">
-          <div className="absolute inset-0 bg-amber-500/5 blur-3xl animate-pulse-slow"></div>
-          <div className="relative z-10 text-center space-y-6">
-            <div className="w-24 h-24 mx-auto relative">
-              <div className="absolute inset-0 border-4 border-amber-500/20 rounded-full"></div>
-              <div className="absolute inset-0 border-4 border-t-amber-500 rounded-full animate-spin"></div>
-              <Sparkles className="absolute inset-0 m-auto text-amber-400 w-8 h-8 animate-pulse" />
-            </div>
-            <div>
-              <h2 className="font-display text-2xl text-white mb-2 tracking-tight">Curating your feed</h2>
-              <p className="text-white/40 font-mono text-sm">{progress}</p>
+      {
+        loading ? (
+          <div className="h-[calc(100vh-64px)] flex flex-col items-center justify-center relative overflow-hidden" >
+            <div className="absolute inset-0 bg-amber-500/5 blur-3xl animate-pulse-slow"></div>
+            <div className="relative z-10 text-center space-y-6">
+              <div className="w-24 h-24 mx-auto relative">
+                <div className="absolute inset-0 border-4 border-amber-500/20 rounded-full"></div>
+                <div className="absolute inset-0 border-4 border-t-amber-500 rounded-full animate-spin"></div>
+                <Sparkles className="absolute inset-0 m-auto text-amber-400 w-8 h-8 animate-pulse" />
+              </div>
+              <div>
+                <h2 className="font-display text-2xl text-white mb-2 tracking-tight">Curating your feed</h2>
+                <p className="text-white/40 font-mono text-sm">{progress}</p>
+              </div>
             </div>
           </div>
-        </div>
-      ) : (
-        <div className="container px-6 py-8">
-          <div className="grid grid-cols-12 gap-8 h-[calc(100vh-140px)]">
-            {/* Main Feed */}
-            <div className="col-span-8 flex flex-col h-full">
-              <div className="flex items-center justify-between mb-6">
-                <div>
-                  <h2 className="font-display text-2xl text-white tracking-tight flex items-center gap-3">
-                    Top Stories
-                    <span className="text-sm font-sans font-normal text-white/40 bg-white/5 px-2.5 py-0.5 rounded-full border border-white/5">
-                      {stories.length} items
+        ) : (
+          <div className="container px-6 py-8">
+            <div className="grid grid-cols-12 gap-8 h-[calc(100vh-140px)]">
+              {/* Main Feed */}
+              <div className="col-span-8 flex flex-col h-full">
+                <div className="flex items-center justify-between mb-6">
+                  <div>
+                    <h2 className="font-display text-2xl text-white tracking-tight flex items-center gap-3">
+                      Top Stories
+                      <span className="text-sm font-sans font-normal text-white/40 bg-white/5 px-2.5 py-0.5 rounded-full border border-white/5">
+                        {stories.length} items
+                      </span>
+                    </h2>
+                  </div>
+                  <div className="flex gap-4 text-xs text-white/40">
+                    <span className="flex items-center gap-1.5 cursor-help hover:text-white transition-colors">
+                      <div className="w-2 h-2 bg-coral-500 rounded-full"></div> Critical
                     </span>
-                  </h2>
+                    <span className="flex items-center gap-1.5 cursor-help hover:text-white transition-colors">
+                      <div className="w-2 h-2 bg-amber-500 rounded-full"></div> Important
+                    </span>
+                  </div>
                 </div>
-                <div className="flex gap-4 text-xs text-white/40">
-                  <span className="flex items-center gap-1.5 cursor-help hover:text-white transition-colors">
-                    <div className="w-2 h-2 bg-coral-500 rounded-full"></div> Critical
-                  </span>
-                  <span className="flex items-center gap-1.5 cursor-help hover:text-white transition-colors">
-                    <div className="w-2 h-2 bg-amber-500 rounded-full"></div> Important
-                  </span>
-                </div>
+
+                <ScrollArea className="flex-1 -mr-6 pr-6">
+                  <div className="space-y-3 pb-20">
+                    {stories.map((story, index) => (
+                      <div
+                        key={story.id}
+                        onClick={() => setViewingStory(story)}
+                        className={`group relative overflow-hidden rounded-xl border p-5 transition-all duration-300 cursor-pointer hover-lift ${selectedIds.has(story.id)
+                          ? 'bg-amber-500/10 border-amber-500/30 shadow-glow-amber-sm'
+                          : 'bg-surface border-white/5 hover:bg-surface-elevated hover:border-white/10'
+                          }`}
+                        style={{ animationDelay: `${index * 0.05}s` }}
+                      >
+                        {/* Accent border on selected */}
+                        {selectedIds.has(story.id) && (
+                          <div className="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-amber-400 to-coral-500"></div>
+                        )}
+
+                        <div className="flex gap-5">
+                          {/* Score Indicator */}
+                          <div className="shrink-0">
+                            <div className={`w-12 h-12 rounded-lg flex flex-col items-center justify-center border font-mono font-bold text-lg ${story.finalScore >= 9 ? 'bg-coral-500/20 border-coral-500/30 text-coral-400' :
+                              story.finalScore >= 7 ? 'bg-amber-500/20 border-amber-500/30 text-amber-400' :
+                                'bg-white/5 border-white/10 text-white/60'
+                              }`}>
+                              {story.finalScore}
+                            </div>
+                          </div>
+
+                          {/* Content */}
+                          <div className="flex-1 min-w-0 pt-0.5">
+                            <h3 className="text-base font-semibold text-white/90 leading-snug mb-2 group-hover:text-amber-300 transition-colors">
+                              {story.headline}
+                            </h3>
+                            <p className="text-sm text-white/50 line-clamp-2 mb-3 font-light leading-relaxed">
+                              {story.summary}
+                            </p>
+
+                            <div className="flex flex-wrap items-center gap-3">
+                              <Badge variant="outline" className="bg-transparent border-white/10 text-white/50 hover:text-white transition-colors text-xs font-normal">
+                                {story.category.replace('_', ' ')}
+                              </Badge>
+
+                              {story.crossSourceCount > 1 && (
+                                <div className="flex items-center gap-1.5 text-xs text-white/40">
+                                  <Layers className="w-3 h-3" />
+                                  {story.crossSourceCount} sources
+                                </div>
+                              )}
+
+                              {story.boosts.includes('+1 (recent)') && (
+                                <div className="flex items-center gap-1.5 text-xs text-teal-400/80">
+                                  <Clock className="w-3 h-3" />
+                                  Fresh
+                                </div>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Action Area */}
+                          <div className="shrink-0 flex flex-col justify-start items-end gap-2">
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className={`rounded-full w-10 h-10 transition-all duration-300 ${selectedIds.has(story.id)
+                                ? 'bg-amber-500 text-[#0B0B0F] hover:bg-amber-600'
+                                : 'bg-white/5 text-white/30 hover:text-amber-400 hover:bg-white/10'
+                                }`}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                toggleSelect(story);
+                              }}
+                            >
+                              {selectedIds.has(story.id) ? <Check className="w-5 h-5" /> : <MoveRight className="w-5 h-5" />}
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </ScrollArea>
               </div>
 
-              <ScrollArea className="flex-1 -mr-6 pr-6">
-                <div className="space-y-3 pb-20">
-                  {stories.map((story, index) => (
-                    <div
-                      key={story.id}
-                      onClick={() => setViewingStory(story)}
-                      className={`group relative overflow-hidden rounded-xl border p-5 transition-all duration-300 cursor-pointer hover-lift ${selectedIds.has(story.id)
-                        ? 'bg-amber-500/10 border-amber-500/30 shadow-glow-amber-sm'
-                        : 'bg-surface border-white/5 hover:bg-surface-elevated hover:border-white/10'
+              {/* Sidebar (Research Queue / Research Panel) */}
+              <div className="col-span-4 h-full flex flex-col pt-14">
+                <div className="sticky top-24 bg-surface/80 backdrop-blur-xl border border-white/10 transition-all duration-300 rounded-2xl flex flex-col p-6 h-[600px] deco-corner-br">
+                  {/* Tab Navigation */}
+                  <div className="flex gap-1 p-1 bg-black/30 rounded-lg mb-4">
+                    <button
+                      onClick={() => setSidebarTab('queue')}
+                      className={`flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-md text-sm font-medium transition-all ${sidebarTab === 'queue'
+                        ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                        : 'text-white/40 hover:text-white/60'
                         }`}
-                      style={{ animationDelay: `${index * 0.05}s` }}
                     >
-                      {/* Accent border on selected */}
-                      {selectedIds.has(story.id) && (
-                        <div className="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-amber-400 to-coral-500"></div>
+                      <ListChecks className="w-4 h-4" />
+                      Queue
+                      {selectedItems.length > 0 && (
+                        <span className="bg-amber-500/20 text-amber-300 text-xs px-1.5 py-0.5 rounded-full">
+                          {selectedItems.length}
+                        </span>
                       )}
+                    </button>
+                    <button
+                      onClick={() => setSidebarTab('research')}
+                      className={`flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-md text-sm font-medium transition-all ${sidebarTab === 'research'
+                        ? 'bg-teal-500/10 text-teal-400 border border-teal-500/20'
+                        : 'text-white/40 hover:text-white/60'
+                        }`}
+                    >
+                      <FileText className="w-4 h-4" />
+                      Research
+                      {researchReports.length > 0 && (
+                        <span className="bg-teal-500/20 text-teal-300 text-xs px-1.5 py-0.5 rounded-full">
+                          {researchReports.length}
+                        </span>
+                      )}
+                    </button>
+                  </div>
 
-                      <div className="flex gap-5">
-                        {/* Score Indicator */}
-                        <div className="shrink-0">
-                          <div className={`w-12 h-12 rounded-lg flex flex-col items-center justify-center border font-mono font-bold text-lg ${story.finalScore >= 9 ? 'bg-coral-500/20 border-coral-500/30 text-coral-400' :
-                            story.finalScore >= 7 ? 'bg-amber-500/20 border-amber-500/30 text-amber-400' :
-                              'bg-white/5 border-white/10 text-white/60'
-                            }`}>
-                            {story.finalScore}
+                  {/* Queue Tab Content */}
+                  {sidebarTab === 'queue' && (
+                    <>
+                      {selectedItems.length === 0 ? (
+                        <div className="flex-1 flex flex-col items-center justify-center text-center p-4 border-2 border-dashed border-white/5 rounded-xl">
+                          <div className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center mb-3">
+                            <Layers className="w-5 h-5 text-white/20" />
                           </div>
-                        </div>
-
-                        {/* Content */}
-                        <div className="flex-1 min-w-0 pt-0.5">
-                          <h3 className="text-base font-semibold text-white/90 leading-snug mb-2 group-hover:text-amber-300 transition-colors">
-                            {story.headline}
-                          </h3>
-                          <p className="text-sm text-white/50 line-clamp-2 mb-3 font-light leading-relaxed">
-                            {story.summary}
+                          <p className="text-sm text-white/40 font-light">
+                            Select stories to verify facts <br />and generate content.
                           </p>
-
-                          <div className="flex flex-wrap items-center gap-3">
-                            <Badge variant="outline" className="bg-transparent border-white/10 text-white/50 hover:text-white transition-colors text-xs font-normal">
-                              {story.category.replace('_', ' ')}
-                            </Badge>
-
-                            {story.crossSourceCount > 1 && (
-                              <div className="flex items-center gap-1.5 text-xs text-white/40">
-                                <Layers className="w-3 h-3" />
-                                {story.crossSourceCount} sources
-                              </div>
-                            )}
-
-                            {story.boosts.includes('+1 (recent)') && (
-                              <div className="flex items-center gap-1.5 text-xs text-teal-400/80">
-                                <Clock className="w-3 h-3" />
-                                Fresh
-                              </div>
-                            )}
-                          </div>
                         </div>
-
-                        {/* Action Area */}
-                        <div className="shrink-0 flex flex-col justify-start items-end gap-2">
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            className={`rounded-full w-10 h-10 transition-all duration-300 ${selectedIds.has(story.id)
-                              ? 'bg-amber-500 text-[#0B0B0F] hover:bg-amber-600'
-                              : 'bg-white/5 text-white/30 hover:text-amber-400 hover:bg-white/10'
-                              }`}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              toggleSelect(story);
-                            }}
-                          >
-                            {selectedIds.has(story.id) ? <Check className="w-5 h-5" /> : <MoveRight className="w-5 h-5" />}
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </ScrollArea>
-            </div>
-
-            {/* Sidebar (Research Queue / Research Panel) */}
-            <div className="col-span-4 h-full flex flex-col pt-14">
-              <div className="sticky top-24 bg-surface/80 backdrop-blur-xl border border-white/10 transition-all duration-300 rounded-2xl flex flex-col p-6 h-[600px] deco-corner-br">
-                {/* Tab Navigation */}
-                <div className="flex gap-1 p-1 bg-black/30 rounded-lg mb-4">
-                  <button
-                    onClick={() => setSidebarTab('queue')}
-                    className={`flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-md text-sm font-medium transition-all ${sidebarTab === 'queue'
-                      ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
-                      : 'text-white/40 hover:text-white/60'
-                      }`}
-                  >
-                    <ListChecks className="w-4 h-4" />
-                    Queue
-                    {selectedItems.length > 0 && (
-                      <span className="bg-amber-500/20 text-amber-300 text-xs px-1.5 py-0.5 rounded-full">
-                        {selectedItems.length}
-                      </span>
-                    )}
-                  </button>
-                  <button
-                    onClick={() => setSidebarTab('research')}
-                    className={`flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-md text-sm font-medium transition-all ${sidebarTab === 'research'
-                      ? 'bg-teal-500/10 text-teal-400 border border-teal-500/20'
-                      : 'text-white/40 hover:text-white/60'
-                      }`}
-                  >
-                    <FileText className="w-4 h-4" />
-                    Research
-                    {researchReports.length > 0 && (
-                      <span className="bg-teal-500/20 text-teal-300 text-xs px-1.5 py-0.5 rounded-full">
-                        {researchReports.length}
-                      </span>
-                    )}
-                  </button>
-                </div>
-
-                {/* Queue Tab Content */}
-                {sidebarTab === 'queue' && (
-                  <>
-                    {selectedItems.length === 0 ? (
-                      <div className="flex-1 flex flex-col items-center justify-center text-center p-4 border-2 border-dashed border-white/5 rounded-xl">
-                        <div className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center mb-3">
-                          <Layers className="w-5 h-5 text-white/20" />
-                        </div>
-                        <p className="text-sm text-white/40 font-light">
-                          Select stories to verify facts <br />and generate content.
-                        </p>
-                      </div>
-                    ) : (
-                      <>
-                        <ScrollArea className="flex-1 -mr-2 pr-2">
-                          <div className="space-y-2">
-                            {selectedItems.map((story, i) => (
-                              <div key={story.id} className="group flex items-start gap-3 p-3 rounded-lg hover:bg-white/5 transition-colors border border-transparent hover:border-white/5 cursor-default relative">
-                                <span className="text-amber-500/60 text-xs font-mono mt-1 w-4 text-right">{i + 1}</span>
-                                <div className="flex-1 min-w-0">
-                                  <p className="text-sm text-white/80 line-clamp-2 leading-snug">{story.headline}</p>
+                      ) : (
+                        <>
+                          <ScrollArea className="flex-1 -mr-2 pr-2">
+                            <div className="space-y-2">
+                              {selectedItems.map((story, i) => (
+                                <div key={story.id} className="group flex items-start gap-3 p-3 rounded-lg hover:bg-white/5 transition-colors border border-transparent hover:border-white/5 cursor-default relative">
+                                  <span className="text-amber-500/60 text-xs font-mono mt-1 w-4 text-right">{i + 1}</span>
+                                  <div className="flex-1 min-w-0">
+                                    <p className="text-sm text-white/80 line-clamp-2 leading-snug">{story.headline}</p>
+                                  </div>
+                                  <button
+                                    onClick={() => toggleSelect(story)}
+                                    className="absolute right-2 top-2 opacity-0 group-hover:opacity-100 text-white/20 hover:text-coral-400 transition-all"
+                                  >
+                                    <span className="sr-only">Remove</span>
+                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                                  </button>
                                 </div>
-                                <button
-                                  onClick={() => toggleSelect(story)}
-                                  className="absolute right-2 top-2 opacity-0 group-hover:opacity-100 text-white/20 hover:text-coral-400 transition-all"
-                                >
-                                  <span className="sr-only">Remove</span>
-                                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-                                </button>
-                              </div>
-                            ))}
+                              ))}
+                            </div>
+                          </ScrollArea>
+                          <div className="pt-4 mt-4 border-t border-white/5">
+                            <Button
+                              onClick={goToResearchPage}
+                              className="w-full bg-gradient-to-r from-amber-500 to-coral-500 hover:from-amber-400 hover:to-coral-400 text-[#0B0B0F] h-11 font-semibold text-sm border-0 shadow-glow-amber-sm"
+                            >
+                              <Sparkles className="w-4 h-4 mr-2" />
+                              Open Research Lab
+                              <ArrowRight className="w-4 h-4 ml-2" />
+                            </Button>
                           </div>
-                        </ScrollArea>
-                        <div className="pt-4 mt-4 border-t border-white/5">
-                          <Button
-                            onClick={goToResearchPage}
-                            className="w-full bg-gradient-to-r from-amber-500 to-coral-500 hover:from-amber-400 hover:to-coral-400 text-[#0B0B0F] h-11 font-semibold text-sm border-0 shadow-glow-amber-sm"
-                          >
-                            <Sparkles className="w-4 h-4 mr-2" />
-                            Open Research Lab
-                            <ArrowRight className="w-4 h-4 ml-2" />
-                          </Button>
-                        </div>
-                      </>
-                    )}
-                  </>
-                )}
+                        </>
+                      )}
+                    </>
+                  )}
 
-                {/* Research Tab Content */}
-                {sidebarTab === 'research' && (
-                  <ResearchPanel
-                    selectedStories={selectedItems}
-                    apiKey={apiKey}
-                    onReportGenerated={(report) => {
-                      setResearchReports(prev => {
-                        // Avoid duplicates
-                        if (prev.find(r => r.story.id === report.story.id)) {
-                          return prev.map(r => r.story.id === report.story.id ? report : r);
-                        }
-                        return [...prev, report];
-                      });
-                    }}
-                  />
-                )}
+                  {/* Research Tab Content */}
+                  {sidebarTab === 'research' && (
+                    <ResearchPanel
+                      selectedStories={selectedItems}
+                      apiKey={apiKey}
+                      onReportGenerated={(report) => {
+                        setResearchReports(prev => {
+                          // Avoid duplicates
+                          if (prev.find(r => r.story.id === report.story.id)) {
+                            return prev.map(r => r.story.id === report.story.id ? report : r);
+                          }
+                          return [...prev, report];
+                        });
+                      }}
+                    />
+                  )}
+                </div>
               </div>
             </div>
           </div>
-        </div>
-      )}
+        )
+      }
 
       {/* Modern Detail View */}
       <Dialog open={!!viewingStory} onOpenChange={(open) => !open && setViewingStory(null)}>
@@ -931,6 +956,6 @@ export default function Home() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+    </div >
   );
 }

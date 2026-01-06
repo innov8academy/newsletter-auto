@@ -3,6 +3,8 @@
 // Target: 18-40 year olds in Kerala who want to stay updated on AI
 
 import { ResearchReport } from './types';
+import { supabaseAdmin } from './supabase'; // RAG Support
+
 
 const OPENROUTER_API_URL = 'https://openrouter.ai/api/v1/chat/completions';
 
@@ -82,6 +84,8 @@ ${content}
 `;
     }).join('\n---\n');
 
+
+
     const systemPrompt = `You are Alex — a 25-year-old AI creator and entrepreneur from Kerala, India. You write "L8R by Innov8," an AI newsletter for young Malayalis (18-40) who want to stay updated on AI.
 
 ## WHO YOU ARE:
@@ -122,6 +126,33 @@ ${content}
 - Vague hedging (might, could potentially, remains to be seen)
 - Placeholder text like "Point 1" or "Impact 1" — ALWAYS write real content
 - Overly formal language`;
+
+    // RAG: Fetch past newsletters to use as style reference
+    let ragContext = "";
+    if (supabaseAdmin) {
+        try {
+            const { data: pastExamples } = await supabaseAdmin
+                .from('past_newsletters')
+                .select('content_text')
+                .order('imported_at', { ascending: false })
+                .limit(2);
+
+            if (pastExamples && pastExamples.length > 0) {
+                ragContext = `
+## RECENT EXAMPLE (GOLD STANDARD):
+Here is a recent newsletter you wrote. **MIMIC THIS VOICE, STRUCTURE, AND FORMATTING EXACTLY.**
+Notice how short the sentences are. Notice the emojis. Notice the "Bottom Line" sections.
+
+${pastExamples.map((ex: any, i: number) => `--- EXAMPLE ${i + 1} ---\n${ex.content_text.substring(0, 3000)}...`).join('\n\n')}
+`;
+            }
+        } catch (e) {
+            console.warn("Failed to fetch past newsletters for RAG:", e);
+        }
+    }
+
+    const finalSystemPrompt = systemPrompt + ragContext;
+
 
     const userPrompt = `Write a complete newsletter from these ${reports.length} AI stories:
 
@@ -230,9 +261,10 @@ appo adutha l8ril varam.. bie. ✌️
             body: JSON.stringify({
                 model: selectedModel,
                 messages: [
-                    { role: 'system', content: systemPrompt },
+                    { role: 'system', content: finalSystemPrompt },
                     { role: 'user', content: userPrompt },
                 ],
+
                 temperature: 0.7,
                 max_tokens: 8000,
             }),

@@ -45,31 +45,9 @@ function calculateSimilarity(text1: string, text2: string): number {
     return intersection.size / union.size;
 }
 
-// Scrape content from URL
-async function scrapeContent(url: string): Promise<string | null> {
-    try {
-        const response = await fetch(url, {
-            headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-            },
-        });
+import { scrapeUrl } from './firecrawl';
 
-        if (!response.ok) return null;
-
-        const html = await response.text();
-        return html
-            .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
-            .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
-            .replace(/<[^>]*>/g, ' ')
-            .replace(/&nbsp;/g, ' ')
-            .replace(/&amp;/g, '&')
-            .replace(/\s+/g, ' ')
-            .trim()
-            .substring(0, 12000);
-    } catch {
-        return null;
-    }
-}
+// [Deleted internal scrapeContent function]
 
 // Extract stories from a single news item using AI
 async function extractStories(
@@ -78,13 +56,17 @@ async function extractStories(
 ): Promise<RawExtractedStory[]> {
     let content = item.content || item.summary || '';
 
-    // Scrape if content is too short
-    if (content.length < 500 && item.url) {
-        const scraped = await scrapeContent(item.url);
-        if (scraped) content = scraped;
+    // INTELLIGENT UPGRADE:
+    // Always attempt to get more context if the initial feed content is thin.
+    // 600 chars is roughly 2 paragraphs. If less, we likely just have a teaser.
+    if (!content || content.length < 600 && item.url) {
+        const scrapeResult = await scrapeUrl(item.url);
+        if (scrapeResult.content && scrapeResult.content.length > 500) {
+            content = `[Full Content Retrieved via ${scrapeResult.method}]\n\n${scrapeResult.content}`;
+        }
     }
 
-    // If still no content, return as single story
+    // If still no content, return as single story (fallback)
     if (!content || content.length < 100) {
         return [{
             headline: item.title,
@@ -103,7 +85,7 @@ TITLE: ${item.title}
 DATE: ${item.publishedAt}
 
 CONTENT:
-${content.substring(0, 10000)}
+${content.substring(0, 15000)}
 
 Return JSON array only.`;
 
@@ -143,7 +125,8 @@ Return JSON array only.`;
             .replace(/```\n?/g, '')
             .trim();
 
-        return JSON.parse(cleanContent);
+        const parsed = JSON.parse(cleanContent);
+        return Array.isArray(parsed) ? parsed : [];
     } catch {
         return [{
             headline: item.title,
