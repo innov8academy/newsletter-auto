@@ -55,6 +55,11 @@ interface DraftGenerationResult {
     success: boolean;
     draft?: NewsletterDraft;
     error?: string;
+    ragInfo?: {
+        used: boolean;
+        newslettersFound: number;
+        newsletterNames: string[];
+    };
 }
 
 /**
@@ -129,15 +134,33 @@ ${content}
 
     // RAG: Fetch past newsletters to use as style reference
     let ragContext = "";
+    let ragInfo = { used: false, newslettersFound: 0, newsletterNames: [] as string[] };
+
+    console.log('[RAG] Attempting to fetch past newsletters from Supabase...');
+
     if (supabaseAdmin) {
         try {
-            const { data: pastExamples } = await supabaseAdmin
+            // First try ordering by imported_at, fallback to created_at or id
+            const { data: pastExamples, error: ragError } = await supabaseAdmin
                 .from('past_newsletters')
-                .select('content_text')
-                .order('imported_at', { ascending: false })
+                .select('content_text, file_name, imported_at')
+                .order('imported_at', { ascending: false, nullsFirst: false })
                 .limit(2);
 
-            if (pastExamples && pastExamples.length > 0) {
+            if (ragError) {
+                console.error('[RAG] Supabase query error:', ragError);
+            } else if (pastExamples && pastExamples.length > 0) {
+                console.log(`[RAG] ✅ Found ${pastExamples.length} past newsletters to use as examples!`);
+                pastExamples.forEach((ex: any, i: number) => {
+                    console.log(`[RAG]   ${i + 1}. ${ex.file_name} (imported: ${ex.imported_at || 'NO DATE'})`);
+                });
+
+                ragInfo = {
+                    used: true,
+                    newslettersFound: pastExamples.length,
+                    newsletterNames: pastExamples.map((ex: any) => ex.file_name || 'Unknown')
+                };
+
                 ragContext = `
 ## RECENT EXAMPLE (GOLD STANDARD):
 Here is a recent newsletter you wrote. **MIMIC THIS VOICE, STRUCTURE, AND FORMATTING EXACTLY.**
@@ -145,10 +168,15 @@ Notice how short the sentences are. Notice the emojis. Notice the "Bottom Line" 
 
 ${pastExamples.map((ex: any, i: number) => `--- EXAMPLE ${i + 1} ---\n${ex.content_text.substring(0, 3000)}...`).join('\n\n')}
 `;
+                console.log(`[RAG] Added ${ragContext.length} characters of context to prompt`);
+            } else {
+                console.warn('[RAG] ⚠️ No past newsletters found in database!');
             }
         } catch (e) {
-            console.warn("Failed to fetch past newsletters for RAG:", e);
+            console.error('[RAG] Failed to fetch past newsletters:', e);
         }
+    } else {
+        console.warn('[RAG] ⚠️ supabaseAdmin not configured - skipping RAG');
     }
 
     const finalSystemPrompt = systemPrompt + ragContext;
@@ -288,7 +316,7 @@ appo adutha l8ril varam.. bie. ✌️
 
         // Parse the generated content into structured format
         const draft = parseNewsletterDraft(content, reports);
-        return { success: true, draft };
+        return { success: true, draft, ragInfo };
 
     } catch (error) {
         console.error('Draft generation error:', error);

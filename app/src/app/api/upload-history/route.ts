@@ -34,7 +34,8 @@ export async function POST(req: NextRequest) {
             title: file.name.replace('.html', '').replace(/[-_]/g, ' '),
             file_name: file.name,
             content_html: htmlConfig.substring(0, 100000), // Cap just in case
-            content_text: textContent.substring(0, 50000) // Cap for token limits later
+            content_text: textContent.substring(0, 50000), // Cap for token limits later
+            imported_at: new Date().toISOString() // Required for RAG ordering
         });
 
         if (error) {

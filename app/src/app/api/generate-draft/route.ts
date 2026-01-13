@@ -47,6 +47,13 @@ export async function POST(request: NextRequest) {
         const cost = calculateCost(selectedModel, estimatedInputTokens, estimatedOutputTokens);
 
         if (result.success) {
+            // Log RAG status for confirmation
+            if (result.ragInfo?.used) {
+                console.log(`[Draft] ✅ RAG used! ${result.ragInfo.newslettersFound} past newsletters included: ${result.ragInfo.newsletterNames.join(', ')}`);
+            } else {
+                console.log('[Draft] ⚠️ RAG not used - no past newsletters found');
+            }
+
             return NextResponse.json({
                 success: true,
                 draft: result.draft,
@@ -54,6 +61,7 @@ export async function POST(request: NextRequest) {
                 cost,
                 costSource: 'draft',
                 model: selectedModel,
+                ragInfo: result.ragInfo, // Include RAG info in response
             });
         } else {
             return NextResponse.json(
