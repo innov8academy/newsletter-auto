@@ -37,7 +37,7 @@ interface EditableSectionProps {
 
 export function EditableSection({
     title,
-    content,
+    content = '',
     onUpdate,
     onRegenerate,
     placeholder = 'Enter content...',
@@ -158,7 +158,7 @@ export function EditableSection({
 
                                         {/* Current content preview */}
                                         <div className="p-2 rounded-lg bg-black/30 text-xs text-white/50 max-h-20 overflow-auto border border-white/5">
-                                            {content.slice(0, 150)}{content.length > 150 ? '...' : ''}
+                                            {(content || '').slice(0, 150)}{(content || '').length > 150 ? '...' : ''}
                                         </div>
 
                                         {/* Prompt input */}
