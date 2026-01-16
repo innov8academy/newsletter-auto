@@ -296,7 +296,7 @@ export function EditableBulletList({
     className = '',
 }: EditableBulletListProps) {
     const [isEditing, setIsEditing] = useState(false);
-    const [editValue, setEditValue] = useState(items.join('\n'));
+    const [editValue, setEditValue] = useState((items || []).join('\n'));
     const [isRegenerating, setIsRegenerating] = useState(false);
     const [regeneratePrompt, setRegeneratePrompt] = useState('');
     const [selectedModel, setSelectedModel] = useState<DraftModelId>('anthropic/claude-sonnet-4');
@@ -324,7 +324,7 @@ export function EditableBulletList({
     }, [isEditing]);
 
     function startEdit() {
-        setEditValue(items.join('\n'));
+        setEditValue((items || []).join('\n'));
         setIsEditing(true);
     }
 
@@ -335,7 +335,7 @@ export function EditableBulletList({
     }
 
     const cancelEdit = useCallback(() => {
-        setEditValue(items.join('\n'));
+        setEditValue((items || []).join('\n'));
         setIsEditing(false);
     }, [items]);
 
@@ -493,7 +493,7 @@ export function EditableBulletList({
                     className="space-y-1.5 cursor-text hover:bg-white/5 rounded-lg p-2 -m-2 transition-colors border border-transparent hover:border-white/5"
                     onClick={startEdit}
                 >
-                    {items.length > 0 ? items.map((item, i) => (
+                    {items && items.length > 0 ? items.map((item, i) => (
                         <li key={i} className="text-sm text-white/70 flex items-start gap-2">
                             <span className="text-amber-400/60 mt-0.5">•</span>
                             <span>{item}</span>

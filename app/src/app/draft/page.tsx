@@ -298,10 +298,10 @@ Key Points:
 ${story.bulletPoints.map(p => `• ${p}`).join('\n')}
 
 Why This Matters:
-${story.whyItMatters.map(p => `• ${p}`).join('\n')}
+${(story.whyItMatters || []).map(p => `• ${p}`).join('\n')}
 
 What's Next:
-${story.whatsNext.map(p => `• ${p}`).join('\n')}
+${(story.whatsNext || []).map(p => `• ${p}`).join('\n')}
 `.trim();
     }
 
@@ -353,7 +353,7 @@ ${story.whatsNext.map(p => `• ${p}`).join('\n')}
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                currentContent: currentItems.join('\n'),
+                currentContent: (currentItems || []).join('\n'),
                 userPrompt: prompt,
                 sectionType,
                 modelId: model,
@@ -882,7 +882,7 @@ ${story.whatsNext.map(p => `• ${p}`).join('\n')}
                                         </div>
 
                                         {/* In Today's Post - TOC */}
-                                        {draft.toc && draft.toc.length > 0 && (
+                                        {draft.toc && Array.isArray(draft.toc) && draft.toc.length > 0 && (
                                             <div className="bg-black/30 rounded-xl p-5 border border-white/5">
                                                 <h3 className="text-sm font-semibold text-white/70 mb-3">In today's post:</h3>
                                                 <ul className="space-y-2">
