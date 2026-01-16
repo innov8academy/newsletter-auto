@@ -402,7 +402,7 @@ export function EditableBulletList({
 
                                         {/* Current items preview */}
                                         <div className="p-2 rounded-lg bg-black/30 text-xs text-white/50 max-h-20 overflow-auto border border-white/5">
-                                            {items.map((item, i) => (
+                                            {(items || []).map((item, i) => (
                                                 <div key={i}>• {item}</div>
                                             ))}
                                         </div>
