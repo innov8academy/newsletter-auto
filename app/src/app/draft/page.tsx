@@ -295,7 +295,7 @@ Story Title: ${story.title}
 Hook: ${story.hookParagraph}
 
 Key Points:
-${story.bulletPoints.map(p => `• ${p}`).join('\n')}
+${(story.bulletPoints || []).map(p => `• ${p}`).join('\n')}
 
 Why This Matters:
 ${(story.whyItMatters || []).map(p => `• ${p}`).join('\n')}
@@ -897,7 +897,7 @@ ${(story.whatsNext || []).map(p => `• ${p}`).join('\n')}
                                         )}
 
                                         {/* Stories */}
-                                        {draft.stories.map((story, storyIndex) => (
+                                        {draft.stories && draft.stories.map((story, storyIndex) => (
                                             <div key={storyIndex} className={`bg-black/30 rounded-xl p-5 border border-white/5 space-y-4 border-accent-left hover:border-amber-500/20 transition-colors relative ${regeneratingStoryIndex === storyIndex ? 'ring-2 ring-amber-500/50 animate-pulse' : ''}`}>
 
                                                 {/* Story Controls Toolbar - REGENERATION UI */}
