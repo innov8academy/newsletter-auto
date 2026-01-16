@@ -20,16 +20,18 @@ import {
 import {
     ArrowLeft,
     Check,
+    ChevronDown,
+    ChevronUp,
     Download,
-    Eye,
     Image as ImageIcon,
     Loader2,
     Maximize2,
-    RefreshCw,
+    Plus,
     Sparkles,
     Trash2,
     Wand2,
     Upload,
+    X,
 } from 'lucide-react';
 
 const IMAGE_MODELS = [
@@ -47,7 +49,12 @@ export default function StudioPage() {
     const [generatedPrompts, setGeneratedPrompts] = useState<{ [key: number]: string }>({});
     const [generatingStates, setGeneratingStates] = useState<{ [key: number]: boolean }>({});
     const [globalModel, setGlobalModel] = useState<string>('google/gemini-3-pro-image-preview');
-    const [useStyleRefs, setUseStyleRefs] = useState(true); // NEW: Toggle for style references
+    const [useStyleRefs, setUseStyleRefs] = useState(true);
+
+    // Prompt Builder state
+    const [userIdeas, setUserIdeas] = useState<{ [key: number]: string }>({});
+    const [referenceImages, setReferenceImages] = useState<{ [key: number]: { file: File; preview: string }[] }>({});
+    const [storyContextExpanded, setStoryContextExpanded] = useState(false);
 
     // Load draft from localStorage on mount
     useEffect(() => {
@@ -184,13 +191,76 @@ export default function StudioPage() {
         }
     }
 
-    // Generate Prompt for a Story
+    // Reference image handlers
+    function handleReferenceImageUpload(index: number, files: FileList | null) {
+        if (!files) return;
+
+        const currentImages = referenceImages[index] || [];
+        const newImages: { file: File; preview: string }[] = [];
+
+        Array.from(files).slice(0, 3 - currentImages.length).forEach(file => {
+            if (file.type.startsWith('image/')) {
+                newImages.push({
+                    file,
+                    preview: URL.createObjectURL(file)
+                });
+            }
+        });
+
+        setReferenceImages(prev => ({
+            ...prev,
+            [index]: [...currentImages, ...newImages].slice(0, 3)
+        }));
+    }
+
+    function removeReferenceImage(storyIndex: number, imageIndex: number) {
+        setReferenceImages(prev => {
+            const current = prev[storyIndex] || [];
+            URL.revokeObjectURL(current[imageIndex]?.preview); // Cleanup
+            return {
+                ...prev,
+                [storyIndex]: current.filter((_, i) => i !== imageIndex)
+            };
+        });
+    }
+
+    function clearAllPromptBuilder(index: number) {
+        setUserIdeas(prev => ({ ...prev, [index]: '' }));
+        setReferenceImages(prev => {
+            const current = prev[index] || [];
+            current.forEach(img => URL.revokeObjectURL(img.preview));
+            return { ...prev, [index]: [] };
+        });
+    }
+
+    // Convert File to base64
+    async function fileToBase64(file: File): Promise<{ base64: string; mimeType: string }> {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => {
+                const result = reader.result as string;
+                const base64 = result.split(',')[1];
+                resolve({ base64, mimeType: file.type });
+            };
+            reader.onerror = reject;
+            reader.readAsDataURL(file);
+        });
+    }
+
+    // Generate Prompt for a Story (with user ideas + reference images)
     async function generatePrompt(index: number) {
         if (!draft) return;
         setGeneratingStates(prev => ({ ...prev, [index]: true }));
 
         const story = draft.stories[index];
+        const ideas = userIdeas[index] || '';
+        const refImages = referenceImages[index] || [];
+
         try {
+            // Convert reference images to base64
+            const imageDataPromises = refImages.map(img => fileToBase64(img.file));
+            const imageData = await Promise.all(imageDataPromises);
+
             const promptRes = await fetch('/api/generate-image-prompt', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -198,6 +268,8 @@ export default function StudioPage() {
                     sectionText: `${story.title}\n\n${story.hookParagraph}\n\n${story.bulletPoints.join('\n')}`,
                     styleContext: 'Tech-forward, vibrant, minimal UI elements, cinematic lighting, 16:9 aspect ratio',
                     newsletterContext: 'L8R by Innov8 - Daily Tech Newsletter',
+                    userIdeas: ideas,
+                    referenceImages: imageData,
                     apiKey
                 })
             });
@@ -231,13 +303,18 @@ export default function StudioPage() {
 
         const story = draft.stories[index];
         const storyText = `${story.title}\n\n${story.hookParagraph}\n\n${story.bulletPoints.join('\n')}`;
+        const refImages = referenceImages[index] || [];
 
         // Check if user already has a custom prompt
         const existingPrompt = generatedPrompts[index];
         const hasCustomPrompt = existingPrompt && existingPrompt.trim().length > 0;
 
         try {
-            console.log(`Studio: Generating styled image with ${globalModel}, styleRefs: ${useStyleRefs}, hasCustomPrompt: ${hasCustomPrompt}`);
+            // Convert reference images to base64 for API
+            const imageDataPromises = refImages.map(img => fileToBase64(img.file));
+            const imageData = await Promise.all(imageDataPromises);
+
+            console.log(`Studio: Generating styled image with ${globalModel}, styleRefs: ${useStyleRefs}, hasCustomPrompt: ${hasCustomPrompt}, refImages: ${imageData.length}`);
 
             const res = await fetch('/api/generate-styled-image', {
                 method: 'POST',
@@ -249,7 +326,9 @@ export default function StudioPage() {
                     useStyleRefs,
                     // If user has a custom prompt, use it directly and skip prompt generation
                     customPrompt: hasCustomPrompt ? existingPrompt : undefined,
-                    useCreativePrompt: !hasCustomPrompt // Only generate if no custom prompt
+                    useCreativePrompt: !hasCustomPrompt, // Only generate if no custom prompt
+                    // Pass reference images for content incorporation
+                    referenceImages: imageData.length > 0 ? imageData : undefined
                 })
             });
 
@@ -390,29 +469,135 @@ export default function StudioPage() {
                     <div className="flex-1 p-8 flex items-center justify-center">
                         <div className="w-full max-w-4xl flex gap-8 h-[60vh]">
 
-                            {/* Prompt Editor (Left Half) */}
-                            <div className="flex-1 flex flex-col gap-4">
-                                <div className="bg-black/40 rounded-xl border border-white/10 p-4 flex-1 flex flex-col">
-                                    <div className="flex items-center justify-between mb-2">
-                                        <label className="text-xs font-semibold text-white/40 uppercase">Image Prompt</label>
+                            {/* Prompt Builder (Left Half) */}
+                            <div className="flex-1 flex flex-col gap-3 overflow-hidden">
+                                <div className="bg-black/40 rounded-xl border border-white/10 p-4 flex-1 flex flex-col overflow-y-auto">
+                                    {/* Header */}
+                                    <div className="flex items-center justify-between mb-3">
+                                        <h3 className="text-sm font-semibold text-white flex items-center gap-2">
+                                            <Sparkles className="w-4 h-4 text-purple-400" />
+                                            Prompt Builder
+                                        </h3>
                                         <Button
                                             variant="ghost"
                                             size="sm"
-                                            onClick={() => generatePrompt(selectedStoryIndex)}
-                                            disabled={generatingStates[selectedStoryIndex]}
-                                            className="h-6 text-xs text-purple-400 hover:text-purple-300 hover:bg-purple-500/10"
+                                            onClick={() => clearAllPromptBuilder(selectedStoryIndex)}
+                                            className="h-6 text-xs text-white/40 hover:text-white hover:bg-white/10"
                                         >
-                                            <Sparkles className="w-3 h-3 mr-1" />
-                                            {generatedPrompts[selectedStoryIndex] ? 'Regenerate Prompt' : 'Auto-Generate Info'}
+                                            Clear All
                                         </Button>
                                     </div>
-                                    <Textarea
-                                        value={generatedPrompts[selectedStoryIndex] || ''}
-                                        onChange={(e) => setGeneratedPrompts(prev => ({ ...prev, [selectedStoryIndex]: e.target.value }))}
-                                        placeholder="Enter a prompt or click Auto-Generate..."
-                                        className="flex-1 bg-black/20 border-white/5 resize-none text-sm leading-relaxed focus:border-purple-500/50"
-                                    />
-                                    <div className="mt-4 pt-4 border-t border-white/5">
+
+                                    {/* Story Context (Collapsible) */}
+                                    <div className="mb-3">
+                                        <button
+                                            onClick={() => setStoryContextExpanded(!storyContextExpanded)}
+                                            className="w-full flex items-center justify-between p-2 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 transition-colors"
+                                        >
+                                            <span className="text-xs font-medium text-white/60 flex items-center gap-2">
+                                                📰 Story Context (auto-loaded)
+                                            </span>
+                                            {storyContextExpanded ? (
+                                                <ChevronUp className="w-4 h-4 text-white/40" />
+                                            ) : (
+                                                <ChevronDown className="w-4 h-4 text-white/40" />
+                                            )}
+                                        </button>
+                                        {storyContextExpanded && (
+                                            <div className="mt-2 p-3 rounded-lg bg-white/5 border border-white/5 text-xs text-white/60 max-h-32 overflow-y-auto">
+                                                <p className="font-medium text-white/80 mb-1">{selectedStory.title}</p>
+                                                <p className="mb-2">{selectedStory.hookParagraph}</p>
+                                                <ul className="list-disc list-inside space-y-1">
+                                                    {selectedStory.bulletPoints.map((bp, i) => (
+                                                        <li key={i}>{bp}</li>
+                                                    ))}
+                                                </ul>
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* Your Ideas */}
+                                    <div className="mb-3">
+                                        <label className="text-xs font-medium text-white/60 mb-1.5 block flex items-center gap-1">
+                                            💭 Your Ideas
+                                        </label>
+                                        <Textarea
+                                            value={userIdeas[selectedStoryIndex] || ''}
+                                            onChange={(e) => setUserIdeas(prev => ({ ...prev, [selectedStoryIndex]: e.target.value }))}
+                                            placeholder="Describe how to merge reference images with this story... e.g., 'Use this meme character looking shocked at the Bitcoin price'"
+                                            className="bg-black/30 border-white/10 resize-none text-sm h-20 focus:border-purple-500/50"
+                                        />
+                                    </div>
+
+                                    {/* Reference Images */}
+                                    <div className="mb-3">
+                                        <label className="text-xs font-medium text-white/60 mb-1.5 block flex items-center gap-1">
+                                            🖼️ Reference Images <span className="text-white/30">(optional, max 3)</span>
+                                        </label>
+                                        <div className="flex gap-2 flex-wrap">
+                                            {(referenceImages[selectedStoryIndex] || []).map((img, i) => (
+                                                <div key={i} className="relative w-16 h-16 rounded-lg overflow-hidden border border-white/20 group">
+                                                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                                                    <img src={img.preview} alt={`Ref ${i + 1}`} className="w-full h-full object-cover" />
+                                                    <button
+                                                        onClick={() => removeReferenceImage(selectedStoryIndex, i)}
+                                                        className="absolute top-0 right-0 p-0.5 bg-red-500 rounded-bl-lg opacity-0 group-hover:opacity-100 transition-opacity"
+                                                    >
+                                                        <X className="w-3 h-3 text-white" />
+                                                    </button>
+                                                </div>
+                                            ))}
+                                            {(referenceImages[selectedStoryIndex]?.length || 0) < 3 && (
+                                                <label className="w-16 h-16 rounded-lg border-2 border-dashed border-white/20 flex flex-col items-center justify-center cursor-pointer hover:border-purple-400/50 hover:bg-purple-500/10 transition-colors">
+                                                    <Plus className="w-5 h-5 text-white/40" />
+                                                    <span className="text-[10px] text-white/40 mt-0.5">Upload</span>
+                                                    <input
+                                                        type="file"
+                                                        accept="image/*"
+                                                        multiple
+                                                        className="hidden"
+                                                        onChange={(e) => handleReferenceImageUpload(selectedStoryIndex, e.target.files)}
+                                                    />
+                                                </label>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    {/* Generate Prompt Button */}
+                                    <Button
+                                        size="sm"
+                                        className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white mb-3"
+                                        onClick={() => generatePrompt(selectedStoryIndex)}
+                                        disabled={generatingStates[selectedStoryIndex]}
+                                    >
+                                        {generatingStates[selectedStoryIndex] ? (
+                                            <>
+                                                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                                Generating Prompt...
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Sparkles className="w-4 h-4 mr-2" />
+                                                ✨ Generate Prompt (Story + Ideas + Images)
+                                            </>
+                                        )}
+                                    </Button>
+
+                                    {/* Generated Prompt (Editable) */}
+                                    <div className="flex-1 flex flex-col min-h-0">
+                                        <label className="text-xs font-medium text-white/60 mb-1.5 block flex items-center gap-1">
+                                            🎯 Generated Prompt <span className="text-white/30">(editable)</span>
+                                        </label>
+                                        <Textarea
+                                            value={generatedPrompts[selectedStoryIndex] || ''}
+                                            onChange={(e) => setGeneratedPrompts(prev => ({ ...prev, [selectedStoryIndex]: e.target.value }))}
+                                            placeholder="Prompt will appear here after generation, or type your own..."
+                                            className="flex-1 bg-black/30 border-white/10 resize-none text-sm leading-relaxed focus:border-purple-500/50 min-h-[80px]"
+                                        />
+                                    </div>
+
+                                    {/* Generate Image Button */}
+                                    <div className="mt-3 pt-3 border-t border-white/5">
                                         <Button
                                             size="lg"
                                             className="w-full bg-purple-600 hover:bg-purple-500 text-white shadow-lg shadow-purple-900/20"
@@ -427,7 +612,7 @@ export default function StudioPage() {
                                             ) : (
                                                 <>
                                                     <Wand2 className="w-4 h-4 mr-2" />
-                                                    Generate Image
+                                                    🪄 Generate Image
                                                 </>
                                             )}
                                         </Button>

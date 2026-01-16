@@ -64,6 +64,48 @@ export function buildMultimodalContent(
 }
 
 /**
+ * Build multimodal content with reference images for CONTENT incorporation
+ * These images are meant to be analyzed for their subjects/characters to include in generation
+ */
+export function buildContentWithReferences(
+    prompt: string,
+    styleImages: { base64: string; mimeType: string }[],
+    referenceImages?: { base64: string; mimeType: string }[]
+): unknown[] {
+    const content: unknown[] = [];
+
+    // Add style reference images first (for aesthetic matching)
+    for (const img of styleImages) {
+        content.push({
+            type: 'image_url',
+            image_url: {
+                url: `data:${img.mimeType};base64,${img.base64}`
+            }
+        });
+    }
+
+    // Add reference images (for content/character incorporation)
+    if (referenceImages && referenceImages.length > 0) {
+        for (const img of referenceImages) {
+            content.push({
+                type: 'image_url',
+                image_url: {
+                    url: `data:${img.mimeType};base64,${img.base64}`
+                }
+            });
+        }
+    }
+
+    // Add the text prompt last
+    content.push({
+        type: 'text',
+        text: prompt
+    });
+
+    return content;
+}
+
+/**
  * Generate a creative prompt using the Art Director approach
  * Uses metaphorical thinking and structured Lo-Fi editorial output
  */

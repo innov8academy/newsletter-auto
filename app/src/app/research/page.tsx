@@ -74,7 +74,7 @@ export default function ResearchPage() {
     const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
     // Model selection
-    const [selectedModel, setSelectedModel] = useState<ResearchModelId>('perplexity/sonar-deep-research');
+    const [selectedModel, setSelectedModel] = useState<ResearchModelId>('x-ai/grok-4.1-fast');
 
     // Manual topic input
     const [customTopic, setCustomTopic] = useState('');

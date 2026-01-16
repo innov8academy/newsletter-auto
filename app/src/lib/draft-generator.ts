@@ -18,7 +18,8 @@ export const DRAFT_MODELS = [
 ] as const;
 
 export type DraftModelId = typeof DRAFT_MODELS[number]['id'];
-export const DEFAULT_DRAFT_MODEL: DraftModelId = 'anthropic/claude-sonnet-4';
+export const DEFAULT_DRAFT_MODEL: DraftModelId = 'google/gemini-3-pro-preview';
+export const DEFAULT_INTRO_MODEL: DraftModelId = 'anthropic/claude-sonnet-4';
 
 // Newsletter draft structure
 export interface NewsletterDraft {
@@ -60,6 +61,10 @@ interface DraftGenerationResult {
         newslettersFound: number;
         newsletterNames: string[];
     };
+    modelsUsed?: {
+        intro: DraftModelId;
+        stories: DraftModelId;
+    };
 }
 
 /**
@@ -69,13 +74,18 @@ interface DraftGenerationResult {
 export async function generateNewsletterDraft(
     reports: ResearchReport[],
     apiKey: string,
-    modelId?: DraftModelId
+    modelId?: DraftModelId,
+    introModelId?: DraftModelId,
+    currentDate?: string
 ): Promise<DraftGenerationResult> {
     if (reports.length === 0) {
         return { success: false, error: 'No research reports provided' };
     }
 
-    const selectedModel = modelId || DEFAULT_DRAFT_MODEL;
+    // Use different models: Claude Sonnet for intro/title, Gemini 3 Pro for stories
+    const storyModel = modelId || DEFAULT_DRAFT_MODEL;
+    const introModel = introModelId || DEFAULT_INTRO_MODEL;
+    const dateContext = currentDate || new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
 
     // Create a clean summary of each research report to pass to AI
     const researchSummaries = reports.map((r, i) => {
@@ -92,6 +102,9 @@ ${content}
 
 
     const systemPrompt = `You are Alex — a 25-year-old AI creator and entrepreneur from Kerala, India. You write "L8R by Innov8," an AI newsletter for young Malayalis (18-40) who want to stay updated on AI.
+
+## CURRENT DATE: ${dateContext}
+⚠️ CRITICAL: Today is ${dateContext}. Verify ALL date references. Do NOT say "Q1 2025" or use outdated timelines. We are in 2026.
 
 ## WHO YOU ARE:
 - CS grad turned content creator (YouTube, Instagram, Newsletter)
@@ -130,6 +143,7 @@ ${content}
 - Corporate speak (synergy, leverage, paradigm, ecosystem)
 - Vague hedging (might, could potentially, remains to be seen)
 - Placeholder text like "Point 1" or "Impact 1" — ALWAYS write real content
+- Outdated date references (we are in ${dateContext}, not 2024 or early 2025)
 - Overly formal language`;
 
     // RAG: Fetch past newsletters to use as style reference
@@ -282,41 +296,157 @@ appo adutha l8ril varam.. bie. ✌️
 8. **Max 4 bullets per section.** Less is more.`;
 
     try {
-        const response = await fetch(OPENROUTER_API_URL, {
+        console.log(`[Draft] Phase 1: Generating intro with ${introModel}`);
+        console.log(`[Draft] Phase 2: Will generate stories with ${storyModel}`);
+
+        // PHASE 1: Generate intro content with Claude Sonnet
+        const introPrompt = `Write ONLY the intro portion of the newsletter:
+
+${researchSummaries}
+
+## GENERATE THESE SECTIONS ONLY:
+
+# [CATCHY TITLE BASED ON MAIN STORY]
+
+PLUS: [Short teaser for story 2] | [Short teaser for story 3]
+
+---
+
+## 🎭 MEME IDEAS (3 distinct concepts based on main story)
+
+For each:
+- **Template:** [Meme template name]
+- **Top Text:** [Setup]
+- **Bottom Text:** [Punchline]  
+- **Angle:** [Why it's funny]
+
+---
+
+## INTRO
+
+Start with MAIN STORY hook (2-3 punchy sentences). Then tease other stories. End with:
+"I'm Alex. Welcome to **L8R by Innov8**. Let's dive deep 🧠👇"
+
+---
+
+**In today's post:**
+• 🎬 [Story 1 title]
+• 💰 [Story 2 title]
+• 📰 [Story 3 title]
+
+---
+
+STOP HERE. Do NOT write the story sections.`;
+
+        const introResponse = await fetch(OPENROUTER_API_URL, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${apiKey}`,
                 'HTTP-Referer': 'https://innov8ai.local',
-                'X-Title': 'Innov8 AI Draft Generator',
+                'X-Title': 'Innov8 AI Draft Generator - Intro',
             },
             body: JSON.stringify({
-                model: selectedModel,
+                model: introModel,
                 messages: [
                     { role: 'system', content: finalSystemPrompt },
-                    { role: 'user', content: userPrompt },
+                    { role: 'user', content: introPrompt },
                 ],
-
                 temperature: 0.7,
-                max_tokens: 8000,
+                max_tokens: 2500,
             }),
         });
 
-        if (!response.ok) {
-            const errorText = await response.text();
-            return { success: false, error: `API Error (${selectedModel}): ${response.status} - ${errorText}` };
+        if (!introResponse.ok) {
+            const errorText = await introResponse.text();
+            return { success: false, error: `Intro API Error (${introModel}): ${introResponse.status} - ${errorText}` };
         }
 
-        const data = await response.json();
-        const content = data.choices?.[0]?.message?.content;
+        const introData = await introResponse.json();
+        const introContent = introData.choices?.[0]?.message?.content || '';
 
-        if (!content) {
-            return { success: false, error: 'No content in API response' };
+        console.log(`[Draft] Phase 1 complete. Intro generated.`);
+
+        // PHASE 2: Generate story sections with Gemini 3 Pro
+        const storiesPrompt = `Continue the newsletter. Write ONLY the story sections and summary:
+
+${researchSummaries}
+
+The intro has already been written. Now write:
+
+## FOR EACH STORY:
+
+### [Emoji] [Story Title]
+
+[HOOK: 2-3 sentences explaining what happened]
+
+**🔍 Key Points:**
+• [Fact 1 - ONE sentence]
+• [Fact 2 - ONE sentence]
+• [Fact 3 - ONE sentence]
+
+**🚨 Why This Matters:**
+• [Impact on readers]
+• [Bigger picture]
+• [What to do]
+
+**⏭️ What's Next:**
+• [Future prediction]
+• [Timeline]
+• [Who's affected]
+
+---
+
+### 🚀 Quick L8R Summary
+
+• **[Story 1]:** [1 punchy sentence]
+• **[Story 2]:** [1 punchy sentence]
+• **[Story 3]:** [1 punchy sentence]
+
+---
+
+Ithrollu innathe AI Update.
+appo adutha l8ril varam.. bie. ✌️`;
+
+        const storiesResponse = await fetch(OPENROUTER_API_URL, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${apiKey}`,
+                'HTTP-Referer': 'https://innov8ai.local',
+                'X-Title': 'Innov8 AI Draft Generator - Stories',
+            },
+            body: JSON.stringify({
+                model: storyModel,
+                messages: [
+                    { role: 'system', content: finalSystemPrompt },
+                    { role: 'user', content: storiesPrompt },
+                ],
+                temperature: 0.7,
+                max_tokens: 6000,
+            }),
+        });
+
+        if (!storiesResponse.ok) {
+            const errorText = await storiesResponse.text();
+            return { success: false, error: `Stories API Error (${storyModel}): ${storiesResponse.status} - ${errorText}` };
+        }
+
+        const storiesData = await storiesResponse.json();
+        const storiesContent = storiesData.choices?.[0]?.message?.content || '';
+
+        console.log(`[Draft] Phase 2 complete. Stories generated.`);
+
+        // Combine both responses
+        const fullContent = introContent + '\n\n' + storiesContent;
+
+        if (!fullContent.trim()) {
+            return { success: false, error: 'No content in API responses' };
         }
 
         // Parse the generated content into structured format
-        const draft = parseNewsletterDraft(content, reports);
-        return { success: true, draft, ragInfo };
+        const draft = parseNewsletterDraft(fullContent, reports);
+        return { success: true, draft, ragInfo, modelsUsed: { intro: introModel, stories: storyModel } };
 
     } catch (error) {
         console.error('Draft generation error:', error);

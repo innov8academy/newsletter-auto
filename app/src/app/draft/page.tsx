@@ -60,7 +60,7 @@ export default function DraftPage() {
     const [draft, setDraft] = useState<NewsletterDraft | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [copied, setCopied] = useState(false);
-    const [selectedModel, setSelectedModel] = useState<DraftModelId>('anthropic/claude-sonnet-4');
+    const [selectedModel, setSelectedModel] = useState<DraftModelId>('google/gemini-3-pro-preview');
 
     // Story regeneration state
     const [regeneratingStoryIndex, setRegeneratingStoryIndex] = useState<number | null>(null);

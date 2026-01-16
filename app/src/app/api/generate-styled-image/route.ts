@@ -1,12 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { loadStyleReferences, buildMultimodalContent, generateCreativePrompt } from '@/lib/image-pipeline';
+import { loadStyleReferences, buildContentWithReferences, generateCreativePrompt } from '@/lib/image-pipeline';
 import { calculateCost } from '@/lib/cost-tracker';
 
 export async function POST(request: NextRequest) {
     console.log('API: generate-styled-image called');
 
     try {
-        const { storyText, model, apiKey: clientApiKey, useStyleRefs = true, useCreativePrompt = true, customPrompt } = await request.json();
+        const {
+            storyText,
+            model,
+            apiKey: clientApiKey,
+            useStyleRefs = true,
+            useCreativePrompt = true,
+            customPrompt,
+            referenceImages // NEW: Reference images for content incorporation
+        } = await request.json();
 
         const apiKey = clientApiKey || process.env.OPENROUTER_API_KEY || '';
 
@@ -18,6 +26,14 @@ export async function POST(request: NextRequest) {
         }
 
         const selectedModel = model || 'google/gemini-3-pro-image-preview';
+        const hasReferenceImages = referenceImages && referenceImages.length > 0;
+
+        console.log('API: Starting styled image generation', {
+            model: selectedModel,
+            useStyleRefs,
+            hasCustomPrompt: !!customPrompt,
+            referenceImageCount: referenceImages?.length || 0
+        });
 
         // Step 1: Use custom prompt if provided, otherwise generate one
         let finalPrompt = storyText;
@@ -37,9 +53,8 @@ export async function POST(request: NextRequest) {
             styleImages = loadStyleReferences();
         }
 
-        // Step 3: Build multimodal content
-        const multimodalContent = buildMultimodalContent(
-            `CRITICAL STYLE INSTRUCTION: Generate an image that EXACTLY matches the visual style of the reference images provided.
+        // Step 3: Build the prompt with reference image instructions
+        let imagePrompt = `CRITICAL STYLE INSTRUCTION: Generate an image that EXACTLY matches the visual style of the style reference images provided.
 
 The style is "Lo-Fi Digital Grit & Editorial Collage" with these MANDATORY elements:
 - Heavy halftone dot patterns and digital noise/grain textures
@@ -49,15 +64,31 @@ The style is "Lo-Fi Digital Grit & Editorial Collage" with these MANDATORY eleme
 - Raw, urgent, retro-futuristic, slightly dystopian feel
 - 16:9 aspect ratio
 
-STUDY THE REFERENCE IMAGES CAREFULLY and replicate their exact aesthetic.
+STUDY THE STYLE REFERENCE IMAGES CAREFULLY and replicate their exact aesthetic.`;
 
-Now create an image in THIS EXACT STYLE that visualizes: ${finalPrompt}`,
-            styleImages
+        // Add reference image instructions if present
+        if (hasReferenceImages) {
+            imagePrompt += `
+
+CONTENT INCORPORATION INSTRUCTION: You have also been provided with REFERENCE IMAGES containing specific characters, people, or elements. 
+You MUST incorporate the visual appearance, pose, expression, or key elements from these reference images into the final generated image.
+Merge these reference elements naturally with the scene described below, maintaining the Lo-Fi editorial style.`;
+        }
+
+        imagePrompt += `
+
+Now create an image in THIS EXACT STYLE that visualizes: ${finalPrompt}`;
+
+        // Step 4: Build multimodal content with both style refs and reference images
+        const multimodalContent = buildContentWithReferences(
+            imagePrompt,
+            styleImages,
+            hasReferenceImages ? referenceImages : undefined
         );
 
-        console.log('API: Sending multimodal request to', selectedModel, 'with', styleImages.length, 'style refs');
+        console.log('API: Sending multimodal request to', selectedModel, 'with', styleImages.length, 'style refs and', referenceImages?.length || 0, 'content refs');
 
-        // Step 4: Send to Gemini
+        // Step 5: Send to Gemini
         const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
             method: 'POST',
             headers: {
@@ -86,7 +117,7 @@ Now create an image in THIS EXACT STYLE that visualizes: ${finalPrompt}`,
         const data = await response.json();
         console.log('API: Received response from model');
 
-        // Step 5: Extract image URL
+        // Step 6: Extract image URL
         let imageUrl = '';
 
         // Check for direct image array (OpenRouter format)
@@ -113,6 +144,7 @@ Now create an image in THIS EXACT STYLE that visualizes: ${finalPrompt}`,
             imageUrl,
             prompt: finalPrompt,
             styleRefsUsed: styleImages.length,
+            contentRefsUsed: referenceImages?.length || 0,
             cost,
             costSource: 'image-gen',
             model: selectedModel,
