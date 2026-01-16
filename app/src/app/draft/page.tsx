@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { ResearchReport } from '@/lib/types';
 import { NewsletterDraft, DRAFT_MODELS, DraftModelId, StoryBlock } from '@/lib/draft-generator';
 import { EditableSection, EditableBulletList } from '@/components/EditableSection';
+import { SectionGenerator, EmptySectionPlaceholder } from '@/components/SectionGenerator';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -65,8 +66,11 @@ export default function DraftPage() {
     // Story regeneration state
     const [regeneratingStoryIndex, setRegeneratingStoryIndex] = useState<number | null>(null);
     const [storyRegenPrompt, setStoryRegenPrompt] = useState('');
-    const [storyRegenModel, setStoryRegenModel] = useState<DraftModelId>('anthropic/claude-sonnet-4');
+    const [storyRegenModel, setStoryRegenModel] = useState<DraftModelId>('google/gemini-3-pro-preview');
     const [storyPopoverOpen, setStoryPopoverOpen] = useState<number | null>(null);
+
+    // Section generation state
+    const [generatingSections, setGeneratingSections] = useState<Set<string>>(new Set());
 
     // Load reports on mount AND restore draft if available
     useEffect(() => {
@@ -121,6 +125,116 @@ export default function DraftPage() {
             localStorage.setItem('selectedReports', JSON.stringify(reportIds));
         }
     }, [selectedReports]);
+
+    // Create empty draft structure when reports are selected but no draft exists
+    function initializeEmptyDraft() {
+        const emptyDraft: NewsletterDraft = {
+            title: '',
+            subtitle: '',
+            date: new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }),
+            memeIdeas: [],
+            intro: '',
+            toc: [],
+            stories: selectedReports.map((_, i) => ({
+                emoji: ['🧠', '💰', '🤖', '🔥'][i % 4],
+                title: '',
+                hookParagraph: '',
+                bulletPoints: [],
+                whyItMatters: [],
+                whatsNext: [],
+            })),
+            quickSummary: '',
+            rawMarkdown: '',
+        };
+        setDraft(emptyDraft);
+    }
+
+    // Handle generated section content
+    function handleSectionGenerated(sectionType: string, content: string, storyIndex?: number) {
+        // If no draft exists, initialize one first
+        if (!draft) {
+            initializeEmptyDraft();
+        }
+
+        setDraft(prev => {
+            if (!prev) return prev;
+
+            switch (sectionType) {
+                case 'title':
+                    // Parse title and subtitle from content
+                    const titleMatch = content.match(/^#\s+(.+?)(?:\n|$)/m);
+                    const subtitleMatch = content.match(/PLUS:\s*(.+?)(?:\n|$)/i);
+                    return {
+                        ...prev,
+                        title: titleMatch ? titleMatch[1].trim() : content.split('\n')[0],
+                        subtitle: subtitleMatch ? subtitleMatch[1].trim() : '',
+                    };
+
+                case 'intro':
+                    return { ...prev, intro: content };
+
+                case 'toc':
+                    // Parse TOC items
+                    const tocItems = content
+                        .split('\n')
+                        .filter(line => line.trim().match(/^[•\-\*]/))
+                        .map(line => line.replace(/^[•\-\*]\s*/, '').trim())
+                        .filter(Boolean);
+                    return { ...prev, toc: tocItems };
+
+                case 'story':
+                    if (storyIndex === undefined) return prev;
+                    const newStories = [...prev.stories];
+                    // Parse story content
+                    const parsedStory = parseStoryContent(content, storyIndex);
+                    newStories[storyIndex] = parsedStory;
+                    return { ...prev, stories: newStories };
+
+                case 'summary':
+                    return { ...prev, quickSummary: content };
+
+                default:
+                    return prev;
+            }
+        });
+    }
+
+    // Parse story content from generated text
+    function parseStoryContent(content: string, storyIndex: number): StoryBlock {
+        const emojis = ['🧠', '💰', '🤖', '🔥', '⚡', '🎯'];
+
+        // Extract title
+        const titleMatch = content.match(/###?\s*[^\n]+\n/);
+        const title = titleMatch
+            ? titleMatch[0].replace(/###?\s*[🧠💰🤖🔥⚡🎯💡🚀🎬📰🏥]\s*/, '').trim()
+            : '';
+
+        // Extract hook (first paragraph after title)
+        const hookMatch = content.match(/###?[^\n]+\n\n([^*#]+)/);
+        const hookParagraph = hookMatch ? hookMatch[1].trim() : '';
+
+        // Extract bullet sections
+        const extractBullets = (sectionName: string): string[] => {
+            const pattern = new RegExp(`\\*\\*[^*]*${sectionName}[^*]*\\*\\*:?\\s*\\n([\\s\\S]*?)(?=\\*\\*|$)`, 'i');
+            const match = content.match(pattern);
+            if (!match) return [];
+            return match[1]
+                .split('\n')
+                .filter(line => line.trim().match(/^[•\-\*]/))
+                .map(line => line.replace(/^[•\-\*]\s*/, '').trim())
+                .filter(Boolean)
+                .slice(0, 4);
+        };
+
+        return {
+            emoji: emojis[storyIndex % emojis.length],
+            title,
+            hookParagraph,
+            bulletPoints: extractBullets('Key Points'),
+            whyItMatters: extractBullets('Why This Matters'),
+            whatsNext: extractBullets("What's Next"),
+        };
+    }
 
     // Update draft field
     function updateDraft(field: keyof NewsletterDraft, value: string) {

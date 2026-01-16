@@ -583,8 +583,8 @@ export default function StudioPage() {
                                         )}
                                     </Button>
 
-                                    {/* Generated Prompt (Editable) */}
-                                    <div className="flex-1 flex flex-col min-h-0">
+                                    {/* Generated Prompt (Editable) - Made larger and more visible */}
+                                    <div className="mb-3">
                                         <label className="text-xs font-medium text-white/60 mb-1.5 block flex items-center gap-1">
                                             🎯 Generated Prompt <span className="text-white/30">(editable)</span>
                                         </label>
@@ -592,12 +592,12 @@ export default function StudioPage() {
                                             value={generatedPrompts[selectedStoryIndex] || ''}
                                             onChange={(e) => setGeneratedPrompts(prev => ({ ...prev, [selectedStoryIndex]: e.target.value }))}
                                             placeholder="Prompt will appear here after generation, or type your own..."
-                                            className="flex-1 bg-black/30 border-white/10 resize-none text-sm leading-relaxed focus:border-purple-500/50 min-h-[80px]"
+                                            className="bg-black/30 border-white/10 text-sm leading-relaxed focus:border-purple-500/50 h-40 resize-y"
                                         />
                                     </div>
 
                                     {/* Generate Image Button */}
-                                    <div className="mt-3 pt-3 border-t border-white/5">
+                                    <div className="pt-3 border-t border-white/5">
                                         <Button
                                             size="lg"
                                             className="w-full bg-purple-600 hover:bg-purple-500 text-white shadow-lg shadow-purple-900/20"

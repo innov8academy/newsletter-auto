@@ -28,8 +28,36 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        // Build the system prompt
-        const systemPrompt = `You are an expert AI Art Director for a cutting-edge tech newsletter called "L8R by Innov8".
+        // Build the system prompt - PRIORITIZE MEME when reference images are provided
+        const hasReferenceImages = referenceImages && referenceImages.length > 0;
+
+        const systemPrompt = hasReferenceImages
+            ? `You are an expert AI Art Director specializing in MEME-FIRST image compositions.
+
+**CRITICAL INSTRUCTION: THE MEME/REFERENCE IMAGE IS THE STAR**
+When reference images are provided, they are the CENTRAL FOCUS of the image. The news story provides CONTEXT, but the meme character/element must be the HERO of the composition.
+
+**Your Approach:**
+1. ANALYZE the reference image(s) carefully - identify the character, their pose, expression, style, and what makes them iconic.
+2. PRESERVE the meme's essence - the character should be instantly recognizable.
+3. BUILD the scene AROUND the meme - use the news story to create a relevant backdrop or context.
+4. The meme character should be REACTING TO or INTERACTING WITH elements from the news.
+
+**Composition Guidelines:**
+- Meme character: 60-70% of visual focus
+- News context/elements: 30-40% as supporting backdrop
+- Keep the meme's original style/aesthetic prominent
+- Dramatic, cinematic lighting on the meme character
+- 16:9 aspect ratio
+
+**Example Approach:**
+If the meme shows a shocked person and the news is about Bitcoin hitting $100K:
+→ Place the meme character in the CENTER looking shocked
+→ Add Bitcoin symbols, price charts, gold coins AROUND them as context
+→ The meme character is REACTING to the Bitcoin news
+
+Output ONLY the final image generation prompt, nothing else.`
+            : `You are an expert AI Art Director for a cutting-edge tech newsletter called "L8R by Innov8".
 Your goal is to create a detailed, vivid, and stylistic image generation prompt based on a specific news section.
 
 **The Aesthetic (L8R Style):**
@@ -42,16 +70,13 @@ Your goal is to create a detailed, vivid, and stylistic image generation prompt 
 **Instructions:**
 1. Read the provided news text carefully.
 2. Extract the core subject (e.g., a specific robot, a CEO, a chip, a software interface).
-3. If the user has provided reference images, analyze them and INCORPORATE the key visual elements (characters, poses, expressions, objects) into your prompt naturally.
-4. If the user has provided creative ideas, use them to guide how reference elements should be merged with the news story.
-5. Visualize a scene that represents the story and any user-specified creative direction.
-6. Write a prompt optimized for high-end diffusion models (Flux, Midjourney, DALL-E 3).
-7. Include technical keywords (e.g., "8k resolution", "unreal engine 5", "octane render", "volumetric lighting").
+3. Visualize a scene that represents the story.
+4. Write a prompt optimized for high-end diffusion models (Flux, Midjourney, DALL-E 3).
+5. Include technical keywords (e.g., "8k resolution", "unreal engine 5", "octane render", "volumetric lighting").
 
 Output ONLY the prompt text, nothing else.`;
 
         // Build the user message - potentially multimodal if reference images exist
-        const hasReferenceImages = referenceImages && referenceImages.length > 0;
 
         let userMessageContent: unknown;
 
@@ -69,16 +94,24 @@ Output ONLY the prompt text, nothing else.`;
                 });
             }
 
-            // Add text prompt
-            let textPrompt = `Generate an image prompt for this news story:\n\n"${sectionText}"`;
+            // Add text prompt - MEME FIRST approach
+            let textPrompt = `**REFERENCE IMAGE(S) ABOVE ARE THE STAR OF THIS IMAGE**
+
+The meme/character in the reference image(s) should be the CENTRAL FOCUS (60-70% of composition).
+
+NEWS CONTEXT to build around the meme:
+"${sectionText}"`;
 
             if (userIdeas && userIdeas.trim()) {
-                textPrompt += `\n\n**User's Creative Direction:**\n${userIdeas}`;
+                textPrompt += `
+
+**User's Creative Direction:**
+${userIdeas}`;
             }
 
-            textPrompt += `\n\n${styleContext ? `Additional Style Notes: ${styleContext}` : ''}`;
-            textPrompt += `\n${newsletterContext ? `Newsletter Context: ${newsletterContext}` : ''}`;
-            textPrompt += `\n\n**IMPORTANT:** Analyze the reference images above and incorporate their key visual elements (characters, poses, expressions, style) into the generated prompt as described in the user's creative direction.`;
+            textPrompt += `
+
+TASK: Create an image prompt that places the meme character as the HERO, with the news story providing context/backdrop around them. The character should be REACTING TO or INTERACTING WITH the news elements.`;
 
             contentParts.push({
                 type: 'text',
