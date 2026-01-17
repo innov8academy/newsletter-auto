@@ -1,11 +1,12 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { ResearchReport } from '@/lib/types';
 import { NewsletterDraft, DRAFT_MODELS, DraftModelId, StoryBlock } from '@/lib/draft-generator';
+import { WizardProvider, useWizard, WIZARD_STEPS, getCurrentDateContext } from '@/context/WizardContext';
+import { StepIndicator, WizardNavigation } from '@/components/StepIndicator';
 import { EditableSection, EditableBulletList } from '@/components/EditableSection';
-import { SectionGenerator, EmptySectionPlaceholder } from '@/components/SectionGenerator';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -17,15 +18,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import {
-    Popover,
-    PopoverContent,
-    PopoverTrigger,
-} from '@/components/ui/popover';
-import {
-    loadResearchReports,
-    getApiKey,
-} from '@/lib/storage';
+import { loadResearchReports } from '@/lib/storage';
 import { addCost } from '@/lib/cost-tracker';
 import {
     Sparkles,
@@ -35,186 +28,476 @@ import {
     Check,
     CheckCircle2,
     RefreshCw,
-    Copy,
-    Download,
-    X,
     ChevronRight,
     Newspaper,
     Settings2,
     Image as ImageIcon,
-    Wand2,
-    Trash2,
-    MoreHorizontal,
-    Maximize2,
+    X,
+    ChevronUp,
+    ChevronDown,
+    Copy,
+    History,
 } from 'lucide-react';
 
-// Image models moved to Studio Page
-
-export default function DraftPage() {
+// Step content components
+function SetupStep() {
     const router = useRouter();
-
-    // State
+    const {
+        selectedReports,
+        addReport,
+        removeReport,
+        reorderReports,
+        nextStep,
+        isStepComplete,
+    } = useWizard();
     const [allReports, setAllReports] = useState<ResearchReport[]>([]);
-    const [selectedReports, setSelectedReports] = useState<ResearchReport[]>([]);
-    const [apiKey, setApiKey] = useState('');
-    const [isGenerating, setIsGenerating] = useState(false);
-    const [draft, setDraft] = useState<NewsletterDraft | null>(null);
-    const [error, setError] = useState<string | null>(null);
-    const [copied, setCopied] = useState(false);
-    const [selectedModel, setSelectedModel] = useState<DraftModelId>('google/gemini-3-pro-preview');
 
-    // Story regeneration state
-    const [regeneratingStoryIndex, setRegeneratingStoryIndex] = useState<number | null>(null);
-    const [storyRegenPrompt, setStoryRegenPrompt] = useState('');
-    const [storyRegenModel, setStoryRegenModel] = useState<DraftModelId>('google/gemini-3-pro-preview');
-    const [storyPopoverOpen, setStoryPopoverOpen] = useState<number | null>(null);
-
-    // Section generation state
-    const [generatingSections, setGeneratingSections] = useState<Set<string>>(new Set());
-
-    // Load reports on mount AND restore draft if available
     useEffect(() => {
         const reports = loadResearchReports();
-        const key = getApiKey();
-
-        // Flow protection: redirect to Research if no reports
         if (reports.length === 0) {
             router.push('/research');
             return;
         }
-
         setAllReports(reports);
-        setApiKey(key || '');
-
-        // Restore draft from localStorage if available
-        try {
-            const savedDraft = localStorage.getItem('currentDraft');
-            if (savedDraft) {
-                const parsedDraft = JSON.parse(savedDraft) as NewsletterDraft;
-                setDraft(parsedDraft);
-            }
-
-            // Restore selected reports from localStorage
-            const savedSelectedReports = localStorage.getItem('selectedReports');
-            if (savedSelectedReports) {
-                const reportIds = JSON.parse(savedSelectedReports) as string[];
-                // Match saved IDs with available reports
-                const restoredReports = reportIds
-                    .map(id => reports.find(r => r.story.id === id))
-                    .filter((r): r is ResearchReport => r !== undefined);
-                if (restoredReports.length > 0) {
-                    setSelectedReports(restoredReports);
-                }
-            }
-        } catch (error) {
-            console.error('Failed to restore draft/reports from localStorage:', error);
-        }
     }, [router]);
 
-    // Auto-save draft to localStorage for Studio access
+    const isSelected = (reportId: string) =>
+        selectedReports.some(r => r.story.id === reportId);
+
+    const moveUp = (index: number) => {
+        if (index > 0) reorderReports(index, index - 1);
+    };
+
+    const moveDown = (index: number) => {
+        if (index < selectedReports.length - 1) reorderReports(index, index + 1);
+    };
+
+    return (
+        <div className="grid grid-cols-2 gap-6 h-full">
+            {/* Selected Stories */}
+            <div className="bg-surface/80 backdrop-blur-xl border border-white/10 rounded-2xl p-6 flex flex-col">
+                <div className="flex items-center justify-between mb-4">
+                    <h2 className="font-semibold flex items-center gap-2 text-white/90">
+                        <CheckCircle2 className="w-4 h-4 text-teal-400" />
+                        Selected Stories
+                    </h2>
+                    <span className="text-xs text-white/40">First = main story</span>
+                </div>
+
+                {selectedReports.length === 0 ? (
+                    <div className="flex-1 flex flex-col items-center justify-center text-center p-4 border-2 border-dashed border-white/5 rounded-xl">
+                        <FileText className="w-8 h-8 text-white/20 mb-3" />
+                        <p className="text-sm text-white/40">
+                            Select stories from the right →
+                        </p>
+                    </div>
+                ) : (
+                    <ScrollArea className="flex-1 -mr-2 pr-2">
+                        <div className="space-y-2">
+                            {selectedReports.map((report, index) => (
+                                <div
+                                    key={report.story.id}
+                                    className="group flex items-start gap-2 p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 relative"
+                                >
+                                    <div className="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-amber-400 to-coral-500 rounded-l-xl" />
+
+                                    <div className="flex flex-col gap-1 ml-2">
+                                        <button
+                                            onClick={() => moveUp(index)}
+                                            disabled={index === 0}
+                                            className="p-0.5 hover:bg-white/10 rounded disabled:opacity-20"
+                                        >
+                                            <ChevronUp className="w-3 h-3" />
+                                        </button>
+                                        <button
+                                            onClick={() => moveDown(index)}
+                                            disabled={index === selectedReports.length - 1}
+                                            className="p-0.5 hover:bg-white/10 rounded disabled:opacity-20"
+                                        >
+                                            <ChevronDown className="w-3 h-3" />
+                                        </button>
+                                    </div>
+
+                                    <div className="flex-1 min-w-0">
+                                        <Badge className={`text-xs px-1.5 py-0 mb-1 ${index === 0 ? 'bg-amber-500/30 text-amber-300' : 'bg-white/10 text-white/60'}`}>
+                                            {index === 0 ? 'Main' : `#${index + 1}`}
+                                        </Badge>
+                                        <p className="text-sm text-white/80 line-clamp-2">
+                                            {report.story.headline}
+                                        </p>
+                                    </div>
+
+                                    <button
+                                        onClick={() => removeReport(report.story.id)}
+                                        className="p-1 hover:bg-white/10 rounded text-white/30 hover:text-coral-400"
+                                    >
+                                        <X className="w-4 h-4" />
+                                    </button>
+                                </div>
+                            ))}
+                        </div>
+                    </ScrollArea>
+                )}
+
+                <div className="pt-4 mt-4 border-t border-white/5">
+                    <Button
+                        onClick={nextStep}
+                        disabled={!isStepComplete(0)}
+                        className="w-full bg-gradient-to-r from-amber-500 to-coral-500 text-[#0B0B0F] h-12 font-semibold disabled:opacity-50"
+                    >
+                        <Sparkles className="w-4 h-4 mr-2" />
+                        Start Newsletter ({selectedReports.length} stories)
+                    </Button>
+                </div>
+            </div>
+
+            {/* Available Reports */}
+            <div className="bg-surface/80 backdrop-blur-xl border border-white/10 rounded-2xl p-6 flex flex-col">
+                <h2 className="font-semibold mb-4 flex items-center gap-2 text-white/90">
+                    <FileText className="w-4 h-4 text-white/40" />
+                    Available Reports
+                    <span className="text-xs text-white/40 font-normal ml-auto">
+                        {allReports.length} reports
+                    </span>
+                </h2>
+
+                <ScrollArea className="flex-1 -mr-2 pr-2">
+                    <div className="space-y-2">
+                        {allReports.map((report) => {
+                            const selected = isSelected(report.story.id);
+                            return (
+                                <button
+                                    key={report.story.id}
+                                    onClick={() => !selected && addReport(report)}
+                                    disabled={selected}
+                                    className={`w-full text-left p-3 rounded-xl border transition-all ${selected
+                                        ? 'bg-teal-500/10 border-teal-500/30 opacity-50 cursor-not-allowed'
+                                        : 'bg-white/5 border-white/5 hover:bg-white/10'
+                                        }`}
+                                >
+                                    <div className="flex items-start gap-3">
+                                        <div className="shrink-0 mt-0.5">
+                                            {selected ? (
+                                                <Check className="w-4 h-4 text-teal-400" />
+                                            ) : (
+                                                <FileText className="w-4 h-4 text-white/30" />
+                                            )}
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <p className="text-sm text-white/80 line-clamp-2">
+                                                {report.story.headline}
+                                            </p>
+                                            <p className="text-xs text-white/40 mt-1">
+                                                {report.sources.length} sources
+                                            </p>
+                                        </div>
+                                    </div>
+                                </button>
+                            );
+                        })}
+                    </div>
+                </ScrollArea>
+            </div>
+        </div>
+    );
+}
+
+// Generic generation step component
+interface GenerationStepProps {
+    title: string;
+    sectionType: 'title' | 'intro' | 'toc' | 'summary';
+    content: string | string[] | { title: string; subtitle: string } | null;
+    onSave: (content: any) => void;
+    placeholder: string;
+}
+
+function GenerationStep({ title, sectionType, content, onSave, placeholder }: GenerationStepProps) {
+    const { selectedReports, prevStep, nextStep, isGenerating, setIsGenerating, setError, error } = useWizard();
+    const [localContent, setLocalContent] = useState('');
+    const [hasGenerated, setHasGenerated] = useState(false);
+    const [selectedModel, setSelectedModel] = useState<DraftModelId>('anthropic/claude-sonnet-4');
+    const [copied, setCopied] = useState(false);
+
+    // Restore content if already generated
     useEffect(() => {
-        if (draft) {
-            localStorage.setItem('currentDraft', JSON.stringify(draft));
-        }
-    }, [draft]);
-
-    // Auto-save selected reports order to localStorage
-    useEffect(() => {
-        if (selectedReports.length > 0) {
-            const reportIds = selectedReports.map(r => r.story.id);
-            localStorage.setItem('selectedReports', JSON.stringify(reportIds));
-        }
-    }, [selectedReports]);
-
-    // Create empty draft structure when reports are selected but no draft exists
-    function initializeEmptyDraft() {
-        const emptyDraft: NewsletterDraft = {
-            title: '',
-            subtitle: '',
-            date: new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }),
-            memeIdeas: [],
-            intro: '',
-            toc: [],
-            stories: selectedReports.map((_, i) => ({
-                emoji: ['🧠', '💰', '🤖', '🔥'][i % 4],
-                title: '',
-                hookParagraph: '',
-                bulletPoints: [],
-                whyItMatters: [],
-                whatsNext: [],
-                l8rsTake: [],
-            })),
-            quickSummary: '',
-            rawMarkdown: '',
-        };
-        setDraft(emptyDraft);
-    }
-
-    // Handle generated section content
-    function handleSectionGenerated(sectionType: string, content: string, storyIndex?: number) {
-        // If no draft exists, initialize one first
-        if (!draft) {
-            initializeEmptyDraft();
-        }
-
-        setDraft(prev => {
-            if (!prev) return prev;
-
-            switch (sectionType) {
-                case 'title':
-                    // Parse title and subtitle from content
-                    const titleMatch = content.match(/^#\s+(.+?)(?:\n|$)/m);
-                    const subtitleMatch = content.match(/PLUS:\s*(.+?)(?:\n|$)/i);
-                    return {
-                        ...prev,
-                        title: titleMatch ? titleMatch[1].trim() : content.split('\n')[0],
-                        subtitle: subtitleMatch ? subtitleMatch[1].trim() : '',
-                    };
-
-                case 'intro':
-                    return { ...prev, intro: content };
-
-                case 'toc':
-                    // Parse TOC items
-                    const tocItems = content
-                        .split('\n')
-                        .filter(line => line.trim().match(/^[•\-\*]/))
-                        .map(line => line.replace(/^[•\-\*]\s*/, '').trim())
-                        .filter(Boolean);
-                    return { ...prev, toc: tocItems };
-
-                case 'story':
-                    if (storyIndex === undefined) return prev;
-                    const newStories = [...prev.stories];
-                    // Parse story content
-                    const parsedStory = parseStoryContent(content, storyIndex);
-                    newStories[storyIndex] = parsedStory;
-                    return { ...prev, stories: newStories };
-
-                case 'summary':
-                    return { ...prev, quickSummary: content };
-
-                default:
-                    return prev;
+        if (content) {
+            if (typeof content === 'string') {
+                setLocalContent(content);
+            } else if (Array.isArray(content)) {
+                setLocalContent(content.join('\n• '));
+            } else if ('title' in content) {
+                setLocalContent(`# ${content.title}\n\nPLUS: ${content.subtitle}`);
             }
-        });
-    }
+            setHasGenerated(true);
+        }
+    }, [content]);
 
-    // Parse story content from generated text
-    function parseStoryContent(content: string, storyIndex: number): StoryBlock {
+    const copyToClipboard = async () => {
+        await navigator.clipboard.writeText(localContent);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+    };
+
+    const generateContent = useCallback(async () => {
+        setIsGenerating(true);
+        setError(null);
+
+        try {
+            const response = await fetch('/api/generate-section', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    sectionType,
+                    researchReports: selectedReports,
+                    modelId: selectedModel,
+                }),
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                setLocalContent(data.content);
+                setHasGenerated(true);
+
+                // Track cost
+                if (data.cost) {
+                    addCost({
+                        source: data.costSource || `section-${sectionType}`,
+                        model: data.model || selectedModel,
+                        cost: data.cost,
+                        description: `Generated ${sectionType}`,
+                    });
+                }
+            } else {
+                setError(data.error || 'Failed to generate');
+            }
+        } catch (err) {
+            setError(err instanceof Error ? err.message : 'Network error');
+        } finally {
+            setIsGenerating(false);
+        }
+    }, [selectedReports, sectionType, selectedModel, setIsGenerating, setError]);
+
+    // Auto-generate on mount if no content
+    useEffect(() => {
+        if (!content && !hasGenerated && selectedReports.length > 0) {
+            generateContent();
+        }
+    }, [content, hasGenerated, selectedReports.length, generateContent]);
+
+    const handleConfirm = () => {
+        // Parse content based on section type
+        if (sectionType === 'title') {
+            const titleMatch = localContent.match(/^#\s+(.+?)(?:\n|$)/m);
+            const subtitleMatch = localContent.match(/PLUS:\s*(.+?)(?:\n|$)/i);
+            onSave({
+                title: titleMatch ? titleMatch[1].trim() : localContent.split('\n')[0],
+                subtitle: subtitleMatch ? subtitleMatch[1].trim() : '',
+            });
+        } else if (sectionType === 'toc') {
+            const items = localContent
+                .split('\n')
+                .filter(line => line.trim().match(/^[•\-\*]/))
+                .map(line => line.replace(/^[•\-\*]\s*/, '').trim())
+                .filter(Boolean);
+            onSave(items);
+        } else {
+            onSave(localContent);
+        }
+        nextStep();
+    };
+
+    return (
+        <div className="bg-surface/80 backdrop-blur-xl border border-white/10 rounded-2xl p-6 h-full flex flex-col">
+            <div className="flex items-center justify-between mb-6">
+                <h2 className="font-display text-xl text-white/90">{title}</h2>
+                <div className="flex items-center gap-2">
+                    <Select value={selectedModel} onValueChange={(v) => setSelectedModel(v as DraftModelId)}>
+                        <SelectTrigger className="w-[180px] bg-black/30 border-white/10 text-white text-sm h-8">
+                            <SelectValue placeholder="Select model" />
+                        </SelectTrigger>
+                        <SelectContent className="bg-surface-elevated border-white/10">
+                            {DRAFT_MODELS.map((model) => (
+                                <SelectItem key={model.id} value={model.id} className="text-white">
+                                    {model.name}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={copyToClipboard}
+                        disabled={!localContent}
+                        className="text-white/50 hover:text-teal-400"
+                    >
+                        {copied ? (
+                            <><Check className="w-4 h-4 mr-1 text-teal-400" /> Copied!</>
+                        ) : (
+                            <><Copy className="w-4 h-4 mr-1" /> Copy</>
+                        )}
+                    </Button>
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={generateContent}
+                        disabled={isGenerating}
+                        className="text-white/50 hover:text-amber-400"
+                    >
+                        <RefreshCw className={`w-4 h-4 mr-1 ${isGenerating ? 'animate-spin' : ''}`} />
+                        Regen
+                    </Button>
+                </div>
+            </div>
+
+            {error && (
+                <div className="mb-4 p-4 rounded-xl bg-coral-500/10 border border-coral-500/30 text-coral-300 text-sm">
+                    {error}
+                </div>
+            )}
+
+            <div className="flex-1 min-h-0">
+                {isGenerating && !hasGenerated ? (
+                    <div className="h-full flex flex-col items-center justify-center text-white/40">
+                        <Loader2 className="w-8 h-8 animate-spin mb-4" />
+                        <p>Generating {title.toLowerCase()}...</p>
+                    </div>
+                ) : (
+                    <Textarea
+                        value={localContent}
+                        onChange={(e) => setLocalContent(e.target.value)}
+                        placeholder={placeholder}
+                        className="h-full resize-none bg-black/20 border-white/10 text-white font-mono text-sm"
+                    />
+                )}
+            </div>
+
+            <WizardNavigation
+                onNext={handleConfirm}
+                nextLabel="Confirm & Continue"
+                isNextLoading={isGenerating}
+                isNextDisabled={!localContent.trim()}
+            />
+        </div>
+    );
+}
+
+// Story generation step
+function StoryStep() {
+    const {
+        selectedReports,
+        currentStoryIndex,
+        completed,
+        saveStory,
+        nextStory,
+        prevStory,
+        nextStep,
+        prevStep,
+        setCurrentStoryIndex,
+        isGenerating,
+        setIsGenerating,
+        error,
+        setError,
+    } = useWizard();
+    const [localStory, setLocalStory] = useState<StoryBlock | null>(null);
+    const [selectedModel, setSelectedModel] = useState<DraftModelId>('google/gemini-3-pro-preview');
+    const [copied, setCopied] = useState(false);
+
+    const totalStories = selectedReports.length;
+    const currentReport = selectedReports[currentStoryIndex];
+    const savedStory = completed.stories[currentStoryIndex];
+
+    // Copy story as formatted text
+    const copyStory = async () => {
+        if (!localStory) return;
+        const text = `### ${localStory.emoji} ${localStory.title}
+
+${localStory.hookParagraph}
+
+**🔍 Key Points:**
+${(localStory.bulletPoints || []).map(p => `• ${p}`).join('\n')}
+
+**🚨 Why This Matters:**
+${(localStory.whyItMatters || []).map(p => `• ${p}`).join('\n')}
+
+**⏭️ What's Next:**
+${(localStory.whatsNext || []).map(p => `• ${p}`).join('\n')}
+
+**💡 L8R's Take:**
+${(localStory.l8rsTake || []).map(p => `• ${p}`).join('\n')}`;
+        await navigator.clipboard.writeText(text);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+    };
+
+    // Restore story if already generated
+    useEffect(() => {
+        if (savedStory && savedStory.title) {
+            setLocalStory(savedStory);
+        } else {
+            setLocalStory(null);
+        }
+    }, [currentStoryIndex, savedStory]);
+
+    const generateStory = useCallback(async () => {
+        setIsGenerating(true);
+        setError(null);
+
+        try {
+            const response = await fetch('/api/generate-section', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    sectionType: 'story',
+                    storyIndex: currentStoryIndex,
+                    researchReports: selectedReports,
+                    modelId: selectedModel,
+                }),
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                // Parse the story content
+                const parsed = parseStoryContent(data.content, currentStoryIndex);
+                setLocalStory(parsed);
+
+                if (data.cost) {
+                    addCost({
+                        source: data.costSource || 'section-story',
+                        model: data.model || selectedModel,
+                        cost: data.cost,
+                        description: `Generated story ${currentStoryIndex + 1}`,
+                    });
+                }
+            } else {
+                setError(data.error || 'Failed to generate story');
+            }
+        } catch (err) {
+            setError(err instanceof Error ? err.message : 'Network error');
+        } finally {
+            setIsGenerating(false);
+        }
+    }, [currentStoryIndex, selectedReports, selectedModel, setIsGenerating, setError]);
+
+    // Auto-generate if no story
+    useEffect(() => {
+        if (!savedStory?.title && !localStory && selectedReports.length > 0) {
+            generateStory();
+        }
+    }, [savedStory, localStory, selectedReports.length, generateStory]);
+
+    const parseStoryContent = (content: string, storyIndex: number): StoryBlock => {
         const emojis = ['🧠', '💰', '🤖', '🔥', '⚡', '🎯'];
 
-        // Extract title
         const titleMatch = content.match(/###?\s*[^\n]+\n/);
         const title = titleMatch
             ? titleMatch[0].replace(/###?\s*[🧠💰🤖🔥⚡🎯💡🚀🎬📰🏥]\s*/, '').trim()
             : '';
 
-        // Extract hook (first paragraph after title)
         const hookMatch = content.match(/###?[^\n]+\n\n([^*#]+)/);
         const hookParagraph = hookMatch ? hookMatch[1].trim() : '';
 
-        // Extract bullet sections
         const extractBullets = (sectionName: string): string[] => {
             const pattern = new RegExp(`\\*\\*[^*]*${sectionName}[^*]*\\*\\*:?\\s*\\n([\\s\\S]*?)(?=\\*\\*|$)`, 'i');
             const match = content.match(pattern);
@@ -236,828 +519,385 @@ export default function DraftPage() {
             whatsNext: extractBullets("What's Next"),
             l8rsTake: extractBullets("L8R's Take"),
         };
-    }
+    };
 
-    // Update draft field
-    function updateDraft(field: keyof NewsletterDraft, value: string) {
-        if (!draft) return;
-        setDraft({ ...draft, [field]: value });
-    }
+    const updateField = (field: keyof StoryBlock, value: string | string[]) => {
+        if (!localStory) return;
+        setLocalStory({ ...localStory, [field]: value });
+    };
 
-    // Update a story field
-    function updateStory(storyIndex: number, field: keyof StoryBlock, value: string | string[]) {
-        if (!draft) return;
-        const newStories = [...draft.stories];
-        newStories[storyIndex] = { ...newStories[storyIndex], [field]: value };
-        setDraft({ ...draft, stories: newStories });
-    }
+    const handleConfirmStory = () => {
+        if (!localStory) return;
+        saveStory(currentStoryIndex, localStory);
 
-    // Replace entire story block
-    function replaceStory(storyIndex: number, newStory: StoryBlock) {
-        if (!draft) return;
-        const newStories = [...draft.stories];
-        // Preserve existing emoji if not returned (api usually handles this but good to be safe)
-        if (!newStory.emoji) newStory.emoji = newStories[storyIndex].emoji;
-
-        newStories[storyIndex] = newStory;
-        setDraft({ ...draft, stories: newStories });
-    }
-
-    // Build full context for a story section regeneration
-    // Includes both current draft content AND the original deep research
-    function getStoryContext(storyIndex: number): string {
-        if (!draft) return '';
-        const story = draft.stories[storyIndex];
-
-        // Get the original research report for this story (if available)
-        const originalReport = selectedReports[storyIndex];
-        const deepResearch = originalReport?.deepResearch || '';
-        const originalHeadline = originalReport?.story?.headline || '';
-        const keyPoints = originalReport?.keyPoints?.join('\n• ') || '';
-        const implications = originalReport?.implications || '';
-
-        return `
-## ORIGINAL RESEARCH (Source Material):
-Headline: ${originalHeadline}
-
-Deep Research:
-${deepResearch}
-
-Key Points from Research:
-• ${keyPoints}
-
-Implications:
-${implications}
-
----
-
-## CURRENT DRAFT CONTENT (What's been written so far):
-Story Title: ${story.title}
-
-Hook: ${story.hookParagraph}
-
-Key Points:
-${(story.bulletPoints || []).map(p => `• ${p}`).join('\n')}
-
-Why This Matters:
-${(story.whyItMatters || []).map(p => `• ${p}`).join('\n')}
-
-What's Next:
-${(story.whatsNext || []).map(p => `• ${p}`).join('\n')}
-`.trim();
-    }
-
-    // Regenerate a text section via API
-    async function regenerateSection(
-        sectionType: string,
-        currentContent: string,
-        prompt: string,
-        model: DraftModelId,
-        context?: string
-    ): Promise<string> {
-        const response = await fetch('/api/regenerate-section', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                currentContent,
-                userPrompt: prompt,
-                sectionType,
-                modelId: model,
-                apiKey,
-                context,
-            }),
-        });
-        const data = await response.json();
-        if (!data.success) throw new Error(data.error);
-
-        // Track cost
-        if (data.cost) {
-            addCost({
-                source: data.costSource || 'regen-section',
-                model: data.model || model,
-                cost: data.cost,
-                description: `Regen ${sectionType}`,
-            });
+        if (currentStoryIndex < totalStories - 1) {
+            nextStory();
+        } else {
+            nextStep();
         }
+    };
 
-        return data.content;
-    }
-
-    // Regenerate a bullet list section via API
-    async function regenerateBullets(
-        sectionType: string,
-        currentItems: string[],
-        prompt: string,
-        model: DraftModelId,
-        context?: string
-    ): Promise<string[]> {
-        const response = await fetch('/api/regenerate-section', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                currentContent: (currentItems || []).join('\n'),
-                userPrompt: prompt,
-                sectionType,
-                modelId: model,
-                apiKey,
-                context,
-            }),
-        });
-        const data = await response.json();
-        if (!data.success) throw new Error(data.error);
-
-        // Track cost
-        if (data.cost) {
-            addCost({
-                source: data.costSource || 'regen-section',
-                model: data.model || model,
-                cost: data.cost,
-                description: `Regen ${sectionType} bullets`,
-            });
+    const handleBack = () => {
+        if (currentStoryIndex > 0) {
+            prevStory();
+        } else {
+            prevStep();
         }
+    };
 
-        return data.isArray ? data.content : data.content.split('\n').filter((l: string) => l.trim());
-    }
+    return (
+        <div className="bg-surface/80 backdrop-blur-xl border border-white/10 rounded-2xl p-6 h-full flex flex-col">
+            {/* Header */}
+            <div className="flex items-center justify-between mb-4">
+                <div>
+                    <h2 className="font-display text-xl text-white/90">
+                        Story {currentStoryIndex + 1} of {totalStories}
+                    </h2>
+                    <p className="text-sm text-white/50 mt-1">
+                        {currentReport?.story.headline?.substring(0, 60)}...
+                    </p>
+                </div>
+                <div className="flex items-center gap-3">
+                    {/* Story navigation pills */}
+                    <div className="flex gap-1">
+                        {selectedReports.map((_, i) => (
+                            <button
+                                key={i}
+                                onClick={() => setCurrentStoryIndex(i)}
+                                className={`w-8 h-8 rounded-full text-xs font-medium transition-all ${i === currentStoryIndex
+                                    ? 'bg-amber-500 text-black'
+                                    : completed.stories[i]?.title
+                                        ? 'bg-teal-500/20 text-teal-400 border border-teal-500/30'
+                                        : 'bg-white/10 text-white/40'
+                                    }`}
+                            >
+                                {i + 1}
+                            </button>
+                        ))}
+                    </div>
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={copyStory}
+                        disabled={!localStory}
+                        className="text-white/50 hover:text-teal-400"
+                    >
+                        {copied ? (
+                            <><Check className="w-4 h-4 mr-1 text-teal-400" /> Copied!</>
+                        ) : (
+                            <><Copy className="w-4 h-4 mr-1" /> Copy</>
+                        )}
+                    </Button>
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={generateStory}
+                        disabled={isGenerating}
+                        className="text-white/50 hover:text-amber-400"
+                    >
+                        <RefreshCw className={`w-4 h-4 mr-1 ${isGenerating ? 'animate-spin' : ''}`} />
+                        Regen
+                    </Button>
+                </div>
+            </div>
 
-    // Regenerate ENTIRE story via API
-    async function handleRegenerateStory(storyIndex: number) {
-        if (!draft || !storyRegenPrompt.trim()) return;
+            {error && (
+                <div className="mb-4 p-3 rounded-xl bg-coral-500/10 border border-coral-500/30 text-coral-300 text-sm">
+                    {error}
+                </div>
+            )}
 
-        setRegeneratingStoryIndex(storyIndex);
+            {/* Story content */}
+            <ScrollArea className="flex-1 -mr-2 pr-2">
+                {isGenerating && !localStory ? (
+                    <div className="h-64 flex flex-col items-center justify-center text-white/40">
+                        <Loader2 className="w-8 h-8 animate-spin mb-4" />
+                        <p>Generating story {currentStoryIndex + 1}...</p>
+                    </div>
+                ) : localStory ? (
+                    <div className="space-y-6">
+                        {/* Title */}
+                        <div>
+                            <label className="text-xs text-white/40 uppercase tracking-wider mb-2 block">
+                                Title
+                            </label>
+                            <input
+                                type="text"
+                                value={localStory.title}
+                                onChange={(e) => updateField('title', e.target.value)}
+                                className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-3 text-white text-lg font-semibold"
+                            />
+                        </div>
 
-        try {
-            const currentStory = draft.stories[storyIndex];
-            const context = getStoryContext(storyIndex);
+                        {/* Hook */}
+                        <div>
+                            <label className="text-xs text-white/40 uppercase tracking-wider mb-2 block">
+                                Hook (2-3 sentences)
+                            </label>
+                            <Textarea
+                                value={localStory.hookParagraph}
+                                onChange={(e) => updateField('hookParagraph', e.target.value)}
+                                className="bg-black/20 border-white/10 text-white min-h-[80px]"
+                            />
+                        </div>
 
-            const response = await fetch('/api/regenerate-story', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    currentStory,
-                    userPrompt: storyRegenPrompt,
-                    modelId: storyRegenModel,
-                    apiKey,
-                    context
-                }),
-            });
+                        {/* Key Points */}
+                        <div>
+                            <label className="text-xs text-white/40 uppercase tracking-wider mb-2 flex items-center gap-2">
+                                🔍 Key Points
+                            </label>
+                            <div className="space-y-2">
+                                {(localStory.bulletPoints || []).map((point, i) => (
+                                    <input
+                                        key={i}
+                                        type="text"
+                                        value={point}
+                                        onChange={(e) => {
+                                            const newPoints = [...localStory.bulletPoints];
+                                            newPoints[i] = e.target.value;
+                                            updateField('bulletPoints', newPoints);
+                                        }}
+                                        className="w-full bg-black/20 border border-white/10 rounded-lg px-3 py-2 text-white text-sm"
+                                    />
+                                ))}
+                            </div>
+                        </div>
 
-            const data = await response.json();
+                        {/* Why This Matters */}
+                        <div>
+                            <label className="text-xs text-white/40 uppercase tracking-wider mb-2 flex items-center gap-2">
+                                🚨 Why This Matters
+                            </label>
+                            <div className="space-y-2">
+                                {(localStory.whyItMatters || []).map((point, i) => (
+                                    <input
+                                        key={i}
+                                        type="text"
+                                        value={point}
+                                        onChange={(e) => {
+                                            const newPoints = [...localStory.whyItMatters];
+                                            newPoints[i] = e.target.value;
+                                            updateField('whyItMatters', newPoints);
+                                        }}
+                                        className="w-full bg-black/20 border border-white/10 rounded-lg px-3 py-2 text-white text-sm"
+                                    />
+                                ))}
+                            </div>
+                        </div>
 
-            if (data.success && data.story) {
-                // Preserve the emoji from original story
-                data.story.emoji = currentStory.emoji;
-                replaceStory(storyIndex, data.story);
-                setStoryPopoverOpen(null);
-                setStoryRegenPrompt('');
+                        {/* What's Next */}
+                        <div>
+                            <label className="text-xs text-white/40 uppercase tracking-wider mb-2 flex items-center gap-2">
+                                ⏭️ What's Next
+                            </label>
+                            <div className="space-y-2">
+                                {(localStory.whatsNext || []).map((point, i) => (
+                                    <input
+                                        key={i}
+                                        type="text"
+                                        value={point}
+                                        onChange={(e) => {
+                                            const newPoints = [...localStory.whatsNext];
+                                            newPoints[i] = e.target.value;
+                                            updateField('whatsNext', newPoints);
+                                        }}
+                                        className="w-full bg-black/20 border border-white/10 rounded-lg px-3 py-2 text-white text-sm"
+                                    />
+                                ))}
+                            </div>
+                        </div>
 
-                // Track cost
-                if (data.cost) {
-                    addCost({
-                        source: data.costSource || 'regen-story',
-                        model: data.model || storyRegenModel,
-                        cost: data.cost,
-                        description: `Regen story: ${currentStory.title.substring(0, 30)}...`,
-                    });
-                }
-            } else {
-                console.error("Failed to regenerate story:", data.error);
-                // Ideally show a toast or error message here
-            }
-        } catch (err) {
-            console.error("Error regenerating story:", err);
-        } finally {
-            setRegeneratingStoryIndex(null);
+                        {/* L8R's Take */}
+                        <div>
+                            <label className="text-xs text-white/40 uppercase tracking-wider mb-2 flex items-center gap-2">
+                                💡 L8R's Take (Alex's Opinion)
+                            </label>
+                            <div className="space-y-2">
+                                {(localStory.l8rsTake || []).map((point, i) => (
+                                    <input
+                                        key={i}
+                                        type="text"
+                                        value={point}
+                                        onChange={(e) => {
+                                            const newPoints = [...(localStory.l8rsTake || [])];
+                                            newPoints[i] = e.target.value;
+                                            updateField('l8rsTake', newPoints);
+                                        }}
+                                        className="w-full bg-black/20 border border-white/10 rounded-lg px-3 py-2 text-white text-sm"
+                                    />
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                ) : null}
+            </ScrollArea>
+
+            {/* Navigation */}
+            <div className="flex items-center justify-between pt-4 border-t border-white/5 mt-4">
+                <button
+                    onClick={handleBack}
+                    className="flex items-center gap-2 px-4 py-2 text-sm text-white/50 hover:text-white hover:bg-white/5 rounded-lg"
+                >
+                    <ChevronRight className="w-4 h-4 rotate-180" />
+                    Back
+                </button>
+
+                <Button
+                    onClick={handleConfirmStory}
+                    disabled={!localStory?.title || isGenerating}
+                    className="bg-gradient-to-r from-amber-500 to-coral-500 text-[#0B0B0F] px-6"
+                >
+                    {currentStoryIndex < totalStories - 1 ? (
+                        <>
+                            Confirm & Next Story
+                            <ChevronRight className="w-4 h-4 ml-2" />
+                        </>
+                    ) : (
+                        <>
+                            Confirm & Finish Stories
+                            <Check className="w-4 h-4 ml-2" />
+                        </>
+                    )}
+                </Button>
+            </div>
+        </div>
+    );
+}
+
+// Main content component that renders based on current step
+function WizardContent() {
+    const router = useRouter();
+    const { currentStep, completed, saveHook, saveIntro, saveToc, saveSummary } = useWizard();
+
+    const renderStep = () => {
+        switch (currentStep) {
+            case 0:
+                return <SetupStep />;
+            case 1:
+                return (
+                    <GenerationStep
+                        title="Generate Hook (Title & Subtitle)"
+                        sectionType="title"
+                        content={completed.hook}
+                        onSave={({ title, subtitle }) => saveHook(title, subtitle)}
+                        placeholder="# Your Newsletter Title Here&#10;&#10;PLUS: Story 2 teaser | Story 3 teaser"
+                    />
+                );
+            case 2:
+                return (
+                    <GenerationStep
+                        title="Generate Introduction"
+                        sectionType="intro"
+                        content={completed.intro}
+                        onSave={saveIntro}
+                        placeholder="Write your introduction here..."
+                    />
+                );
+            case 3:
+                return (
+                    <GenerationStep
+                        title="Generate Table of Contents"
+                        sectionType="toc"
+                        content={completed.toc}
+                        onSave={saveToc}
+                        placeholder="**In today's post:**&#10;• 🎬 Story 1 title&#10;• 💰 Story 2 title&#10;• 📰 Story 3 title"
+                    />
+                );
+            case 4:
+                return <StoryStep />;
+            case 5:
+                return (
+                    <GenerationStep
+                        title="Generate Quick Summary"
+                        sectionType="summary"
+                        content={completed.summary}
+                        onSave={(summary) => {
+                            saveSummary(summary);
+                            router.push('/studio');
+                        }}
+                        placeholder="### 🚀 Quick L8R Summary..."
+                    />
+                );
+            default:
+                return null;
         }
-    }
+    };
 
-    // IMAGE GENERATION HANDLING
-    // Image generation moved to Studio Page
+    return (
+        <div className="flex-1 overflow-hidden">
+            {renderStep()}
+        </div>
+    );
+}
 
-    // Add report to selection
-    function addReport(report: ResearchReport) {
-        if (!selectedReports.find(r => r.story.id === report.story.id)) {
-            setSelectedReports([...selectedReports, report]);
-        }
-    }
-
-    // Remove report from selection
-    function removeReport(reportId: string) {
-        setSelectedReports(selectedReports.filter(r => r.story.id !== reportId));
-    }
-
-    // Move report up in order
-    function moveUp(index: number) {
-        if (index === 0) return;
-        const newOrder = [...selectedReports];
-        [newOrder[index - 1], newOrder[index]] = [newOrder[index], newOrder[index - 1]];
-        setSelectedReports(newOrder);
-    }
-
-    // Move report down in order
-    function moveDown(index: number) {
-        if (index === selectedReports.length - 1) return;
-        const newOrder = [...selectedReports];
-        [newOrder[index], newOrder[index + 1]] = [newOrder[index + 1], newOrder[index]];
-        setSelectedReports(newOrder);
-    }
-
-    // Generate newsletter draft
-    async function generateDraft() {
-        if (selectedReports.length === 0) return;
-
-        setIsGenerating(true);
-        setError(null);
-
-        try {
-            const response = await fetch('/api/generate-draft', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ reports: selectedReports, apiKey, modelId: selectedModel }),
-            });
-
-            const data = await response.json();
-
-            if (data.success && data.draft) {
-                setDraft(data.draft);
-
-                // Track cost
-                if (data.cost) {
-                    addCost({
-                        source: data.costSource || 'draft',
-                        model: data.model || selectedModel,
-                        cost: data.cost,
-                        description: `Generated draft from ${selectedReports.length} reports`,
-                    });
-                }
-            } else {
-                setError(data.error || 'Failed to generate draft');
-            }
-        } catch (err) {
-            setError(err instanceof Error ? err.message : 'Network error');
-        } finally {
-            setIsGenerating(false);
-        }
-    }
-
-    // Copy markdown to clipboard
-    async function copyToClipboard() {
-        if (!draft) return;
-        await navigator.clipboard.writeText(draft.rawMarkdown);
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
-    }
-
-    // Download as markdown file
-    function downloadMarkdown() {
-        if (!draft) return;
-        const blob = new Blob([draft.rawMarkdown], { type: 'text/markdown' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `newsletter-${draft.date.replace(/,?\s+/g, '-').toLowerCase()}.md`;
-        a.click();
-        URL.revokeObjectURL(url);
-    }
-
-    // Check if report is already selected
-    function isSelected(reportId: string) {
-        return selectedReports.some(r => r.story.id === reportId);
-    }
+// Main page component
+function WizardDraftPage() {
+    const router = useRouter();
 
     return (
         <div className="min-h-screen bg-[#0B0B0F] text-white noise-overlay">
-            {/* Atmospheric gradient */}
             <div className="fixed inset-0 bg-gradient-to-br from-coral-900/5 via-transparent to-amber-900/5 pointer-events-none" />
 
             {/* Header */}
             <header className="sticky top-0 z-50 backdrop-blur-xl bg-[#0B0B0F]/80 border-b border-white/5">
-                <div className="max-w-[1800px] mx-auto px-6 py-4 flex items-center justify-between">
-                    <div className="flex items-center gap-4">
-                        <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => router.push('/research')}
-                            className="text-white/50 hover:text-amber-400 hover:bg-white/5"
-                        >
-                            <ArrowLeft className="w-4 h-4 mr-2" />
-                            Back to Research
-                        </Button>
-                        <div className="h-6 w-px bg-white/10" />
-                        <h1 className="font-display text-xl flex items-center gap-2">
-                            <Newspaper className="w-5 h-5 text-coral-400" />
-                            Newsletter Draft
-                        </h1>
+                <div className="max-w-[1400px] mx-auto px-6 py-4">
+                    <div className="flex items-center justify-between mb-4">
+                        <div className="flex items-center gap-4">
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => router.push('/research')}
+                                className="text-white/50 hover:text-amber-400"
+                            >
+                                <ArrowLeft className="w-4 h-4 mr-2" />
+                                Research
+                            </Button>
+                            <div className="h-6 w-px bg-white/10" />
+                            <h1 className="font-display text-xl flex items-center gap-2">
+                                <Newspaper className="w-5 h-5 text-coral-400" />
+                                Newsletter Wizard
+                            </h1>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => router.push('/draft-classic')}
+                                className="text-white/40 hover:text-white/60"
+                            >
+                                <History className="w-4 h-4 mr-1" />
+                                Classic View
+                            </Button>
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => router.push('/studio')}
+                                className="text-purple-300 hover:text-purple-200"
+                            >
+                                <ImageIcon className="w-4 h-4 mr-2" />
+                                Skip to Studio
+                            </Button>
+                        </div>
                     </div>
 
-                    <div className="flex items-center gap-3">
-                        {draft && (
-                            <>
-                                <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={copyToClipboard}
-                                    className="text-white/50 hover:text-teal-400 hover:bg-white/5"
-                                >
-                                    {copied ? (
-                                        <Check className="w-4 h-4 mr-2 text-teal-400" />
-                                    ) : (
-                                        <Copy className="w-4 h-4 mr-2" />
-                                    )}
-                                    {copied ? 'Copied!' : 'Copy'}
-                                </Button>
-                                {/* Studio Button */}
-                                <Button
-                                    onClick={() => router.push('/studio')}
-                                    className="bg-purple-600/20 hover:bg-purple-600/30 text-purple-300 border border-purple-500/30 animate-pulse-slow"
-                                >
-                                    <ImageIcon className="w-4 h-4 mr-2" />
-                                    Open Image Studio 🎨
-                                </Button>
-                            </>
-                        )}
-                        <Badge className="bg-amber-500/10 text-amber-400 border-amber-500/20">
-                            {selectedReports.length} selected
-                        </Badge>
-                    </div>
+                    {/* Step indicator */}
+                    <StepIndicator />
                 </div>
             </header>
 
-            <main className="max-w-[1800px] mx-auto px-6 py-8">
-                <div className="grid grid-cols-12 gap-8 h-[calc(100vh-140px)]">
-
-                    {/* Left Panel - Report Selection */}
-                    <div className="col-span-4 flex flex-col h-full space-y-6">
-
-                        {/* Selected Reports (Orderable) */}
-                        <div className="bg-surface/80 backdrop-blur-xl border border-white/10 rounded-2xl p-6 flex-1 flex flex-col deco-corner-tl">
-                            <div className="flex items-center justify-between mb-4">
-                                <h2 className="font-semibold flex items-center gap-2 text-white/90">
-                                    <CheckCircle2 className="w-4 h-4 text-teal-400" />
-                                    Selected Stories
-                                </h2>
-                                <span className="text-xs text-white/40">
-                                    First = main story
-                                </span>
-                            </div>
-
-                            {selectedReports.length === 0 ? (
-                                <div className="flex-1 flex flex-col items-center justify-center text-center p-4 border-2 border-dashed border-white/5 rounded-xl">
-                                    <div className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center mb-3 border border-white/5">
-                                        <FileText className="w-5 h-5 text-white/20" />
-                                    </div>
-                                    <p className="text-sm text-white/40 font-light">
-                                        Select research reports below<br />to include in your newsletter
-                                    </p>
-                                </div>
-                            ) : (
-                                <ScrollArea className="flex-1 -mr-2 pr-2">
-                                    <div className="space-y-2">
-                                        {selectedReports.map((report, index) => (
-                                            <div
-                                                key={report.story.id}
-                                                className="group flex items-start gap-2 p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 relative"
-                                            >
-                                                {/* Accent bar */}
-                                                <div className="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-amber-400 to-coral-500 rounded-l-xl"></div>
-
-                                                <div className="flex flex-col gap-1 ml-2">
-                                                    <button
-                                                        onClick={() => moveUp(index)}
-                                                        disabled={index === 0}
-                                                        className="p-0.5 hover:bg-white/10 rounded disabled:opacity-20 text-white/50 hover:text-amber-400 transition-colors"
-                                                    >
-                                                        <ChevronRight className="w-3 h-3 -rotate-90" />
-                                                    </button>
-                                                    <button
-                                                        onClick={() => moveDown(index)}
-                                                        disabled={index === selectedReports.length - 1}
-                                                        className="p-0.5 hover:bg-white/10 rounded disabled:opacity-20 text-white/50 hover:text-amber-400 transition-colors"
-                                                    >
-                                                        <ChevronRight className="w-3 h-3 rotate-90" />
-                                                    </button>
-                                                </div>
-                                                <div className="flex-1 min-w-0">
-                                                    <div className="flex items-center gap-2 mb-1">
-                                                        <Badge className={`text-xs px-1.5 py-0 ${index === 0 ? 'bg-amber-500/30 text-amber-300 border-amber-500/40' : 'bg-white/10 text-white/60 border-white/10'}`}>
-                                                            {index === 0 ? 'Main' : `#${index + 1}`}
-                                                        </Badge>
-                                                    </div>
-                                                    <p className="text-sm text-white/80 line-clamp-2">
-                                                        {report.story.headline}
-                                                    </p>
-                                                </div>
-                                                <button
-                                                    onClick={() => removeReport(report.story.id)}
-                                                    className="p-1 hover:bg-white/10 rounded text-white/30 hover:text-coral-400 transition-colors"
-                                                >
-                                                    <X className="w-4 h-4" />
-                                                </button>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </ScrollArea>
-                            )}
-
-                            {/* Generate Button */}
-                            <div className="pt-4 mt-4 border-t border-white/5">
-                                <Button
-                                    onClick={generateDraft}
-                                    disabled={selectedReports.length === 0 || isGenerating}
-                                    className="w-full bg-gradient-to-r from-amber-500 to-coral-500 hover:from-amber-400 hover:to-coral-400 text-[#0B0B0F] h-12 font-semibold text-sm border-0 shadow-glow-amber"
-                                >
-                                    {isGenerating ? (
-                                        <>
-                                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                                            Generating Newsletter...
-                                        </>
-                                    ) : (
-                                        <>
-                                            <Sparkles className="w-4 h-4 mr-2" />
-                                            Generate Newsletter Draft
-                                        </>
-                                    )}
-                                </Button>
-                            </div>
-                        </div>
-
-                        {/* Available Reports */}
-                        <div className="bg-surface/80 backdrop-blur-xl border border-white/10 rounded-2xl p-6 flex-1 flex flex-col">
-                            <h2 className="font-semibold mb-4 flex items-center gap-2 text-white/90">
-                                <FileText className="w-4 h-4 text-white/40" />
-                                Available Reports
-                                <span className="text-xs text-white/40 font-normal ml-auto">
-                                    {allReports.length} reports
-                                </span>
-                            </h2>
-
-                            {allReports.length === 0 ? (
-                                <div className="flex-1 flex flex-col items-center justify-center text-center p-4">
-                                    <p className="text-sm text-white/40">
-                                        No research reports found.<br />
-                                        <button
-                                            onClick={() => router.push('/research')}
-                                            className="text-amber-400 hover:underline"
-                                        >
-                                            Go to Research Lab
-                                        </button>
-                                    </p>
-                                </div>
-                            ) : (
-                                <ScrollArea className="flex-1 -mr-2 pr-2">
-                                    <div className="space-y-2">
-                                        {allReports.map((report) => {
-                                            const selected = isSelected(report.story.id);
-                                            return (
-                                                <button
-                                                    key={report.story.id}
-                                                    onClick={() => !selected && addReport(report)}
-                                                    disabled={selected}
-                                                    className={`w-full text-left p-3 rounded-xl border transition-all hover-lift ${selected
-                                                        ? 'bg-teal-500/10 border-teal-500/30 opacity-50 cursor-not-allowed'
-                                                        : 'bg-white/5 border-white/5 hover:bg-white/10 hover:border-white/10'
-                                                        }`}
-                                                >
-                                                    <div className="flex items-start gap-3">
-                                                        <div className="shrink-0 mt-0.5">
-                                                            {selected ? (
-                                                                <Check className="w-4 h-4 text-teal-400" />
-                                                            ) : (
-                                                                <FileText className="w-4 h-4 text-white/30" />
-                                                            )}
-                                                        </div>
-                                                        <div className="flex-1 min-w-0">
-                                                            <p className="text-sm text-white/80 line-clamp-2">
-                                                                {report.story.headline}
-                                                            </p>
-                                                            <p className="text-xs text-white/40 mt-1">
-                                                                {report.sources.length} sources
-                                                            </p>
-                                                        </div>
-                                                    </div>
-                                                </button>
-                                            );
-                                        })}
-                                    </div>
-                                </ScrollArea>
-                            )}
-                        </div>
-                    </div>
-
-                    {/* Right Panel - Newsletter Preview */}
-                    <div className="col-span-8 flex flex-col h-full">
-                        <div className="bg-surface/80 backdrop-blur-xl border border-white/10 rounded-2xl p-6 flex-1 flex flex-col overflow-hidden deco-corner-br">
-                            <div className="flex items-center justify-between mb-4">
-                                <h2 className="font-display text-lg flex items-center gap-2 text-white/90">
-                                    <Newspaper className="w-5 h-5 text-coral-400" />
-                                    Newsletter Preview
-                                </h2>
-                                <div className="flex items-center gap-3">
-                                    {/* Model Selector */}
-                                    <div className="flex items-center gap-2">
-                                        <Settings2 className="w-4 h-4 text-white/40" />
-                                        <Select value={selectedModel} onValueChange={(v) => setSelectedModel(v as DraftModelId)}>
-                                            <SelectTrigger className="w-[180px] bg-black/30 border-white/10 text-white text-sm h-8">
-                                                <SelectValue placeholder="Select model" />
-                                            </SelectTrigger>
-                                            <SelectContent className="bg-surface-elevated border-white/10">
-                                                {DRAFT_MODELS.map((model) => (
-                                                    <SelectItem
-                                                        key={model.id}
-                                                        value={model.id}
-                                                        className="text-white focus:bg-white/10 focus:text-white"
-                                                    >
-                                                        <span className="font-medium">{model.name}</span>
-                                                    </SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
-                                    {draft && (
-                                        <Button
-                                            variant="ghost"
-                                            size="sm"
-                                            onClick={generateDraft}
-                                            disabled={isGenerating}
-                                            className="text-white/50 hover:text-amber-400 hover:bg-white/5"
-                                        >
-                                            <RefreshCw className={`w-4 h-4 mr-2 ${isGenerating ? 'animate-spin' : ''}`} />
-                                            Regenerate
-                                        </Button>
-                                    )}
-                                </div>
-                            </div>
-
-                            {error && (
-                                <div className="mb-4 p-4 rounded-xl bg-coral-500/10 border border-coral-500/30 text-coral-300 text-sm">
-                                    {error}
-                                </div>
-                            )}
-
-                            {!draft && !isGenerating ? (
-                                <div className="flex-1 flex flex-col items-center justify-center text-center">
-                                    <div className="w-16 h-16 rounded-2xl bg-white/5 flex items-center justify-center mb-4 border border-white/5">
-                                        <Newspaper className="w-8 h-8 text-white/20" />
-                                    </div>
-                                    <h3 className="font-display text-lg text-white/60 mb-2">
-                                        No Draft Yet
-                                    </h3>
-                                    <p className="text-sm text-white/40 max-w-md">
-                                        Select research reports from the left panel and click "Generate Newsletter Draft" to create your newsletter.
-                                    </p>
-                                </div>
-                            ) : isGenerating ? (
-                                <div className="flex-1 flex flex-col items-center justify-center text-center">
-                                    <div className="relative">
-                                        <div className="absolute inset-0 bg-amber-500/20 blur-2xl animate-pulse-slow"></div>
-                                        <Loader2 className="relative w-12 h-12 text-amber-400 animate-spin mb-4" />
-                                    </div>
-                                    <h3 className="font-display text-lg text-white/80 mb-2">
-                                        Crafting Your Newsletter...
-                                    </h3>
-                                    <p className="text-sm text-white/40">
-                                        AI is writing engaging content for your audience
-                                    </p>
-                                </div>
-                            ) : draft && (
-                                <ScrollArea className="flex-1 -mr-2 pr-2">
-                                    {/* Editable Newsletter Draft */}
-                                    <article className="space-y-6">
-                                        {/* Title & Subtitle */}
-                                        <div className="bg-black/30 rounded-xl p-5 border border-white/5 border-accent-left">
-                                            <EditableSection
-                                                title="Title"
-                                                content={draft.title}
-                                                onUpdate={(newContent) => updateDraft('title', newContent)}
-                                                onRegenerate={(prompt, model) => regenerateSection('title', draft.title, prompt, model)}
-                                            />
-                                            <div className="mt-4">
-                                                <EditableSection
-                                                    title="Subtitle"
-                                                    content={draft.subtitle}
-                                                    onUpdate={(newContent) => updateDraft('subtitle', newContent)}
-                                                    onRegenerate={(prompt, model) => regenerateSection('intro', draft.subtitle, prompt, model)}
-                                                    placeholder="PLUS: teaser for other stories..."
-                                                />
-                                            </div>
-                                        </div>
-
-                                        {/* Meme Ideas */}
-                                        {draft.memeIdeas && draft.memeIdeas.length > 0 && (
-                                            <div className="bg-gradient-to-r from-purple-500/10 to-pink-500/10 rounded-xl p-5 border border-purple-500/20">
-                                                <h3 className="text-sm font-semibold text-purple-400 mb-4 flex items-center gap-2">
-                                                    🎭 Meme Ideas (for intro image)
-                                                </h3>
-                                                <div className="space-y-4">
-                                                    {draft.memeIdeas.map((meme, idx) => (
-                                                        <div key={idx} className="bg-black/30 rounded-lg p-4 border border-white/5">
-                                                            <div className="flex items-start justify-between mb-2">
-                                                                <span className="text-sm font-medium text-amber-400">
-                                                                    #{idx + 1} {meme.templateName}
-                                                                </span>
-                                                            </div>
-                                                            <div className="space-y-1 text-sm">
-                                                                <p className="text-white/70">
-                                                                    <span className="text-white/40">Top:</span> "{meme.topText}"
-                                                                </p>
-                                                                <p className="text-white/70">
-                                                                    <span className="text-white/40">Bottom:</span> "{meme.bottomText}"
-                                                                </p>
-                                                                <p className="text-white/50 text-xs mt-2 italic">
-                                                                    💡 {meme.angle}
-                                                                </p>
-                                                            </div>
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            </div>
-                                        )}
-
-                                        {/* Intro */}
-                                        <div className="bg-black/30 rounded-xl p-5 border border-white/5">
-                                            <EditableSection
-                                                title="Introduction"
-                                                content={draft.intro}
-                                                onUpdate={(newContent) => updateDraft('intro', newContent)}
-                                                onRegenerate={(prompt, model) => regenerateSection('intro', draft.intro, prompt, model)}
-                                                placeholder="Opening paragraph that hooks readers..."
-                                            />
-                                        </div>
-
-                                        {/* In Today's Post - TOC */}
-                                        {draft.toc && Array.isArray(draft.toc) && draft.toc.length > 0 && (
-                                            <div className="bg-black/30 rounded-xl p-5 border border-white/5">
-                                                <h3 className="text-sm font-semibold text-white/70 mb-3">In today's post:</h3>
-                                                <ul className="space-y-2">
-                                                    {draft.toc.map((item, idx) => (
-                                                        <li key={idx} className="flex items-start gap-2 text-white/80">
-                                                            <span className="text-amber-400">•</span>
-                                                            <span className="text-sm">{item}</span>
-                                                        </li>
-                                                    ))}
-                                                </ul>
-                                            </div>
-                                        )}
-
-                                        {/* Stories */}
-                                        {draft.stories && draft.stories.map((story, storyIndex) => (
-                                            <div key={storyIndex} className={`bg-black/30 rounded-xl p-5 border border-white/5 space-y-4 border-accent-left hover:border-amber-500/20 transition-colors relative ${regeneratingStoryIndex === storyIndex ? 'ring-2 ring-amber-500/50 animate-pulse' : ''}`}>
-
-                                                {/* Story Controls Toolbar - REGENERATION UI */}
-                                                <div className="absolute top-4 right-4 z-10">
-                                                    <Popover open={storyPopoverOpen === storyIndex} onOpenChange={(open) => setStoryPopoverOpen(open ? storyIndex : null)}>
-                                                        <PopoverTrigger asChild>
-                                                            <Button
-                                                                variant="ghost"
-                                                                size="sm"
-                                                                className="h-8 text-white/40 hover:text-amber-400 hover:bg-white/5 gap-2"
-                                                            >
-                                                                <Sparkles className="w-3.5 h-3.5" />
-                                                                Regenerate Story
-                                                            </Button>
-                                                        </PopoverTrigger>
-                                                        <PopoverContent className="w-80 bg-surface-elevated border-white/10 p-4" align="end">
-                                                            <div className="space-y-3">
-                                                                <h4 className="font-semibold text-white text-sm flex items-center gap-2">
-                                                                    <Sparkles className="w-4 h-4 text-amber-400" />
-                                                                    Regenerate Entire Story
-                                                                </h4>
-
-                                                                <p className="text-xs text-white/50">
-                                                                    This will rewrite the Title, Hook, and all Bullet Points for this story.
-                                                                </p>
-
-                                                                {/* Prompt input */}
-                                                                <Textarea
-                                                                    value={storyRegenPrompt}
-                                                                    onChange={(e) => setStoryRegenPrompt(e.target.value)}
-                                                                    placeholder="e.g. 'Make it more enthusiastic' or 'Focus more on the financial impact'"
-                                                                    className="bg-black/30 border-white/10 text-white text-sm min-h-[80px] resize-none focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/20"
-                                                                />
-
-                                                                {/* Model selector */}
-                                                                <Select value={storyRegenModel} onValueChange={(v) => setStoryRegenModel(v as DraftModelId)}>
-                                                                    <SelectTrigger className="w-full bg-black/30 border-white/10 text-white text-sm h-9">
-                                                                        <SelectValue placeholder="Select model" />
-                                                                    </SelectTrigger>
-                                                                    <SelectContent className="bg-surface-elevated border-white/10">
-                                                                        {DRAFT_MODELS.map((model) => (
-                                                                            <SelectItem
-                                                                                key={model.id}
-                                                                                value={model.id}
-                                                                                className="text-white focus:bg-white/10 focus:text-white"
-                                                                            >
-                                                                                <span className="font-medium">{model.name}</span>
-                                                                            </SelectItem>
-                                                                        ))}
-                                                                    </SelectContent>
-                                                                </Select>
-
-                                                                {/* Action buttons */}
-                                                                <div className="flex gap-2">
-                                                                    <Button
-                                                                        onClick={() => setStoryPopoverOpen(null)}
-                                                                        variant="ghost"
-                                                                        size="sm"
-                                                                        className="flex-1 text-white/60 hover:text-white"
-                                                                    >
-                                                                        Cancel
-                                                                    </Button>
-                                                                    <Button
-                                                                        onClick={() => handleRegenerateStory(storyIndex)}
-                                                                        disabled={!storyRegenPrompt.trim() || regeneratingStoryIndex !== null}
-                                                                        size="sm"
-                                                                        className="flex-1 bg-amber-500 hover:bg-amber-600 text-[#0B0B0F] font-semibold"
-                                                                    >
-                                                                        {regeneratingStoryIndex === storyIndex ? (
-                                                                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                                                                        ) : (
-                                                                            'Regenerate'
-                                                                        )}
-                                                                    </Button>
-                                                                </div>
-                                                            </div>
-                                                        </PopoverContent>
-                                                    </Popover>
-                                                </div>
-
-                                                {/* Text content only */}
-
-                                                {/* Story Title */}
-                                                <div className="pr-12"> {/* Padding for absolute button */}
-                                                    <EditableSection
-                                                        title={`Story ${storyIndex + 1}: ${story.emoji}`}
-                                                        content={story.title}
-                                                        onUpdate={(newContent) => updateStory(storyIndex, 'title', newContent)}
-                                                        onRegenerate={(prompt, model) => regenerateSection('title', story.title, prompt, model, getStoryContext(storyIndex))}
-                                                        storyContext={getStoryContext(storyIndex)}
-                                                    />
-                                                </div>
-
-                                                {/* Hook Paragraph */}
-                                                <EditableSection
-                                                    title="Hook"
-                                                    content={story.hookParagraph}
-                                                    onUpdate={(newContent) => updateStory(storyIndex, 'hookParagraph', newContent)}
-                                                    onRegenerate={(prompt, model) => regenerateSection('hook', story.hookParagraph, prompt, model, getStoryContext(storyIndex))}
-                                                    placeholder="Opening hook to grab attention..."
-                                                    storyContext={getStoryContext(storyIndex)}
-                                                />
-
-                                                {/* Key Points */}
-                                                <EditableBulletList
-                                                    title="The Key Points"
-                                                    emoji="🔍"
-                                                    items={story.bulletPoints}
-                                                    onUpdate={(items) => updateStory(storyIndex, 'bulletPoints', items)}
-                                                    onRegenerate={(prompt, model) => regenerateBullets('bullets', story.bulletPoints, prompt, model, getStoryContext(storyIndex))}
-                                                    storyContext={getStoryContext(storyIndex)}
-                                                />
-
-                                                {/* Why It Matters */}
-                                                <EditableBulletList
-                                                    title="Why This Matters"
-                                                    emoji="🚨"
-                                                    items={story.whyItMatters}
-                                                    onUpdate={(items) => updateStory(storyIndex, 'whyItMatters', items)}
-                                                    onRegenerate={(prompt, model) => regenerateBullets('whyMatters', story.whyItMatters, prompt, model, getStoryContext(storyIndex))}
-                                                    storyContext={getStoryContext(storyIndex)}
-                                                />
-
-                                                {/* What's Next */}
-                                                <EditableBulletList
-                                                    title="What's Next"
-                                                    emoji="⏭️"
-                                                    items={story.whatsNext}
-                                                    onUpdate={(items) => updateStory(storyIndex, 'whatsNext', items)}
-                                                    onRegenerate={(prompt, model) => regenerateBullets('whatsNext', story.whatsNext, prompt, model, getStoryContext(storyIndex))}
-                                                    storyContext={getStoryContext(storyIndex)}
-                                                />
-                                            </div>
-                                        ))}
-
-                                        {/* Quick Summary */}
-                                        <div className="bg-black/30 rounded-xl p-5 border border-white/5">
-                                            <EditableSection
-                                                title="🚀 Quick Summary"
-                                                content={draft.quickSummary}
-                                                onUpdate={(newContent) => updateDraft('quickSummary', newContent)}
-                                                onRegenerate={(prompt, model) => regenerateSection('summary', draft.quickSummary, prompt, model)}
-                                                placeholder="Brief summary of all stories..."
-                                            />
-                                        </div>
-
-                                        {/* Outro */}
-                                        <div className="text-center text-white/60 py-6 bg-gradient-to-b from-black/30 to-transparent rounded-xl border border-white/5">
-                                            <p className="font-display text-lg">Ithrollu innathe AI Update.</p>
-                                            <p className="mt-2">appo adutha l8ril varam.. bie. ✌️</p>
-                                        </div>
-                                    </article>
-                                </ScrollArea>
-                            )}
-                        </div>
-                    </div>
-                </div>
+            {/* Main content */}
+            <main className="max-w-[1400px] mx-auto px-6 py-6 h-[calc(100vh-160px)]">
+                <WizardContent />
             </main>
-        </div >
+        </div>
+    );
+}
+
+// Export with provider wrapper
+export default function DraftPage() {
+    return (
+        <WizardProvider>
+            <WizardDraftPage />
+        </WizardProvider>
     );
 }
