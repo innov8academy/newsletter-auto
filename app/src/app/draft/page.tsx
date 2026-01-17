@@ -506,8 +506,11 @@ ${(localStory.l8rsTake || []).map(p => `• ${p}`).join('\n')}`;
         const emojis = ['🧠', '💰', '🤖', '🔥', '⚡', '🎯'];
 
         // Extract title - handle "### emoji Title" or "### Title"
-        const titleMatch = content.match(/###?\s*[🧠💰🤖🔥⚡🎯💡🚀🎬📰🏥]?\s*([^\n]+)/);
-        const title = titleMatch ? titleMatch[1].trim() : '';
+        const titleMatch = content.match(/###?\s*[🧠💰🤖🔥⚡🎯💡🚀🎬📰🏥◆◇○●]?\s*([^\n]+)/);
+        // Clean up title - remove any leading special chars the AI might add
+        const title = titleMatch
+            ? titleMatch[1].replace(/^[◆◇○●♦♢✦✧⬥⯑\s]+/, '').trim()
+            : '';
 
         // Extract hook paragraph - text between title and first **section**
         const hookMatch = content.match(/###?[^\n]+\n\n([\s\S]*?)(?=\*\*[🔍🚨⏭️💡])/);
@@ -707,12 +710,15 @@ ${(localStory.l8rsTake || []).map(p => `• ${p}`).join('\n')}`;
                             <label className="text-xs text-white/40 uppercase tracking-wider mb-2 block">
                                 Title
                             </label>
-                            <input
-                                type="text"
-                                value={localStory.title}
-                                onChange={(e) => updateField('title', e.target.value)}
-                                className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-3 text-white text-lg font-semibold"
-                            />
+                            <div className="flex items-center gap-2">
+                                <span className="text-2xl">{localStory.emoji}</span>
+                                <input
+                                    type="text"
+                                    value={localStory.title}
+                                    onChange={(e) => updateField('title', e.target.value)}
+                                    className="flex-1 bg-black/20 border border-white/10 rounded-xl px-4 py-3 text-white text-lg font-semibold"
+                                />
+                            </div>
                         </div>
 
                         {/* Hook */}
