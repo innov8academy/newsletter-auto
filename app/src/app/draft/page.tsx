@@ -218,19 +218,29 @@ function GenerationStep({ title, sectionType, content, onSave, placeholder }: Ge
     const [selectedModel, setSelectedModel] = useState<DraftModelId>('anthropic/claude-sonnet-4');
     const [copied, setCopied] = useState(false);
 
-    // Restore content if already generated
+    // Reset state when section type changes (navigating between steps)
+    useEffect(() => {
+        // Reset local state for new section
+        setLocalContent('');
+        setHasGenerated(false);
+        setCopied(false);
+    }, [sectionType]);
+
+    // Restore content if already saved in wizard context
     useEffect(() => {
         if (content) {
+            let restoredContent = '';
             if (typeof content === 'string') {
-                setLocalContent(content);
+                restoredContent = content;
             } else if (Array.isArray(content)) {
-                setLocalContent(content.join('\n• '));
+                restoredContent = '**In today\'s post:**\n' + content.map(item => `• ${item}`).join('\n');
             } else if ('title' in content) {
-                setLocalContent(`# ${content.title}\n\nPLUS: ${content.subtitle}`);
+                restoredContent = `# ${content.title}\n\nPLUS: ${content.subtitle}`;
             }
+            setLocalContent(restoredContent);
             setHasGenerated(true);
         }
-    }, [content]);
+    }, [content, sectionType]);
 
     const copyToClipboard = async () => {
         await navigator.clipboard.writeText(localContent);
@@ -356,9 +366,9 @@ function GenerationStep({ title, sectionType, content, onSave, placeholder }: Ge
                 </div>
             )}
 
-            <div className="flex-1 min-h-0">
+            <div className="flex-1 min-h-[300px]">
                 {isGenerating && !hasGenerated ? (
-                    <div className="h-full flex flex-col items-center justify-center text-white/40">
+                    <div className="h-full min-h-[300px] flex flex-col items-center justify-center text-white/40">
                         <Loader2 className="w-8 h-8 animate-spin mb-4" />
                         <p>Generating {title.toLowerCase()}...</p>
                     </div>
@@ -367,7 +377,7 @@ function GenerationStep({ title, sectionType, content, onSave, placeholder }: Ge
                         value={localContent}
                         onChange={(e) => setLocalContent(e.target.value)}
                         placeholder={placeholder}
-                        className="h-full resize-none bg-black/20 border-white/10 text-white font-mono text-sm"
+                        className="h-full min-h-[300px] resize-none bg-black/20 border-white/10 text-white font-mono text-sm"
                     />
                 )}
             </div>
