@@ -142,6 +142,7 @@ export default function DraftPage() {
                 bulletPoints: [],
                 whyItMatters: [],
                 whatsNext: [],
+                l8rsTake: [],
             })),
             quickSummary: '',
             rawMarkdown: '',
@@ -233,6 +234,7 @@ export default function DraftPage() {
             bulletPoints: extractBullets('Key Points'),
             whyItMatters: extractBullets('Why This Matters'),
             whatsNext: extractBullets("What's Next"),
+            l8rsTake: extractBullets("L8R's Take"),
         };
     }
 

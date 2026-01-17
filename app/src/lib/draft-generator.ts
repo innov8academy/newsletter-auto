@@ -46,10 +46,11 @@ export interface StoryBlock {
     emoji: string;
     title: string;
     hookParagraph: string;
-    bulletPoints: string[];
-    whyItMatters: string[];
-    whatsNext: string[];
-    imageUrl?: string; // Generated image URL for this story
+    bulletPoints: string[];      // 🔍 Key Points
+    whyItMatters: string[];      // 🚨 Why This Matters
+    whatsNext: string[];         // ⏭️ What's Next
+    l8rsTake: string[];          // 💡 L8R's Take (Alex's opinion)
+    imageUrl?: string;           // Generated image URL for this story
 }
 
 interface DraftGenerationResult {
@@ -255,7 +256,6 @@ Let's dive deep 🧠👇
 • [Fact 1 - ONE sentence. Be specific. Use numbers.]
 • [Fact 2 - ONE sentence.]
 • [Fact 3 - ONE sentence.]
-• [Fact 4 - ONE sentence. (Optional)]
 
 **🚨 Why This Matters:**
 • [How does this affect a 25-year-old Malayali? Their job? Their daily life?]
@@ -266,6 +266,11 @@ Let's dive deep 🧠👇
 • [What to watch for in the coming weeks/months]
 • [Expected timeline or next steps]
 • [Who will be most affected?]
+
+**💡 L8R's Take:**
+• [Alex's strong opinion - no hedging, say what you actually think]
+• [Is this overhyped or actually groundbreaking? Be honest.]
+• [One actionable insight or hot take for readers]
 
 ---
 
@@ -288,12 +293,13 @@ appo adutha l8ril varam.. bie. ✌️
 
 1. **SCANNABILITY IS KING.** Every bullet point = 1 sentence. Max 2 lines. Readers SCAN, they don't read.
 2. **Write ACTUAL content.** Never use "Point 1" or placeholder text.
-3. **Each section must be UNIQUE.** Key Points = Facts. Why This Matters = Impact. What's Next = Future. NO OVERLAP.
+3. **Each section must be UNIQUE.** Key Points = Facts. Why This Matters = Impact. What's Next = Future. L8R's Take = Opinion.
 4. **Be specific.** Use company names, numbers, dates from the research.
 5. **Hook first.** The intro and story hooks must grab attention immediately.
 6. **Use the Manglish outro.** "Ithrollu innathe AI Update. appo adutha l8ril varam.. bie."
-7. **Give strong opinions.** Don't hedge. Say what you think.
-8. **Max 4 bullets per section.** Less is more.`;
+7. **Give strong opinions in L8R's Take.** Don't hedge. Say what you think.
+8. **Max 4 bullets per section.** Less is more.
+9. **NO subsections in Intro/TOC/Summary.** Only stories get the 4 subsections.`;
 
     try {
         console.log(`[Draft] Phase 1: Generating intro with ${introModel}`);
@@ -394,6 +400,11 @@ The intro has already been written. Now write:
 • [Future prediction]
 • [Timeline]
 • [Who's affected]
+
+**💡 L8R's Take:**
+• [Alex's strong opinion - be honest]
+• [Is this overhyped or actually big?]
+• [One actionable insight]
 
 ---
 
@@ -529,6 +540,7 @@ function parseNewsletterDraft(content: string, reports: ResearchReport[]): Newsl
             const bulletPoints = extractBulletsFromSection(storyContent, 'Key Points');
             const whyItMatters = extractBulletsFromSection(storyContent, 'Why This Matters');
             const whatsNext = extractBulletsFromSection(storyContent, "What's Next");
+            const l8rsTake = extractBulletsFromSection(storyContent, "L8R's Take");
 
             stories.push({
                 emoji,
@@ -537,6 +549,7 @@ function parseNewsletterDraft(content: string, reports: ResearchReport[]): Newsl
                 bulletPoints,
                 whyItMatters,
                 whatsNext,
+                l8rsTake,
             });
         } else {
             // Fallback - use report data
@@ -547,6 +560,7 @@ function parseNewsletterDraft(content: string, reports: ResearchReport[]): Newsl
                 bulletPoints: extractFromResearch(reports[i].deepResearch, 'key'),
                 whyItMatters: extractFromResearch(reports[i].deepResearch, 'matters'),
                 whatsNext: extractFromResearch(reports[i].deepResearch, 'next'),
+                l8rsTake: [], // Will be generated via L8R's Take section
             });
         }
     }
