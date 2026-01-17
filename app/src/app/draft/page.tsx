@@ -505,35 +505,60 @@ ${(localStory.l8rsTake || []).map(p => `• ${p}`).join('\n')}`;
     const parseStoryContent = (content: string, storyIndex: number): StoryBlock => {
         const emojis = ['🧠', '💰', '🤖', '🔥', '⚡', '🎯'];
 
-        const titleMatch = content.match(/###?\s*[^\n]+\n/);
-        const title = titleMatch
-            ? titleMatch[0].replace(/###?\s*[🧠💰🤖🔥⚡🎯💡🚀🎬📰🏥]\s*/, '').trim()
-            : '';
+        // Extract title - handle "### emoji Title" or "### Title"
+        const titleMatch = content.match(/###?\s*[🧠💰🤖🔥⚡🎯💡🚀🎬📰🏥]?\s*([^\n]+)/);
+        const title = titleMatch ? titleMatch[1].trim() : '';
 
-        const hookMatch = content.match(/###?[^\n]+\n\n([^*#]+)/);
+        // Extract hook paragraph - text between title and first **section**
+        const hookMatch = content.match(/###?[^\n]+\n\n([\s\S]*?)(?=\*\*[🔍🚨⏭️💡])/);
         const hookParagraph = hookMatch ? hookMatch[1].trim() : '';
 
-        const extractBullets = (sectionName: string): string[] => {
-            const pattern = new RegExp(`\\*\\*[^*]*${sectionName}[^*]*\\*\\*:?\\s*\\n([\\s\\S]*?)(?=\\*\\*|$)`, 'i');
-            const match = content.match(pattern);
-            if (!match) return [];
-            return match[1]
-                .split('\n')
-                .filter(line => line.trim().match(/^[•\-\*]/))
-                .map(line => line.replace(/^[•\-\*]\s*/, '').trim())
-                .filter(Boolean)
-                .slice(0, 4);
+        // Robust bullet extraction - tries multiple patterns
+        const extractBullets = (sectionName: string, emoji?: string): string[] => {
+            // Pattern variations to try (most specific to least)
+            const patterns = [
+                // Pattern 1: **emoji Section Name:** with bullets below
+                emoji ? new RegExp(`\\*\\*${emoji}[^*]*${sectionName}[^*]*\\*\\*:?\\s*\\n([\\s\\S]*?)(?=\\*\\*[🔍🚨⏭️💡]|$)`, 'i') : null,
+                // Pattern 2: **Section Name:** (no emoji)
+                new RegExp(`\\*\\*[^*]*${sectionName}[^*]*\\*\\*:?\\s*\\n([\\s\\S]*?)(?=\\*\\*[🔍🚨⏭️💡]|$)`, 'i'),
+                // Pattern 3: Section Name: on its own line
+                new RegExp(`${sectionName}:?\\s*\\n([\\s\\S]*?)(?=\\n\\s*\\*\\*|\\n\\s*[A-Z][a-z]+:|$)`, 'i'),
+            ].filter(Boolean) as RegExp[];
+
+            for (const pattern of patterns) {
+                const match = content.match(pattern);
+                if (match && match[1]) {
+                    const bullets = match[1]
+                        .split('\n')
+                        .map(line => line.trim())
+                        .filter(line => line.match(/^[•\-\*]/))
+                        .map(line => line.replace(/^[•\-\*]\s*/, '').trim())
+                        .filter(line => line.length > 5); // Filter out too-short lines
+
+                    if (bullets.length > 0) {
+                        console.log(`[Parse] Found ${bullets.length} bullets for "${sectionName}"`);
+                        return bullets.slice(0, 4);
+                    }
+                }
+            }
+
+            console.warn(`[Parse] No bullets found for "${sectionName}"`);
+            return [];
         };
 
-        return {
+        const result = {
             emoji: emojis[storyIndex % emojis.length],
             title,
             hookParagraph,
-            bulletPoints: extractBullets('Key Points'),
-            whyItMatters: extractBullets('Why This Matters'),
-            whatsNext: extractBullets("What's Next"),
-            l8rsTake: extractBullets("L8R's Take"),
+            bulletPoints: extractBullets('Key Points', '🔍'),
+            whyItMatters: extractBullets('Why This Matters', '🚨'),
+            whatsNext: extractBullets("What's Next", '⏭️'),
+            l8rsTake: extractBullets("L8R's Take", '💡'),
         };
+
+        console.log(`[Parse] Story ${storyIndex + 1}: title="${title.substring(0, 30)}...", bullets=[${result.bulletPoints.length}, ${result.whyItMatters.length}, ${result.whatsNext.length}, ${result.l8rsTake.length}]`);
+
+        return result;
     };
 
     const updateField = (field: keyof StoryBlock, value: string | string[]) => {

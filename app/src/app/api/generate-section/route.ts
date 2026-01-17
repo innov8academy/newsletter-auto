@@ -254,12 +254,34 @@ export async function POST(request: NextRequest) {
         // Get section-specific RAG
         const ragContext = await getSectionRAG(sectionType);
 
-        // Build research summaries
-        const researchSummaries = researchReports.map((r, i) => `
+        // Build research summaries - FOR STORY TYPE, FOCUS ON ONLY THE TARGET STORY
+        let researchSummaries: string;
+
+        if (sectionType === 'story' && storyIndex !== undefined && researchReports[storyIndex]) {
+            // For story generation: Send ONLY the target story's research
+            const targetReport = researchReports[storyIndex];
+            researchSummaries = `
+## TARGET STORY TO GENERATE (Story ${storyIndex + 1} of ${researchReports.length}):
+
+**Headline:** ${targetReport.story.headline}
+**Category:** ${targetReport.story.category}
+**Source:** ${targetReport.story.sources?.[0] || 'Unknown'}
+
+**Full Research:**
+${targetReport.deepResearch || targetReport.story.summary}
+
+---
+IMPORTANT: Generate content ONLY for this specific story above. Do NOT mix content from other stories.
+`;
+            console.log(`[Section] Story ${storyIndex + 1} focus: "${targetReport.story.headline.substring(0, 50)}..."`);
+        } else {
+            // For other sections (title, intro, toc, summary): Send all stories for context
+            researchSummaries = researchReports.map((r, i) => `
 STORY ${i + 1}: ${r.story.headline}
 Category: ${r.story.category}
-Research: ${r.deepResearch || r.story.summary}
+Summary: ${(r.deepResearch || r.story.summary || '').substring(0, 500)}...
 `).join('\n---\n');
+        }
 
         // Build prompts
         const systemPrompt = getBaseSystemPrompt(dateContext) + ragContext;
@@ -271,7 +293,7 @@ Research: ${r.deepResearch || r.story.summary}
 
         const startTime = Date.now();
 
-        const response = await fetch(OPENROUTER_API_URL, {
+        const fetchOptions = {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -288,21 +310,54 @@ Research: ${r.deepResearch || r.story.summary}
                 temperature: 0.7,
                 max_tokens: sectionType === 'story' ? 1500 : 800,
             }),
-        });
+        };
 
-        if (!response.ok) {
-            const errorText = await response.text();
-            return NextResponse.json({
-                success: false,
-                error: `API Error (${selectedModel}): ${response.status} - ${errorText}`
-            }, { status: 500 });
+        // Retry logic - try up to 2 times for empty responses
+        let content: string | null = null;
+        let lastError: string | null = null;
+        const maxRetries = 2;
+
+        for (let attempt = 1; attempt <= maxRetries; attempt++) {
+            try {
+                console.log(`[Section] Attempt ${attempt}/${maxRetries}...`);
+
+                const response = await fetch(OPENROUTER_API_URL, fetchOptions);
+
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    lastError = `API Error (${selectedModel}): ${response.status} - ${errorText.substring(0, 200)}`;
+                    console.error(`[Section] Attempt ${attempt} failed: ${lastError}`);
+                    if (attempt < maxRetries) continue;
+                    break;
+                }
+
+                const data = await response.json();
+                content = data.choices?.[0]?.message?.content?.trim();
+
+                if (!content || content.length < 50) {
+                    lastError = `Empty or too short response (${content?.length || 0} chars)`;
+                    console.warn(`[Section] Attempt ${attempt}: ${lastError}`);
+                    if (attempt < maxRetries) continue;
+                    break;
+                }
+
+                // Success!
+                console.log(`[Section] Success on attempt ${attempt}, ${content.length} chars`);
+                break;
+
+            } catch (err) {
+                lastError = err instanceof Error ? err.message : 'Network error';
+                console.error(`[Section] Attempt ${attempt} error:`, lastError);
+                if (attempt < maxRetries) continue;
+            }
         }
 
-        const data = await response.json();
-        const content = data.choices?.[0]?.message?.content?.trim();
-
         if (!content) {
-            return NextResponse.json({ success: false, error: 'No content in response' }, { status: 500 });
+            return NextResponse.json({
+                success: false,
+                error: lastError || 'No content after retries',
+                debug: { attempts: maxRetries, lastError }
+            }, { status: 500 });
         }
 
         const duration = ((Date.now() - startTime) / 1000).toFixed(1);
