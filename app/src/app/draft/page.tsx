@@ -39,6 +39,53 @@ import {
     History,
 } from 'lucide-react';
 
+// Helper function to convert wizard state to NewsletterDraft and save to localStorage
+function saveWizardStateToCurrentDraft(completed: {
+    hook: { title: string; subtitle: string } | null;
+    intro: string | null;
+    toc: string[] | null;
+    stories: StoryBlock[];
+    summary: string | null;
+    memeIdeas: Array<{ templateName: string; topText: string; bottomText: string; angle: string }>;
+}) {
+    const draft: NewsletterDraft = {
+        title: completed.hook?.title || '',
+        subtitle: completed.hook?.subtitle || '',
+        date: getCurrentDateContext(),
+        memeIdeas: completed.memeIdeas || [],
+        intro: completed.intro || '',
+        toc: completed.toc || [],
+        stories: completed.stories || [],
+        quickSummary: completed.summary || '',
+        rawMarkdown: '',
+    };
+    localStorage.setItem('currentDraft', JSON.stringify(draft));
+}
+
+// Skip to Studio button component with context access
+function SkipToStudioButton() {
+    const router = useRouter();
+    const { completed } = useWizard();
+
+    const handleSkipToStudio = () => {
+        // Save current state to localStorage before navigating
+        saveWizardStateToCurrentDraft(completed);
+        router.push('/studio');
+    };
+
+    return (
+        <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleSkipToStudio}
+            className="text-purple-300 hover:text-purple-200"
+        >
+            <ImageIcon className="w-4 h-4 mr-2" />
+            Skip to Studio
+        </Button>
+    );
+}
+
 // Step content components
 function SetupStep() {
     const router = useRouter();
@@ -905,6 +952,11 @@ function WizardContent() {
                         content={completed.summary}
                         onSave={(summary) => {
                             saveSummary(summary);
+
+                            // Save with the new summary value (completed.summary won't have it yet)
+                            const updatedCompleted = { ...completed, summary };
+                            saveWizardStateToCurrentDraft(updatedCompleted);
+
                             router.push('/studio');
                         }}
                         placeholder="### 🚀 Quick L8R Summary..."
@@ -960,15 +1012,7 @@ function WizardDraftPage() {
                                 <History className="w-4 h-4 mr-1" />
                                 Classic View
                             </Button>
-                            <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => router.push('/studio')}
-                                className="text-purple-300 hover:text-purple-200"
-                            >
-                                <ImageIcon className="w-4 h-4 mr-2" />
-                                Skip to Studio
-                            </Button>
+                            <SkipToStudioButton />
                         </div>
                     </div>
 
