@@ -48,7 +48,7 @@ export function EditableSection({
     const [editValue, setEditValue] = useState(content);
     const [isRegenerating, setIsRegenerating] = useState(false);
     const [regeneratePrompt, setRegeneratePrompt] = useState('');
-    const [selectedModel, setSelectedModel] = useState<DraftModelId>('anthropic/claude-sonnet-4');
+    const [selectedModel, setSelectedModel] = useState<DraftModelId>('anthropic/claude-sonnet-4.5');
     const [popoverOpen, setPopoverOpen] = useState(false);
     const containerRef = useRef<HTMLDivElement>(null);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -299,7 +299,7 @@ export function EditableBulletList({
     const [editValue, setEditValue] = useState((items || []).join('\n'));
     const [isRegenerating, setIsRegenerating] = useState(false);
     const [regeneratePrompt, setRegeneratePrompt] = useState('');
-    const [selectedModel, setSelectedModel] = useState<DraftModelId>('anthropic/claude-sonnet-4');
+    const [selectedModel, setSelectedModel] = useState<DraftModelId>('anthropic/claude-sonnet-4.5');
     const [popoverOpen, setPopoverOpen] = useState(false);
     const containerRef = useRef<HTMLDivElement>(null);
 

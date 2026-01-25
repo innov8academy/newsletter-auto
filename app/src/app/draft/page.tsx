@@ -262,7 +262,7 @@ function GenerationStep({ title, sectionType, content, onSave, placeholder }: Ge
     const { selectedReports, prevStep, nextStep, isGenerating, setIsGenerating, setError, error } = useWizard();
     const [localContent, setLocalContent] = useState('');
     const [hasGenerated, setHasGenerated] = useState(false);
-    const [selectedModel, setSelectedModel] = useState<DraftModelId>('anthropic/claude-sonnet-4');
+    const [selectedModel, setSelectedModel] = useState<DraftModelId>('anthropic/claude-sonnet-4.5');
     const [copied, setCopied] = useState(false);
 
     // Reset state when section type changes (navigating between steps)

@@ -150,7 +150,7 @@ Do NOT include any explanations, phase breakdowns, or commentary. Output ONLY th
             'HTTP-Referer': 'https://innov8-newsletter.local',
         },
         body: JSON.stringify({
-            model: 'anthropic/claude-sonnet-4',
+            model: 'anthropic/claude-sonnet-4.5',
             messages: [
                 {
                     role: 'system',

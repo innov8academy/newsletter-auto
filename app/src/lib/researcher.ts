@@ -15,7 +15,7 @@ export const RESEARCH_MODELS = [
     { id: 'alibaba/tongyi-deepresearch-30b-a3b', name: 'Tongyi DeepResearch', description: 'Alibaba deep research agent', category: 'research' },
 
     // Strong General Purpose (great writing quality)
-    { id: 'anthropic/claude-sonnet-4', name: 'Claude Sonnet 4', description: 'Best writing quality', category: 'general' },
+    { id: 'anthropic/claude-sonnet-4.5', name: 'Claude Sonnet 4.5', description: 'Best writing quality', category: 'general' },
     { id: 'openai/gpt-4o', name: 'GPT-4o', description: 'OpenAI flagship', category: 'general' },
     { id: 'deepseek/deepseek-r1', name: 'DeepSeek R1', description: 'Powerful reasoning', category: 'general' },
 
