@@ -80,10 +80,38 @@ ${isPerplexity ? 'Extract the key insights and thinking. Keep it under 800 words
         }
 
         const data = await response.json();
+
+        // Debug logging for OpenAI deep research models
+        if (selectedModel.includes('deep-research')) {
+            console.log(`[Deep Research Debug] Model: ${selectedModel}`);
+            console.log(`[Deep Research Debug] Response keys:`, Object.keys(data));
+            console.log(`[Deep Research Debug] Choices count:`, data.choices?.length);
+            if (data.choices?.[0]) {
+                console.log(`[Deep Research Debug] Choice[0] keys:`, Object.keys(data.choices[0]));
+                console.log(`[Deep Research Debug] Message keys:`, data.choices[0].message ? Object.keys(data.choices[0].message) : 'no message');
+                console.log(`[Deep Research Debug] Content length:`, data.choices[0].message?.content?.length || 0);
+                console.log(`[Deep Research Debug] Finish reason:`, data.choices[0].finish_reason);
+            }
+            // Check for alternative response formats
+            if (data.output) {
+                console.log(`[Deep Research Debug] Output field found:`, typeof data.output);
+            }
+            if (data.response) {
+                console.log(`[Deep Research Debug] Response field found:`, typeof data.response);
+            }
+        }
+
         const content = data.choices?.[0]?.message?.content;
 
         if (!content) {
-            return { success: false, error: 'No content in API response' };
+            // Try alternative response formats for deep research
+            const altContent = data.output?.text || data.response?.text || data.text;
+            if (altContent) {
+                console.log(`[Deep Research Debug] Using alternative content format`);
+                const report = parseResearchContent(story, altContent);
+                return { success: true, report };
+            }
+            return { success: false, error: `No content in API response. Model: ${selectedModel}. Keys: ${Object.keys(data).join(', ')}` };
         }
 
         // Parse the structured response
