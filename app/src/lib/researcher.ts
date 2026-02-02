@@ -188,6 +188,9 @@ async function callOpenRouter(
     const modelConfig = RESEARCH_MODELS.find(m => m.id === model);
     const enableReasoning = modelConfig && 'reasoning' in modelConfig && modelConfig.reasoning;
 
+    // Check if model supports temperature (OpenAI deep research/reasoning models don't)
+    const isOpenAIReasoning = model.includes('o4-mini') || model.includes('o1') || model.includes('o3');
+
     // Build request body - reduce max_tokens for cost-optimized (Perplexity) calls
     const requestBody: Record<string, unknown> = {
         model,
@@ -195,9 +198,13 @@ async function callOpenRouter(
             { role: 'system', content: systemPrompt },
             { role: 'user', content: userPrompt },
         ],
-        temperature: 0.3, // Lower for more factual output
         max_tokens: isCostOptimized ? 1500 : 4000,
     };
+
+    // Only add temperature for models that support it
+    if (!isOpenAIReasoning) {
+        requestBody.temperature = 0.3; // Lower for more factual output
+    }
 
     // Enable reasoning for supported models (xAI Grok)
     if (enableReasoning) {
