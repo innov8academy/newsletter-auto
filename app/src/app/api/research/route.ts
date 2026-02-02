@@ -16,7 +16,7 @@ export async function POST(request: NextRequest) {
         };
 
         const apiKey = clientApiKey || process.env.OPENROUTER_API_KEY || '';
-        const selectedModel = modelId || 'perplexity/sonar-deep-research';
+        const selectedModel = modelId || 'perplexity/sonar';
 
         if (!story) {
             return NextResponse.json(
