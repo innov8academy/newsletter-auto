@@ -12,6 +12,7 @@ const SOURCE_LABELS: Record<CostSource, string> = {
     'draft': 'Draft',
     'regen-section': 'Section Regen',
     'regen-story': 'Story Regen',
+    'section-story-batch': 'Batch Stories',
     'image-prompt': 'Image Prompt',
     'image-gen': 'Image Gen',
 };

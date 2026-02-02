@@ -46,33 +46,13 @@ export async function generateResearchReport(
     modelId?: ResearchModelId
 ): Promise<ResearchResult> {
     const selectedModel = modelId || DEFAULT_MODEL;
-    const systemPrompt = `You are a sharp, witty newsletter writer for "Innov8 AI" - a tech newsletter that explains AI news to curious people who want to understand what's ACTUALLY happening, not just the hype.
 
-Your writing style:
-- CONVERSATIONAL: Write like you're explaining this to a smart friend over coffee
-- PUNCHY: Short paragraphs. No filler. Every sentence earns its place.
-- OPINIONATED: Take a stance. Say what YOU think matters.
-- CLEAR: Explain technical concepts without dumbing them down
-- ENGAGING: Start with a hook. End with something memorable.
+    // Check if using Perplexity model - use cost-optimized prompt
+    const isPerplexity = selectedModel.toLowerCase().includes('perplexity');
 
-Structure your response EXACTLY as follows:
-
-## The Story
-[A 2-3 paragraph narrative that explains WHAT happened and WHY anyone should care. This should read like the opening of a great article - hook them immediately. Include the key facts but make them interesting.]
-
-## The Context
-[1-2 paragraphs explaining the bigger picture. What's this really about? Who wins/loses? How does this fit into the AI landscape? Be specific.]
-
-## The Hot Take 🔥
-[Your bold, opinionated take in 2-3 sentences. Don't be wishy-washy. What's the real story here that others are missing?]
-
-## What's Next
-[2-3 bullet points on what to watch for. Make these specific and actionable, not generic predictions.]
-
-## Quotables
-[If you found any notable quotes from key people involved, include 1-2 of the best ones. If none exist, skip this section.]
-
-Remember: You're writing content that will be used in an actual newsletter. It should be ready to publish with minimal editing. No hedging, no "it remains to be seen", no corporate speak.`;
+    const systemPrompt = isPerplexity
+        ? getCostOptimizedPrompt()
+        : getVerbosePrompt();
 
     const userPrompt = `Research and write about this story for the newsletter:
 
@@ -86,11 +66,11 @@ Remember: You're writing content that will be used in an actual newsletter. It s
 
 ${story.originalUrl ? `**Source URL:** ${story.originalUrl}` : ''}
 
-Write this up for the newsletter. Make it engaging and newsletter-ready. Focus on what's actually interesting about this story.`;
+${isPerplexity ? 'Extract the key insights and thinking. Keep it under 800 words.' : 'Write this up for the newsletter. Make it engaging and newsletter-ready. Focus on what\'s actually interesting about this story.'}`;
 
     try {
         // Call the selected model
-        const response = await callOpenRouter(apiKey, selectedModel, systemPrompt, userPrompt);
+        const response = await callOpenRouter(apiKey, selectedModel, systemPrompt, userPrompt, isPerplexity);
 
         if (!response.ok) {
             const errorText = await response.text();
@@ -117,17 +97,96 @@ Write this up for the newsletter. Make it engaging and newsletter-ready. Focus o
     }
 }
 
+/**
+ * Cost-optimized prompt for Perplexity models - structured bullets, no prose
+ */
+function getCostOptimizedPrompt(): string {
+    return `You are a researcher preparing raw material for a newsletter writer.
+Your job: Extract the THINKING and INSIGHTS, not just facts.
+
+## OUTPUT FORMAT (bullet points only, NO prose):
+
+### THE ANGLE (What makes this interesting?)
+• Why should a 25yo tech enthusiast care about this?
+• What's the surprising or counterintuitive element?
+• One-line hook that grabs attention
+
+### KEY FACTS (with specifics)
+• Company names, $ amounts, dates, people quoted
+• Technical details that matter
+• Comparisons or benchmarks
+
+### IMPLICATIONS (Who wins/loses?)
+• Who benefits from this?
+• Who gets hurt?
+• What changes in the industry?
+
+### PREDICTIONS (What happens next?)
+• Short-term: next 3 months
+• Medium-term: next 1 year
+• What should readers watch for?
+
+### HOT TAKE (Strong opinion)
+• Is this overhyped or actually big?
+• Contrarian view if any
+• What others are missing
+
+### QUOTABLES (if found)
+• "[Exact quote]" — Person, Title
+
+RULES:
+- STRICT WORD LIMIT: Keep entire response under 800 words
+- Each bullet = 1-2 sentences MAX
+- Be specific: names, numbers, dates
+- Skip sources/URLs (not needed)
+- NO prose paragraphs`;
+}
+
+/**
+ * Original verbose prompt for general models (Grok, Claude, etc.)
+ */
+function getVerbosePrompt(): string {
+    return `You are a sharp, witty newsletter writer for "Innov8 AI" - a tech newsletter that explains AI news to curious people who want to understand what's ACTUALLY happening, not just the hype.
+
+Your writing style:
+- CONVERSATIONAL: Write like you're explaining this to a smart friend over coffee
+- PUNCHY: Short paragraphs. No filler. Every sentence earns its place.
+- OPINIONATED: Take a stance. Say what YOU think matters.
+- CLEAR: Explain technical concepts without dumbing them down
+- ENGAGING: Start with a hook. End with something memorable.
+
+Structure your response EXACTLY as follows:
+
+## The Story
+[A 2-3 paragraph narrative that explains WHAT happened and WHY anyone should care. This should read like the opening of a great article - hook them immediately. Include the key facts but make them interesting.]
+
+## The Context
+[1-2 paragraphs explaining the bigger picture. What's this really about? Who wins/loses? How does this fit into the AI landscape? Be specific.]
+
+## The Hot Take 🔥
+[Your bold, opinionated take in 2-3 sentences. Don't be wishy-washy. What's the real story here that others are missing?]
+
+## What's Next
+[2-3 bullet points on what to watch for. Make these specific and actionable, not generic predictions.]
+
+## Quotables
+[If you found any notable quotes from key people involved, include 1-2 of the best ones. If none exist, skip this section.]
+
+Remember: You're writing content that will be used in an actual newsletter. It should be ready to publish with minimal editing. No hedging, no "it remains to be seen", no corporate speak.`;
+}
+
 async function callOpenRouter(
     apiKey: string,
     model: string,
     systemPrompt: string,
-    userPrompt: string
+    userPrompt: string,
+    isCostOptimized: boolean = false
 ): Promise<Response> {
     // Check if the model supports reasoning (Grok models)
     const modelConfig = RESEARCH_MODELS.find(m => m.id === model);
     const enableReasoning = modelConfig && 'reasoning' in modelConfig && modelConfig.reasoning;
 
-    // Build request body
+    // Build request body - reduce max_tokens for cost-optimized (Perplexity) calls
     const requestBody: Record<string, unknown> = {
         model,
         messages: [
@@ -135,7 +194,7 @@ async function callOpenRouter(
             { role: 'user', content: userPrompt },
         ],
         temperature: 0.3, // Lower for more factual output
-        max_tokens: 4000,
+        max_tokens: isCostOptimized ? 1500 : 4000,
     };
 
     // Enable reasoning for supported models (xAI Grok)

@@ -21,6 +21,7 @@ export type CostSource =
     | 'draft'
     | 'regen-section'
     | 'regen-story'
+    | 'section-story-batch'
     | 'image-prompt'
     | 'image-gen';
 
@@ -164,6 +165,7 @@ export function getCostSummary(): {
         'draft': 0,
         'regen-section': 0,
         'regen-story': 0,
+        'section-story-batch': 0,
         'image-prompt': 0,
         'image-gen': 0,
     };
