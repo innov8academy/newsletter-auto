@@ -6,6 +6,9 @@ import { generateResearchReport, ResearchModelId } from '@/lib/researcher';
 import { CuratedStory } from '@/lib/types';
 import { calculateCost } from '@/lib/cost-tracker';
 
+// Extend timeout for deep research models that take 30-60+ seconds
+export const maxDuration = 120; // seconds (Vercel Pro limit, adjust for your plan)
+
 export async function POST(request: NextRequest) {
     try {
         const body = await request.json();
