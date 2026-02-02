@@ -43,8 +43,8 @@ interface StoryResearchState {
     error?: string;
 }
 
-// Default to o4-mini-deep-research for best quality
-const DEFAULT_RESEARCH_MODEL: ResearchModelId = 'openai/o4-mini-deep-research';
+// Default to Perplexity Deep Research for best quality + speed
+const DEFAULT_RESEARCH_MODEL: ResearchModelId = 'perplexity/sonar-deep-research';
 
 export function ResearchPanel({ selectedStories, apiKey, onReportGenerated }: ResearchPanelProps) {
     const [researchStates, setResearchStates] = useState<Record<string, StoryResearchState>>({});

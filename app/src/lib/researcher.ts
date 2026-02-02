@@ -9,8 +9,8 @@ const OPENROUTER_API_URL = 'https://openrouter.ai/api/v1/chat/completions';
 // Updated 2025: Organized by specialty
 export const RESEARCH_MODELS = [
     // Deep Research Specialists (have web access or agentic research capability)
-    { id: 'openai/o4-mini-deep-research', name: 'OpenAI o4-mini Deep Research', description: '🧪 OpenAI deep research - test vs Perplexity', category: 'research' },
-    { id: 'perplexity/sonar-deep-research', name: 'Perplexity Deep Research', description: '🔬 Best quality but $1+/call', category: 'research' },
+    // NOTE: o4-mini-deep-research removed - takes 5-10min, exceeds Vercel timeout
+    { id: 'perplexity/sonar-deep-research', name: 'Perplexity Deep Research', description: '🔬 Best deep research - fast & reliable', category: 'research' },
     { id: 'x-ai/grok-4.1-fast', name: 'Grok 4.1 Fast (Reasoning)', description: '🚀 10x cheaper! Deep reasoning + 2M context', category: 'research', reasoning: true },
     { id: 'perplexity/sonar', name: 'Perplexity Sonar', description: '💰 Web search - $1/1M tokens', category: 'research' },
     { id: 'perplexity/sonar-pro', name: 'Perplexity Sonar Pro', description: '🔥 Advanced web research', category: 'research' },
@@ -362,17 +362,15 @@ async function callOpenRouter(
         requestBody.reasoning = { enabled: true };
     }
 
-    // OpenAI deep research models require the web_search tool via OpenRouter plugins
-    // Per OpenRouter docs: use plugins array with web search enabled
+    // OpenAI deep research models (o4-mini-deep-research) have web search built-in
+    // According to OpenRouter docs: "This model always uses the 'web_search' tool"
+    // We should NOT add extra plugins/tools as they may conflict with the built-in behavior
+    // The model handles web search internally - just send the request normally
     if (isOpenAIDeepResearch) {
-        requestBody.plugins = [
-            { id: 'web', max_results: 10 }
-        ];
-        // Also add tools array for OpenAI's native web search format
-        requestBody.tools = [
-            { type: 'web_search_preview' }
-        ];
-        console.log(`[Deep Research] Enabling web search plugins for model: ${model}`);
+        console.log(`[Deep Research] Model ${model} has built-in web search, not adding extra plugins`);
+        // Remove max_tokens limit for deep research - let it use its default
+        // Deep research models may have different token handling
+        delete requestBody.max_tokens;
     }
 
     console.log(`[OpenRouter] Request to ${model}:`, JSON.stringify(requestBody, null, 2));
