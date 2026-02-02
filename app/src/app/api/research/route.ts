@@ -6,9 +6,9 @@ import { generateResearchReport, ResearchModelId } from '@/lib/researcher';
 import { CuratedStory } from '@/lib/types';
 import { calculateCost } from '@/lib/cost-tracker';
 
-// Use Edge Runtime to avoid 10s serverless timeout issues on Vercel Free
-export const runtime = 'edge';
-export const maxDuration = 60; // Edge functions can run longer
+// Revert to Serverless with extended timeout (Node.js)
+// User reports Perplexity Deep Research works fine, so Edge isn't strictly needed if setup is correct
+export const maxDuration = 60; // Standard extended timeout
 
 export async function POST(request: NextRequest) {
     try {

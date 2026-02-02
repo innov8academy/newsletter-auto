@@ -216,12 +216,13 @@ async function callOpenRouter(
     const modelConfig = RESEARCH_MODELS.find(m => m.id === model);
     const enableReasoning = modelConfig && 'reasoning' in modelConfig && modelConfig.reasoning;
 
-    // Check if model is OpenAI deep research (needs web plugin, no temperature)
-    const isOpenAIDeepResearch = model.includes('o4-mini-deep-research');
+    // Check if model is OpenAI deep research or reasoning model
+    // o4-mini-deep-research and o1/o3 do not support temperature
     const isOpenAIReasoning = model.includes('o4-mini') || model.includes('o1') || model.includes('o3');
+    const isOpenAIDeepResearch = model.includes('deep-research');
 
-    // Build request body - reduce max_tokens for cost-optimized (Perplexity) calls
-    // OpenAI deep research models may need more output tokens
+    // Build request body - reduce max_tokens for cost-optimized calls
+    // Deep research models need more output tokens
     const requestBody: Record<string, unknown> = {
         model,
         messages: [
@@ -229,11 +230,12 @@ async function callOpenRouter(
             { role: 'user', content: userPrompt },
         ],
         max_tokens: isOpenAIDeepResearch ? 16000 : (isCostOptimized ? 1500 : 4000),
+        stream: false, // Explicitly disable streaming to ensure we get a full JSON response
     };
 
     // Only add temperature for models that support it (OpenAI reasoning models don't)
     if (!isOpenAIReasoning) {
-        requestBody.temperature = 0.3; // Lower for more factual output
+        requestBody.temperature = 0.3;
     }
 
     // Enable reasoning for supported models (xAI Grok)
@@ -241,10 +243,9 @@ async function callOpenRouter(
         requestBody.reasoning = { enabled: true };
     }
 
-    // Enable web search plugin for OpenAI deep research models
-    if (isOpenAIDeepResearch) {
-        requestBody.plugins = [{ id: 'web', enabled: true }];
-    }
+    // Note: OpenAI o4-mini-deep-research on OpenRouter automatically uses the 'web_search' tool 
+    // when configured as such, or handles it internally. 
+    // We do NOT manually add plugins here to avoid conflicts.
 
     return fetch(OPENROUTER_API_URL, {
         method: 'POST',
