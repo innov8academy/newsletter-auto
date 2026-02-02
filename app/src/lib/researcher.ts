@@ -243,11 +243,22 @@ async function callOpenRouter(
         requestBody.reasoning = { enabled: true };
     }
 
-    // Note: OpenAI o4-mini-deep-research on OpenRouter automatically uses the 'web_search' tool 
-    // when configured as such, or handles it internally. 
-    // We do NOT manually add plugins here to avoid conflicts.
+    // OpenAI deep research models require the web_search tool via OpenRouter plugins
+    // Per OpenRouter docs: use plugins array with web search enabled
+    if (isOpenAIDeepResearch) {
+        requestBody.plugins = [
+            { id: 'web', max_results: 10 }
+        ];
+        // Also add tools array for OpenAI's native web search format
+        requestBody.tools = [
+            { type: 'web_search_preview' }
+        ];
+        console.log(`[Deep Research] Enabling web search plugins for model: ${model}`);
+    }
 
-    return fetch(OPENROUTER_API_URL, {
+    console.log(`[OpenRouter] Request to ${model}:`, JSON.stringify(requestBody, null, 2));
+
+    const response = await fetch(OPENROUTER_API_URL, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -257,6 +268,21 @@ async function callOpenRouter(
         },
         body: JSON.stringify(requestBody),
     });
+
+    // Log response status for debugging
+    if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`[OpenRouter] Error response (${response.status}):`, errorText);
+        // Return a new Response with the error for proper handling upstream
+        return new Response(JSON.stringify({
+            error: { message: errorText, status: response.status }
+        }), {
+            status: response.status,
+            headers: { 'Content-Type': 'application/json' }
+        });
+    }
+
+    return response;
 }
 
 /**

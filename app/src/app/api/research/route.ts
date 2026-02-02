@@ -6,9 +6,9 @@ import { generateResearchReport, ResearchModelId } from '@/lib/researcher';
 import { CuratedStory } from '@/lib/types';
 import { calculateCost } from '@/lib/cost-tracker';
 
-// Revert to Serverless with extended timeout (Node.js)
-// User reports Perplexity Deep Research works fine, so Edge isn't strictly needed if setup is correct
-export const maxDuration = 60; // Standard extended timeout
+// Extended timeout for deep research models (can take 2-5 minutes)
+// OpenAI deep research models perform web searches and need more time
+export const maxDuration = 300; // 5 minutes for deep research
 
 export async function POST(request: NextRequest) {
     try {
