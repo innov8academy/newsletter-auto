@@ -11,8 +11,17 @@ import { calculateCost } from '@/lib/cost-tracker';
 export const maxDuration = 300; // 5 minutes for deep research
 
 export async function POST(request: NextRequest) {
+    console.log('[Research API] POST request received');
+
     try {
         const body = await request.json();
+        console.log('[Research API] Request body parsed:', {
+            hasStory: !!body.story,
+            storyHeadline: body.story?.headline?.substring(0, 50),
+            hasApiKey: !!body.apiKey,
+            modelId: body.modelId
+        });
+
         const { story, apiKey: clientApiKey, modelId } = body as {
             story: CuratedStory;
             apiKey: string;
@@ -21,6 +30,9 @@ export async function POST(request: NextRequest) {
 
         const apiKey = clientApiKey || process.env.OPENROUTER_API_KEY || '';
         const selectedModel = modelId || 'perplexity/sonar';
+
+        console.log('[Research API] Using model:', selectedModel);
+        console.log('[Research API] API key present:', !!apiKey, 'length:', apiKey?.length);
 
         if (!story) {
             return NextResponse.json(
@@ -39,7 +51,9 @@ export async function POST(request: NextRequest) {
         console.log(`[Research] Starting deep dive on: ${story.headline} (model: ${selectedModel})`);
         const startTime = Date.now();
 
+        console.log('[Research API] Calling generateResearchReport...');
         const result = await generateResearchReport(story, apiKey, modelId);
+        console.log('[Research API] generateResearchReport returned:', { success: result.success, hasReport: !!result.report, error: result.error });
 
         const duration = ((Date.now() - startTime) / 1000).toFixed(1);
         console.log(`[Research] Completed in ${duration}s - Success: ${result.success}`);

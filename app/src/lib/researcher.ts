@@ -47,7 +47,15 @@ export async function generateResearchReport(
     apiKey: string,
     modelId?: ResearchModelId
 ): Promise<ResearchResult> {
+    console.log('[generateResearchReport] Called with:', {
+        storyId: story.id,
+        headline: story.headline?.substring(0, 50),
+        modelId,
+        hasApiKey: !!apiKey
+    });
+
     const selectedModel = modelId || DEFAULT_MODEL;
+    console.log('[generateResearchReport] Selected model:', selectedModel);
 
     // Check if using Perplexity model - use cost-optimized prompt
     const isPerplexity = selectedModel.toLowerCase().includes('perplexity');
@@ -72,7 +80,9 @@ ${isPerplexity ? 'Extract the key insights and thinking. Keep it under 800 words
 
     try {
         // Call the selected model
+        console.log('[generateResearchReport] Calling callOpenRouter...');
         const response = await callOpenRouter(apiKey, selectedModel, systemPrompt, userPrompt, isPerplexity);
+        console.log('[generateResearchReport] callOpenRouter returned, status:', response.status);
 
         if (!response.ok) {
             const errorText = await response.text();
@@ -101,17 +111,123 @@ ${isPerplexity ? 'Extract the key insights and thinking. Keep it under 800 words
             }
         }
 
-        const content = data.choices?.[0]?.message?.content;
+        // Log the full response structure for deep research models
+        if (selectedModel.includes('deep-research')) {
+            console.log(`[Deep Research Debug] Full response:`, JSON.stringify(data, null, 2).substring(0, 3000));
+        }
+
+        // Try multiple extraction paths for content
+        let content = data.choices?.[0]?.message?.content;
+
+        // OpenAI Deep Research models use a different response format:
+        // output array → find type: "message" → content array → find type: "output_text" → text
+        if (!content && selectedModel.includes('deep-research')) {
+            console.log('[Deep Research] Trying deep research specific extraction...');
+
+            // Try the output array format (OpenAI Responses API format)
+            if (Array.isArray(data.output)) {
+                for (const item of data.output) {
+                    if (item.type === 'message' && Array.isArray(item.content)) {
+                        for (const contentItem of item.content) {
+                            if (contentItem.type === 'output_text' && contentItem.text) {
+                                content = contentItem.text;
+                                console.log('[Deep Research] Found content via output[].content[].text');
+                                break;
+                            }
+                            if (contentItem.type === 'text' && contentItem.text) {
+                                content = contentItem.text;
+                                console.log('[Deep Research] Found content via output[].content[].text (text type)');
+                                break;
+                            }
+                        }
+                    }
+                    if (content) break;
+
+                    // Also try direct text field on output items
+                    if (item.text) {
+                        content = item.text;
+                        console.log('[Deep Research] Found content via output[].text');
+                        break;
+                    }
+                }
+            }
+
+            // Try output_text field directly
+            if (!content && data.output_text) {
+                content = data.output_text;
+                console.log('[Deep Research] Found content via output_text');
+            }
+
+            // Try choices with different structure
+            if (!content && data.choices?.[0]) {
+                const choice = data.choices[0];
+
+                // Check if message.content is an array (OpenAI format)
+                if (Array.isArray(choice.message?.content)) {
+                    for (const item of choice.message.content) {
+                        if (item.type === 'text' && item.text) {
+                            content = item.text;
+                            console.log('[Deep Research] Found content via choices[0].message.content[] array');
+                            break;
+                        }
+                        if (item.type === 'output_text' && item.text) {
+                            content = item.text;
+                            console.log('[Deep Research] Found content via choices[0].message.content[] output_text');
+                            break;
+                        }
+                    }
+                }
+
+                // Try other choice paths
+                if (!content) {
+                    content = choice.text ||
+                              choice.content ||
+                              choice.message?.text ||
+                              choice.output?.content ||
+                              choice.output?.text;
+
+                    if (content) {
+                        console.log('[Deep Research] Found content via alternative choice path');
+                    }
+                }
+            }
+        }
+
+        // Alternative paths for non-deep-research models
+        if (!content && data.choices?.[0]) {
+            const choice = data.choices[0];
+            content = choice.text ||
+                      choice.content ||
+                      choice.message?.text;
+
+            if (content) {
+                console.log('[Research] Found content via alternative choice path');
+            }
+        }
+
+        // Try top-level alternative formats
+        if (!content) {
+            content = data.output?.text ||
+                      data.output?.content ||
+                      data.response?.text ||
+                      data.response?.content ||
+                      data.text ||
+                      data.content;
+
+            if (content) {
+                console.log('[Research] Found content via top-level alternative');
+            }
+        }
 
         if (!content) {
-            // Try alternative response formats for deep research
-            const altContent = data.output?.text || data.response?.text || data.text;
-            if (altContent) {
-                console.log(`[Deep Research Debug] Using alternative content format`);
-                const report = parseResearchContent(story, altContent);
-                return { success: true, report };
-            }
-            return { success: false, error: `No content in API response. Model: ${selectedModel}. Keys: ${Object.keys(data).join(', ')}` };
+            // Log more details about what we received
+            const choiceKeys = data.choices?.[0] ? Object.keys(data.choices[0]) : [];
+            const messageKeys = data.choices?.[0]?.message ? Object.keys(data.choices[0].message) : [];
+            const outputInfo = Array.isArray(data.output) ? `output is array of ${data.output.length} items` : `output type: ${typeof data.output}`;
+            return {
+                success: false,
+                error: `No content in API response. Model: ${selectedModel}. Keys: ${Object.keys(data).join(', ')}. Choice keys: ${choiceKeys.join(', ')}. Message keys: ${messageKeys.join(', ')}. ${outputInfo}`
+            };
         }
 
         // Parse the structured response
@@ -212,6 +328,9 @@ async function callOpenRouter(
     userPrompt: string,
     isCostOptimized: boolean = false
 ): Promise<Response> {
+    console.log('[callOpenRouter] Starting request to model:', model);
+    console.log('[callOpenRouter] API URL:', OPENROUTER_API_URL);
+
     // Check if the model supports reasoning (Grok models)
     const modelConfig = RESEARCH_MODELS.find(m => m.id === model);
     const enableReasoning = modelConfig && 'reasoning' in modelConfig && modelConfig.reasoning;
@@ -257,32 +376,41 @@ async function callOpenRouter(
     }
 
     console.log(`[OpenRouter] Request to ${model}:`, JSON.stringify(requestBody, null, 2));
+    console.log('[callOpenRouter] About to call fetch...');
 
-    const response = await fetch(OPENROUTER_API_URL, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${apiKey}`,
-            'HTTP-Referer': 'https://innov8ai.local',
-            'X-Title': 'Innov8 AI Research Agent',
-        },
-        body: JSON.stringify(requestBody),
-    });
-
-    // Log response status for debugging
-    if (!response.ok) {
-        const errorText = await response.text();
-        console.error(`[OpenRouter] Error response (${response.status}):`, errorText);
-        // Return a new Response with the error for proper handling upstream
-        return new Response(JSON.stringify({
-            error: { message: errorText, status: response.status }
-        }), {
-            status: response.status,
-            headers: { 'Content-Type': 'application/json' }
+    try {
+        const response = await fetch(OPENROUTER_API_URL, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${apiKey}`,
+                'HTTP-Referer': 'https://innov8ai.local',
+                'X-Title': 'Innov8 AI Research Agent',
+            },
+            body: JSON.stringify(requestBody),
         });
-    }
 
-    return response;
+        console.log('[callOpenRouter] Fetch completed, status:', response.status);
+
+        // Log response status for debugging
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error(`[OpenRouter] Error response (${response.status}):`, errorText);
+            // Return a new Response with the error for proper handling upstream
+            return new Response(JSON.stringify({
+                error: { message: errorText, status: response.status }
+            }), {
+                status: response.status,
+                headers: { 'Content-Type': 'application/json' }
+            });
+        }
+
+        console.log('[callOpenRouter] Response OK, returning...');
+        return response;
+    } catch (fetchError) {
+        console.error('[callOpenRouter] Fetch threw an error:', fetchError);
+        throw fetchError;
+    }
 }
 
 /**
