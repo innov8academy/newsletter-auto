@@ -188,20 +188,22 @@ async function callOpenRouter(
     const modelConfig = RESEARCH_MODELS.find(m => m.id === model);
     const enableReasoning = modelConfig && 'reasoning' in modelConfig && modelConfig.reasoning;
 
-    // Check if model supports temperature (OpenAI deep research/reasoning models don't)
+    // Check if model is OpenAI deep research (needs web plugin, no temperature)
+    const isOpenAIDeepResearch = model.includes('o4-mini-deep-research');
     const isOpenAIReasoning = model.includes('o4-mini') || model.includes('o1') || model.includes('o3');
 
     // Build request body - reduce max_tokens for cost-optimized (Perplexity) calls
+    // OpenAI deep research models may need more output tokens
     const requestBody: Record<string, unknown> = {
         model,
         messages: [
             { role: 'system', content: systemPrompt },
             { role: 'user', content: userPrompt },
         ],
-        max_tokens: isCostOptimized ? 1500 : 4000,
+        max_tokens: isOpenAIDeepResearch ? 16000 : (isCostOptimized ? 1500 : 4000),
     };
 
-    // Only add temperature for models that support it
+    // Only add temperature for models that support it (OpenAI reasoning models don't)
     if (!isOpenAIReasoning) {
         requestBody.temperature = 0.3; // Lower for more factual output
     }
@@ -209,6 +211,11 @@ async function callOpenRouter(
     // Enable reasoning for supported models (xAI Grok)
     if (enableReasoning) {
         requestBody.reasoning = { enabled: true };
+    }
+
+    // Enable web search plugin for OpenAI deep research models
+    if (isOpenAIDeepResearch) {
+        requestBody.plugins = [{ id: 'web', enabled: true }];
     }
 
     return fetch(OPENROUTER_API_URL, {
