@@ -2,9 +2,17 @@
 
 import { useState } from 'react';
 import { CuratedStory, ResearchReport } from '@/lib/types';
+import { RESEARCH_MODELS, ResearchModelId } from '@/lib/researcher';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import {
     Sparkles,
     FileText,
@@ -20,6 +28,7 @@ import {
     Link2,
     CheckCircle2,
     XCircle,
+    RefreshCw,
 } from 'lucide-react';
 
 interface ResearchPanelProps {
@@ -34,10 +43,14 @@ interface StoryResearchState {
     error?: string;
 }
 
+// Default to o4-mini-deep-research for best quality
+const DEFAULT_RESEARCH_MODEL: ResearchModelId = 'openai/o4-mini-deep-research';
+
 export function ResearchPanel({ selectedStories, apiKey, onReportGenerated }: ResearchPanelProps) {
     const [researchStates, setResearchStates] = useState<Record<string, StoryResearchState>>({});
     const [activeReportId, setActiveReportId] = useState<string | null>(null);
     const [isResearchingAll, setIsResearchingAll] = useState(false);
+    const [selectedModel, setSelectedModel] = useState<ResearchModelId>(DEFAULT_RESEARCH_MODEL);
 
     async function researchStory(story: CuratedStory) {
         setResearchStates(prev => ({
@@ -49,8 +62,15 @@ export function ResearchPanel({ selectedStories, apiKey, onReportGenerated }: Re
             const response = await fetch('/api/research', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ story, apiKey }),
+                body: JSON.stringify({ story, apiKey, modelId: selectedModel }),
             });
+
+            // Handle non-JSON responses gracefully
+            const contentType = response.headers.get('content-type');
+            if (!contentType?.includes('application/json')) {
+                const text = await response.text();
+                throw new Error(`API returned non-JSON response: ${text.slice(0, 100)}`);
+            }
 
             const data = await response.json();
 
@@ -110,34 +130,60 @@ export function ResearchPanel({ selectedStories, apiKey, onReportGenerated }: Re
     return (
         <div className="flex flex-col h-full">
             {/* Header */}
-            <div className="flex items-center justify-between mb-4 pb-4 border-b border-white/5">
-                <div>
-                    <h3 className="font-semibold text-white flex items-center gap-2">
-                        <Sparkles className="w-4 h-4 text-amber-400" />
-                        Deep Research
-                    </h3>
-                    <p className="text-xs text-white/40 mt-1">
-                        {completedCount}/{selectedStories.length} stories analyzed
-                    </p>
+            <div className="flex flex-col gap-3 mb-4 pb-4 border-b border-white/5">
+                <div className="flex items-center justify-between">
+                    <div>
+                        <h3 className="font-semibold text-white flex items-center gap-2">
+                            <Sparkles className="w-4 h-4 text-amber-400" />
+                            Deep Research
+                        </h3>
+                        <p className="text-xs text-white/40 mt-1">
+                            {completedCount}/{selectedStories.length} stories analyzed
+                        </p>
+                    </div>
+                    <Button
+                        size="sm"
+                        onClick={researchAll}
+                        disabled={isResearchingAll || selectedStories.length === 0}
+                        className="bg-gradient-to-r from-amber-500 to-coral-500 hover:from-amber-400 hover:to-coral-400 text-[#0B0B0F] font-semibold border-0"
+                    >
+                        {isResearchingAll ? (
+                            <>
+                                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                Researching...
+                            </>
+                        ) : (
+                            <>
+                                <Sparkles className="w-4 h-4 mr-2" />
+                                Research All
+                            </>
+                        )}
+                    </Button>
                 </div>
-                <Button
-                    size="sm"
-                    onClick={researchAll}
-                    disabled={isResearchingAll || selectedStories.length === 0}
-                    className="bg-gradient-to-r from-amber-500 to-coral-500 hover:from-amber-400 hover:to-coral-400 text-[#0B0B0F] font-semibold border-0"
-                >
-                    {isResearchingAll ? (
-                        <>
-                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                            Researching...
-                        </>
-                    ) : (
-                        <>
-                            <Sparkles className="w-4 h-4 mr-2" />
-                            Research All
-                        </>
-                    )}
-                </Button>
+
+                {/* Model Selector */}
+                <div className="flex items-center gap-2">
+                    <span className="text-xs text-white/40">Model:</span>
+                    <Select value={selectedModel} onValueChange={(v) => setSelectedModel(v as ResearchModelId)}>
+                        <SelectTrigger className="flex-1 h-8 text-xs bg-white/5 border-white/10 text-white">
+                            <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent className="bg-[#1a1a1f] border-white/10">
+                            {RESEARCH_MODELS.map((model) => (
+                                <SelectItem
+                                    key={model.id}
+                                    value={model.id}
+                                    className="text-xs text-white/80 focus:bg-white/10 focus:text-white"
+                                >
+                                    <div className="flex flex-col">
+                                        <span>{model.name}</span>
+                                        <span className="text-[10px] text-white/40">{model.description}</span>
+                                    </div>
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                </div>
             </div>
 
             {/* Story Queue */}
@@ -181,7 +227,19 @@ export function ResearchPanel({ selectedStories, apiKey, onReportGenerated }: Re
                                         {story.headline}
                                     </p>
                                     {state.status === 'error' && (
-                                        <p className="text-xs text-coral-400 mt-1">{state.error}</p>
+                                        <p className="text-xs text-coral-400 mt-1 truncate" title={state.error}>{state.error}</p>
+                                    )}
+                                    {(state.status === 'error' || state.status === 'success') && (
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                researchStory(story);
+                                            }}
+                                            className="text-xs text-amber-400 hover:text-amber-300 mt-1 flex items-center gap-1"
+                                        >
+                                            <RefreshCw className="w-3 h-3" />
+                                            Redo
+                                        </button>
                                     )}
                                 </div>
                             </div>
