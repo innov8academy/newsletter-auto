@@ -9,6 +9,8 @@ const OPENROUTER_API_URL = 'https://openrouter.ai/api/v1/chat/completions';
 // Updated 2025: Organized by specialty
 export const RESEARCH_MODELS = [
     // Deep Research Specialists (have web access or agentic research capability)
+    { id: 'openai/o4-mini-deep-research', name: 'OpenAI o4-mini Deep Research', description: '🧪 OpenAI deep research - test vs Perplexity', category: 'research' },
+    { id: 'perplexity/sonar-deep-research', name: 'Perplexity Deep Research', description: '🔬 Best quality but $1+/call', category: 'research' },
     { id: 'x-ai/grok-4.1-fast', name: 'Grok 4.1 Fast (Reasoning)', description: '🚀 10x cheaper! Deep reasoning + 2M context', category: 'research', reasoning: true },
     { id: 'perplexity/sonar', name: 'Perplexity Sonar', description: '💰 Web search - $1/1M tokens', category: 'research' },
     { id: 'perplexity/sonar-pro', name: 'Perplexity Sonar Pro', description: '🔥 Advanced web research', category: 'research' },
