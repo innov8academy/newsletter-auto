@@ -1,6 +1,7 @@
 import { NewsItem, CuratedStory, CurationProgress } from './types';
 import { defaultConfig, SCORING_CONFIG, SMART_CURATION_PROMPT } from './config';
 import { fetchAllNews, filterByDate } from './news-fetcher';
+import { supabaseAdmin, isSupabaseConfigured } from './supabase';
 
 interface RawExtractedStory {
     headline: string;
@@ -43,6 +44,48 @@ function calculateSimilarity(text1: string, text2: string): number {
     const union = new Set([...words1, ...words2]);
 
     return intersection.size / union.size;
+}
+
+// Fetch previously used story headlines from Supabase (last 30 days)
+async function fetchUsedStoryHeadlines(): Promise<string[]> {
+    if (!isSupabaseConfigured()) {
+        console.log('[Duplicate Check] Supabase not configured, skipping');
+        return [];
+    }
+
+    try {
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+        const { data, error } = await supabaseAdmin
+            .from('used_stories')
+            .select('headline')
+            .gte('used_at', thirtyDaysAgo.toISOString())
+            .order('used_at', { ascending: false });
+
+        if (error) {
+            console.error('[Duplicate Check] Error fetching used stories:', error);
+            return [];
+        }
+
+        console.log(`[Duplicate Check] Found ${data?.length || 0} previously used stories`);
+        return (data || []).map(s => s.headline);
+    } catch (e) {
+        console.error('[Duplicate Check] Exception:', e);
+        return [];
+    }
+}
+
+// Check if a story headline is too similar to previously used ones
+function isStoryUsed(headline: string, usedHeadlines: string[], threshold: number = 0.6): boolean {
+    for (const usedHeadline of usedHeadlines) {
+        const similarity = calculateSimilarity(headline, usedHeadline);
+        if (similarity >= threshold) {
+            console.log(`[Duplicate Check] Skipping "${headline.substring(0, 40)}..." (${(similarity * 100).toFixed(0)}% similar to used)`);
+            return true;
+        }
+    }
+    return false;
 }
 
 import { scrapeUrl } from './firecrawl';
@@ -320,9 +363,22 @@ export async function curateNews(
     }
 
     // Filter and sort
-    const result = Array.from(stories.values())
+    let result = Array.from(stories.values())
         .filter(s => s.finalScore >= SCORING_CONFIG.minScoreToShow)
         .sort((a, b) => b.finalScore - a.finalScore);
+
+    // Stage 4: Filter out previously used stories
+    onProgress?.({ stage: 'scoring', current: 1, total: 1, message: 'Checking for duplicates...' });
+    
+    const usedHeadlines = await fetchUsedStoryHeadlines();
+    if (usedHeadlines.length > 0) {
+        const beforeCount = result.length;
+        result = result.filter(story => !isStoryUsed(story.headline, usedHeadlines));
+        const filtered = beforeCount - result.length;
+        if (filtered > 0) {
+            console.log(`[Duplicate Check] Filtered out ${filtered} previously used stories`);
+        }
+    }
 
     onProgress?.({ stage: 'done', current: 1, total: 1, message: `Found ${result.length} curated stories` });
 
