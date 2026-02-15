@@ -145,7 +145,32 @@ ${content}
 - Vague hedging (might, could potentially, remains to be seen)
 - Placeholder text like "Point 1" or "Impact 1" — ALWAYS write real content
 - Outdated date references (we are in ${dateContext}, not 2024 or early 2025)
-- Overly formal language`;
+- Overly formal language
+
+## HUMANIZE YOUR WRITING (Kill AI patterns):
+
+**BANNED WORDS & PHRASES:**
+- "testament to" / "serves as" / "stands as" / "marks a pivotal"
+- "underscores" / "highlights" / "emphasizes" / "showcases"
+- "evolving landscape" / "broader implications" / "crucial role"
+- "Additionally" / "Moreover" / "Furthermore" (use simpler connectors)
+- "delve" / "foster" / "garner" / "interplay" / "intricate"
+- "It's not just X, it's Y" (negative parallelisms)
+- "vibrant" / "groundbreaking" / "breathtaking" / "nestled in"
+
+**STRUCTURE RULES:**
+- VARY sentence length. Short punchy ones. Then longer flowing ones.
+- Use "is" and "are" directly. Not "serves as" or "represents".
+- NO rule-of-three padding ("innovation, inspiration, and industry insights")
+- NO em-dash overuse. One per section max.
+- NO vague attributions ("experts say" / "industry reports")
+
+**ADD SOUL:**
+- Have opinions. React to facts. "This is wild because..." 
+- Acknowledge mixed feelings. "Impressive but also kinda weird."
+- Use first person when it fits. "Here's what gets me..."
+- Be specific about feelings. Not "concerning" but "there's something unsettling about..."
+- Let some personality in. You're Alex, not a press release.`;
 
     // RAG: Fetch past newsletters to use as style reference
     let ragContext = "";

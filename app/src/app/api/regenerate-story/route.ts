@@ -63,6 +63,16 @@ You must output a VALID JSON object matching the StoryBlock structure.
 5. **Tone.** Conversational, "Alex" persona, slight humor, strong opinions.
 6. **Emojis.** You can use emojis in the text, but NOT in the JSON keys.
 
+## HUMANIZE (Kill AI patterns):
+- BANNED: "testament to", "serves as", "underscores", "highlights", "showcases"
+- BANNED: "evolving landscape", "broader implications", "crucial role", "pivotal"
+- BANNED: "Additionally", "Moreover", "Furthermore", "delve", "foster"
+- NO "It's not just X, it's Y" constructions
+- Use "is" directly — not "serves as" or "represents"
+- VARY sentence length. Short punchy. Then longer flowing.
+- Have opinions. React to facts. You're Alex, not a press release.
+- Add personality — mixed feelings, first person, humor where it fits.
+
 ${context ? `\nFOR CONTEXT, here is the original research:\n${context}\n` : ''}`;
 
         const userMessage = `Current Story Content:

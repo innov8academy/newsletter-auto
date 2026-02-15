@@ -84,6 +84,15 @@ export async function POST(request: NextRequest) {
 5. Keep bullet points SHORT — one sentence each. MAX 2 lines.
 6. Be specific with facts, companies, and numbers.
 
+## HUMANIZE (Kill AI patterns):
+- NO "testament to" / "serves as" / "underscores" / "highlights"
+- NO "evolving landscape" / "broader implications" / "crucial role"
+- NO "Additionally" / "Moreover" / "Furthermore"
+- NO "It's not just X, it's Y" patterns
+- Use "is" directly — not "serves as" or "represents"
+- VARY sentence length. Short. Then longer flowing ones.
+- Have opinions. React to facts. Be Alex, not a press release.
+
 ${context ? `\nFOR CONTEXT, here is the full story this section belongs to:\n${context}\n\nUse this context to write better content, but ONLY output the specific section being rewritten.` : ''}`;
 
         const userMessage = `Current ${sectionType} content:
