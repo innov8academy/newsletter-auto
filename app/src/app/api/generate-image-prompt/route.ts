@@ -12,8 +12,9 @@ export async function POST(request: NextRequest) {
             userIdeas,
             referenceImages,
             apiKey: clientApiKey,
-            searchForReferences = true, // NEW: Enable web search for reference images
-            storyTitle, // NEW: Headline for image search
+            searchForReferences = true, // Enable web search for reference images
+            storyTitle, // Headline for image search
+            webReferenceContext, // Pre-searched web references from UI
         } = await request.json();
 
         const apiKey = clientApiKey || process.env.OPENROUTER_API_KEY || '';
@@ -31,12 +32,21 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        // NEW: Search for relevant images from the web if no reference images provided
+        // Web reference context - either from UI or auto-search
         let webSearchContext = '';
         let searchedImages: { url: string; title: string; source: string }[] = [];
         
-        if (searchForReferences && (!referenceImages || referenceImages.length === 0)) {
-            // Extract headline from section text (first line) or use provided title
+        // If UI provided web references, use those
+        if (webReferenceContext && webReferenceContext.trim()) {
+            webSearchContext = `
+**REAL-WORLD VISUAL REFERENCES (selected by user):**
+${webReferenceContext}
+
+Use these as inspiration for visual elements, composition, and style. The image should feel connected to actual news coverage, not generic stock art.`;
+            console.log('[ImagePrompt] Using UI-provided web references');
+        }
+        // Otherwise, auto-search if enabled and no manual refs
+        else if (searchForReferences && (!referenceImages || referenceImages.length === 0)) {
             const headline = storyTitle || sectionText.split('\n')[0].substring(0, 100);
             
             console.log('[ImagePrompt] Searching web for reference images...');

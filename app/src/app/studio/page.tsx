@@ -55,6 +55,10 @@ export default function StudioPage() {
     const [userIdeas, setUserIdeas] = useState<{ [key: number]: string }>({});
     const [referenceImages, setReferenceImages] = useState<{ [key: number]: { file: File; preview: string }[] }>({});
     const [storyContextExpanded, setStoryContextExpanded] = useState(false);
+    
+    // Web-searched reference images
+    const [webRefImages, setWebRefImages] = useState<{ [key: number]: { url: string; title: string; source: string }[] }>({});
+    const [searchingRefs, setSearchingRefs] = useState<{ [key: number]: boolean }>({});
 
     // Load draft from localStorage on mount
     useEffect(() => {
@@ -247,6 +251,47 @@ export default function StudioPage() {
         });
     }
 
+    // Search for reference images from the web
+    async function searchWebReferences(index: number) {
+        if (!draft) return;
+        
+        const story = draft.stories[index];
+        setSearchingRefs(prev => ({ ...prev, [index]: true }));
+        
+        try {
+            const response = await fetch('/api/search-images', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    query: story.title,
+                    count: 5,
+                }),
+            });
+            
+            if (!response.ok) throw new Error('Search failed');
+            
+            const data = await response.json();
+            if (data.images && data.images.length > 0) {
+                setWebRefImages(prev => ({ ...prev, [index]: data.images }));
+            }
+        } catch (err) {
+            console.error('Failed to search images:', err);
+        } finally {
+            setSearchingRefs(prev => ({ ...prev, [index]: false }));
+        }
+    }
+    
+    // Remove a web reference image
+    function removeWebRef(storyIndex: number, imageIndex: number) {
+        setWebRefImages(prev => {
+            const current = prev[storyIndex] || [];
+            return {
+                ...prev,
+                [storyIndex]: current.filter((_, i) => i !== imageIndex),
+            };
+        });
+    }
+
     // Generate Prompt for a Story (with user ideas + reference images)
     async function generatePrompt(index: number) {
         if (!draft) return;
@@ -255,11 +300,17 @@ export default function StudioPage() {
         const story = draft.stories[index];
         const ideas = userIdeas[index] || '';
         const refImages = referenceImages[index] || [];
+        const webRefs = webRefImages[index] || [];
 
         try {
-            // Convert reference images to base64
+            // Convert user-uploaded reference images to base64
             const imageDataPromises = refImages.map(img => fileToBase64(img.file));
             const imageData = await Promise.all(imageDataPromises);
+            
+            // Build web references context for prompt
+            const webRefContext = webRefs.length > 0 
+                ? webRefs.map((img, i) => `${i + 1}. "${img.title}" (${img.source})`).join('\n')
+                : '';
 
             const promptRes = await fetch('/api/generate-image-prompt', {
                 method: 'POST',
@@ -271,8 +322,9 @@ export default function StudioPage() {
                     userIdeas: ideas,
                     referenceImages: imageData,
                     apiKey,
-                    storyTitle: story.title, // For web image search
-                    searchForReferences: imageData.length === 0, // Only search if no manual refs
+                    storyTitle: story.title,
+                    searchForReferences: false, // We're handling search in UI now
+                    webReferenceContext: webRefContext, // Pass web refs as text context
                 })
             });
 
@@ -533,9 +585,57 @@ export default function StudioPage() {
 
                                     {/* Reference Images */}
                                     <div className="mb-3">
-                                        <label className="text-xs font-medium text-white/60 mb-1.5 block flex items-center gap-1">
-                                            🖼️ Reference Images <span className="text-white/30">(optional, max 3)</span>
+                                        <label className="text-xs font-medium text-white/60 mb-1.5 block flex items-center justify-between">
+                                            <span className="flex items-center gap-1">
+                                                🖼️ Reference Images <span className="text-white/30">(optional, max 3)</span>
+                                            </span>
+                                            <Button
+                                                size="sm"
+                                                variant="ghost"
+                                                className="h-6 text-xs text-teal-400 hover:text-teal-300 hover:bg-teal-500/10 px-2"
+                                                onClick={() => searchWebReferences(selectedStoryIndex)}
+                                                disabled={searchingRefs[selectedStoryIndex]}
+                                            >
+                                                {searchingRefs[selectedStoryIndex] ? (
+                                                    <><Loader2 className="w-3 h-3 mr-1 animate-spin" /> Searching...</>
+                                                ) : (
+                                                    <><Wand2 className="w-3 h-3 mr-1" /> Find from Web</>
+                                                )}
+                                            </Button>
                                         </label>
+                                        
+                                        {/* Web-searched images */}
+                                        {(webRefImages[selectedStoryIndex]?.length || 0) > 0 && (
+                                            <div className="mb-2">
+                                                <span className="text-[10px] text-teal-400/70 mb-1 block">🌐 From web (click to remove):</span>
+                                                <div className="flex gap-2 flex-wrap">
+                                                    {webRefImages[selectedStoryIndex].map((img, i) => (
+                                                        <div 
+                                                            key={i} 
+                                                            className="relative w-16 h-16 rounded-lg overflow-hidden border border-teal-500/30 group cursor-pointer hover:border-red-500/50 transition-colors"
+                                                            onClick={() => removeWebRef(selectedStoryIndex, i)}
+                                                            title={`${img.title} - Click to remove`}
+                                                        >
+                                                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                                                            <img 
+                                                                src={img.url} 
+                                                                alt={img.title} 
+                                                                className="w-full h-full object-cover"
+                                                                onError={(e) => {
+                                                                    // Hide broken images
+                                                                    (e.target as HTMLImageElement).style.display = 'none';
+                                                                }}
+                                                            />
+                                                            <div className="absolute inset-0 bg-red-500/0 group-hover:bg-red-500/30 transition-colors flex items-center justify-center">
+                                                                <X className="w-4 h-4 text-white opacity-0 group-hover:opacity-100" />
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
+                                        
+                                        {/* User-uploaded images */}
                                         <div className="flex gap-2 flex-wrap">
                                             {(referenceImages[selectedStoryIndex] || []).map((img, i) => (
                                                 <div key={i} className="relative w-16 h-16 rounded-lg overflow-hidden border border-white/20 group">
