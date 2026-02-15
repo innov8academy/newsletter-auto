@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { calculateCost } from '@/lib/cost-tracker';
+import { searchRelevantImages, buildImageContext, fetchImageAsBase64 } from '@/lib/image-search';
 
 export async function POST(request: NextRequest) {
     console.log('API: generate-image-prompt called');
@@ -10,7 +11,9 @@ export async function POST(request: NextRequest) {
             newsletterContext,
             userIdeas,
             referenceImages,
-            apiKey: clientApiKey
+            apiKey: clientApiKey,
+            searchForReferences = true, // NEW: Enable web search for reference images
+            storyTitle, // NEW: Headline for image search
         } = await request.json();
 
         const apiKey = clientApiKey || process.env.OPENROUTER_API_KEY || '';
@@ -26,6 +29,23 @@ export async function POST(request: NextRequest) {
                 { success: false, error: 'Missing required fields' },
                 { status: 400 }
             );
+        }
+
+        // NEW: Search for relevant images from the web if no reference images provided
+        let webSearchContext = '';
+        let searchedImages: { url: string; title: string; source: string }[] = [];
+        
+        if (searchForReferences && (!referenceImages || referenceImages.length === 0)) {
+            // Extract headline from section text (first line) or use provided title
+            const headline = storyTitle || sectionText.split('\n')[0].substring(0, 100);
+            
+            console.log('[ImagePrompt] Searching web for reference images...');
+            searchedImages = await searchRelevantImages(headline, 3);
+            
+            if (searchedImages.length > 0) {
+                webSearchContext = buildImageContext(searchedImages);
+                console.log(`[ImagePrompt] Found ${searchedImages.length} reference images from web`);
+            }
         }
 
         // Build the system prompt - PRIORITIZE MEME when reference images are provided
@@ -58,21 +78,29 @@ If the meme shows a shocked person and the news is about Bitcoin hitting $100K:
 
 Output ONLY the final image generation prompt, nothing else.`
             : `You are an expert AI Art Director for a cutting-edge tech newsletter called "L8R by Innov8".
-Your goal is to create a detailed, vivid, and stylistic image generation prompt based on a specific news section.
+Your goal is to create a detailed, vivid, and UNIQUE image generation prompt based on a specific news section.
 
 **The Aesthetic (L8R Style):**
 - **Vibrant & Tech-Forward:** Use neon accents, glassmorphism, or clean futuristic lines.
-- **Conceptual:** Specific objects from the news story should be central.
+- **Conceptual:** Specific objects from the news story should be central - NOT generic AI imagery.
 - **Lighting:** Cinematic, dramatic, or studio lighting.
 - **Aspect Ratio:** 16:9 (Landscape).
-- **Avoid:** Generic "AI brain" stock photos, messy text, cluttered compositions.
+- **CRITICAL - Avoid:** Generic "AI brain" stock photos, floating hologram hands, abstract neural networks, glowing orbs. These are BANNED.
 
 **Instructions:**
 1. Read the provided news text carefully.
-2. Extract the core subject (e.g., a specific robot, a CEO, a chip, a software interface).
-3. Visualize a scene that represents the story.
-4. Write a prompt optimized for high-end diffusion models (Flux, Midjourney, DALL-E 3).
-5. Include technical keywords (e.g., "8k resolution", "unreal engine 5", "octane render", "volumetric lighting").
+2. Extract the SPECIFIC subject (e.g., "Sam Altman", "Nvidia H100 chip", "ByteDance logo", "TikTok interface").
+3. If web reference images are provided, use them as VISUAL INSPIRATION for composition and style.
+4. Create a UNIQUE scene - each story should look different.
+5. Include specific visual elements: company logos, product shots, recognizable people/objects.
+6. Write a prompt optimized for high-end diffusion models (Flux, Midjourney, DALL-E 3).
+7. Include technical keywords (e.g., "8k resolution", "unreal engine 5", "octane render", "volumetric lighting").
+
+**Variety Tips:**
+- Story about a company? → Feature their logo/product prominently
+- Story about a person? → Describe their appearance or a symbolic representation
+- Story about a trend? → Create a metaphorical scene with specific objects
+- Story about data/numbers? → Use infographic-style elements with the actual figures
 
 Output ONLY the prompt text, nothing else.`;
 
@@ -120,8 +148,13 @@ TASK: Create an image prompt that places the meme character as the HERO, with th
 
             userMessageContent = contentParts;
         } else {
-            // Simple text-only message
+            // Text-only message (potentially enhanced with web search results)
             let textPrompt = `Generate an image prompt for this news story:\n\n"${sectionText}"`;
+
+            // Add web search context if found
+            if (webSearchContext) {
+                textPrompt += `\n\n${webSearchContext}`;
+            }
 
             if (userIdeas && userIdeas.trim()) {
                 textPrompt += `\n\n**User's Creative Direction:**\n${userIdeas}`;
@@ -177,6 +210,7 @@ TASK: Create an image prompt that places the meme character as the HERO, with th
             costSource: 'image-prompt',
             model,
             analyzedImages: hasReferenceImages ? referenceImages.length : 0,
+            webSearchImages: searchedImages, // Return found images for UI display
         });
 
     } catch (error) {

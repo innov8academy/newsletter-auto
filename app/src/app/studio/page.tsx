@@ -270,7 +270,9 @@ export default function StudioPage() {
                     newsletterContext: 'L8R by Innov8 - Daily Tech Newsletter',
                     userIdeas: ideas,
                     referenceImages: imageData,
-                    apiKey
+                    apiKey,
+                    storyTitle: story.title, // For web image search
+                    searchForReferences: imageData.length === 0, // Only search if no manual refs
                 })
             });
 
