@@ -103,7 +103,7 @@ Rewrite the full story as a JSON object. Return ONLY the valid JSON, no markdown
                     { role: 'user', content: userMessage },
                 ],
                 temperature: 0.7,
-                max_tokens: 4000,
+                max_tokens: 6000, // Increased from 4000 to prevent truncation
                 response_format: { type: "json_object" } // Force JSON output
             }),
         });
@@ -127,6 +127,13 @@ Rewrite the full story as a JSON object. Return ONLY the valid JSON, no markdown
         }
 
         try {
+            // Clean up potential markdown formatting
+            content = content
+                .replace(/^```json\s*/i, '')
+                .replace(/^```\s*/i, '')
+                .replace(/\s*```$/i, '')
+                .trim();
+
             // Parse JSON response
             const newStory = JSON.parse(content);
 
@@ -135,10 +142,26 @@ Rewrite the full story as a JSON object. Return ONLY the valid JSON, no markdown
                 throw new Error('Invalid JSON structure returned from AI');
             }
 
-            // Ensure arrays are limited to correct length
-            newStory.bulletPoints = newStory.bulletPoints.slice(0, 4);
-            newStory.whyItMatters = newStory.whyItMatters.slice(0, 3);
-            newStory.whatsNext = newStory.whatsNext.slice(0, 3);
+            // Ensure arrays exist and are limited to correct length
+            newStory.bulletPoints = (newStory.bulletPoints || []).slice(0, 4);
+            newStory.whyItMatters = (newStory.whyItMatters || []).slice(0, 3);
+            newStory.whatsNext = (newStory.whatsNext || []).slice(0, 3);
+            
+            // Ensure L8R's Take exists
+            if (!newStory.l8rsTake) {
+                newStory.l8rsTake = currentStory.l8rsTake || [];
+            }
+
+            // Fill in missing arrays with fallback
+            if (newStory.bulletPoints.length === 0) {
+                newStory.bulletPoints = currentStory.bulletPoints || ['[Points to be filled]'];
+            }
+            if (newStory.whyItMatters.length === 0) {
+                newStory.whyItMatters = currentStory.whyItMatters || ['[Impact to be filled]'];
+            }
+            if (newStory.whatsNext.length === 0) {
+                newStory.whatsNext = currentStory.whatsNext || ['[Next steps to be filled]'];
+            }
 
             // Estimate cost: ~2000 input tokens, ~2000 output tokens
             const cost = calculateCost(modelId, 2000, 2000);

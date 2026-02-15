@@ -459,7 +459,7 @@ appo adutha l8ril varam.. bie. ✌️`;
                     { role: 'user', content: storiesPrompt },
                 ],
                 temperature: 0.7,
-                max_tokens: 6000,
+                max_tokens: 8000, // Increased from 6000 to prevent truncation
             }),
         });
 
@@ -470,8 +470,14 @@ appo adutha l8ril varam.. bie. ✌️`;
 
         const storiesData = await storiesResponse.json();
         const storiesContent = storiesData.choices?.[0]?.message?.content || '';
+        const finishReason = storiesData.choices?.[0]?.finish_reason;
 
-        console.log(`[Draft] Phase 2 complete. Stories generated.`);
+        console.log(`[Draft] Phase 2 complete. Stories generated. Finish reason: ${finishReason}`);
+
+        // Check for truncation
+        if (finishReason === 'length') {
+            console.warn('[Draft] ⚠️ Stories response was TRUNCATED due to token limit!');
+        }
 
         // Combine both responses
         const fullContent = introContent + '\n\n' + storiesContent;
@@ -596,6 +602,36 @@ function parseNewsletterDraft(content: string, reports: ResearchReport[]): Newsl
 
     // Extract meme ideas
     const memeIdeas = extractMemeIdeas(content);
+
+    // Validate stories - ensure each has complete sections
+    for (let i = 0; i < stories.length; i++) {
+        const story = stories[i];
+        
+        // Fill in missing sections with fallback if research available
+        if (story.bulletPoints.length === 0 && reports[i]) {
+            console.warn(`[Draft] Story ${i + 1} missing bulletPoints, using fallback`);
+            story.bulletPoints = extractFromResearch(reports[i].deepResearch, 'key');
+        }
+        if (story.whyItMatters.length === 0 && reports[i]) {
+            console.warn(`[Draft] Story ${i + 1} missing whyItMatters, using fallback`);
+            story.whyItMatters = extractFromResearch(reports[i].deepResearch, 'matters');
+        }
+        if (story.whatsNext.length === 0 && reports[i]) {
+            console.warn(`[Draft] Story ${i + 1} missing whatsNext, using fallback`);
+            story.whatsNext = extractFromResearch(reports[i].deepResearch, 'next');
+        }
+
+        // Ensure minimum content
+        if (story.bulletPoints.length === 0) {
+            story.bulletPoints = ['[Key points to be filled]'];
+        }
+        if (story.whyItMatters.length === 0) {
+            story.whyItMatters = ['[Impact to be filled]'];
+        }
+        if (story.whatsNext.length === 0) {
+            story.whatsNext = ['[Future outlook to be filled]'];
+        }
+    }
 
     return {
         title,
