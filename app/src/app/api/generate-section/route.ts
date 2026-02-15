@@ -308,7 +308,7 @@ Summary: ${(r.deepResearch || r.story.summary || '').substring(0, 500)}...
                     { role: 'user', content: userPrompt },
                 ],
                 temperature: 0.7,
-                max_tokens: sectionType === 'story' ? 1500 : 800,
+                max_tokens: sectionType === 'story' ? 4000 : 1000, // Increased for full story content
             }),
         };
 
@@ -333,16 +333,36 @@ Summary: ${(r.deepResearch || r.story.summary || '').substring(0, 500)}...
 
                 const data = await response.json();
                 content = data.choices?.[0]?.message?.content?.trim();
+                const finishReason = data.choices?.[0]?.finish_reason;
+
+                // Check for truncation
+                if (finishReason === 'length') {
+                    console.warn(`[Section] ⚠️ Response TRUNCATED (finish_reason: length)`);
+                }
 
                 if (!content || content.length < 50) {
-                    lastError = `Empty or too short response (${content?.length || 0} chars)`;
+                    lastError = `Empty or too short response (${content?.length || 0} chars, finish: ${finishReason})`;
                     console.warn(`[Section] Attempt ${attempt}: ${lastError}`);
                     if (attempt < maxRetries) continue;
                     break;
                 }
 
+                // For story type, validate we got all sections
+                if (sectionType === 'story') {
+                    const hasKeyPoints = content.includes('Key Points') || content.includes('🔍');
+                    const hasWhyMatters = content.includes('Why This Matters') || content.includes('🚨');
+                    const hasWhatsNext = content.includes("What's Next") || content.includes('⏭️');
+                    
+                    if (!hasKeyPoints || !hasWhyMatters || !hasWhatsNext) {
+                        console.warn(`[Section] Story missing sections: KeyPoints=${hasKeyPoints}, WhyMatters=${hasWhyMatters}, WhatsNext=${hasWhatsNext}`);
+                        lastError = `Incomplete story - missing sections (finish: ${finishReason})`;
+                        if (attempt < maxRetries) continue;
+                        // Don't break - return what we have, but log the issue
+                    }
+                }
+
                 // Success!
-                console.log(`[Section] Success on attempt ${attempt}, ${content.length} chars`);
+                console.log(`[Section] Success on attempt ${attempt}, ${content.length} chars, finish: ${finishReason}`);
                 break;
 
             } catch (err) {
