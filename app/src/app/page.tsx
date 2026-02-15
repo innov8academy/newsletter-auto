@@ -249,6 +249,63 @@ export default function Home() {
     setCustomFeeds([]); // Also clear custom feeds? Maybe keep them? Let's clear for "Clear All" semantic.
   }
 
+  // Find MORE news without clearing existing selections
+  async function findMoreNews() {
+    setLoading(true);
+    setProgress('Finding more stories...');
+
+    try {
+      const response = await fetch('/api/curate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ apiKey, customFeeds }),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        // Merge new stories with existing, avoiding duplicates by ID
+        const existingIds = new Set(stories.map(s => s.id));
+        const newStories = data.stories.filter((s: CuratedStory) => !existingIds.has(s.id));
+        
+        if (newStories.length > 0) {
+          // Also filter by headline similarity to avoid near-duplicates
+          const existingHeadlines = stories.map(s => s.headline.toLowerCase());
+          const trulyNew = newStories.filter((s: CuratedStory) => {
+            const normalized = s.headline.toLowerCase();
+            return !existingHeadlines.some(h => {
+              const similarity = calculateHeadlineSimilarity(normalized, h);
+              return similarity > 0.6;
+            });
+          });
+
+          setStories(prev => [...prev, ...trulyNew]);
+          setProgress(`Found ${trulyNew.length} new stories`);
+        } else {
+          setProgress('No new stories found');
+        }
+
+        if (data.stats) setCurationStats(data.stats);
+      } else {
+        setProgress(`Error: ${data.error}`);
+      }
+    } catch (error) {
+      setProgress('Failed to find more news');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  // Simple headline similarity check
+  function calculateHeadlineSimilarity(a: string, b: string): number {
+    const wordsA = new Set(a.split(/\s+/).filter(w => w.length > 3));
+    const wordsB = new Set(b.split(/\s+/).filter(w => w.length > 3));
+    if (wordsA.size === 0 || wordsB.size === 0) return 0;
+    const intersection = [...wordsA].filter(w => wordsB.has(w)).length;
+    const union = new Set([...wordsA, ...wordsB]).size;
+    return intersection / union;
+  }
+
   const selectedItems = stories.filter(s => selectedIds.has(s.id));
 
   // Premium Empty State - Editorial Noir
@@ -584,6 +641,17 @@ export default function Home() {
               <Trash2 className="w-4 h-4 mr-2" />
               Clear All
             </Button>
+            {stories.length > 0 && (
+              <Button
+                className="bg-teal-500/10 hover:bg-teal-500/20 text-teal-400 border border-teal-500/20 hover:border-teal-500/30"
+                size="sm"
+                onClick={findMoreNews}
+                disabled={loading}
+              >
+                <Plus className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+                {loading ? 'Finding...' : 'Find More'}
+              </Button>
+            )}
             <Button
               className="bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/20 hover:border-amber-500/30"
               size="sm"
