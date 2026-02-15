@@ -15,6 +15,10 @@ export async function POST(request: NextRequest) {
             );
         }
 
+        // Debug: Check if env vars are set
+        const hasBrave = !!process.env.BRAVE_API_KEY;
+        const hasSerper = !!process.env.SERPER_API_KEY;
+        console.log(`[SearchImages] ENV CHECK - BRAVE_API_KEY: ${hasBrave}, SERPER_API_KEY: ${hasSerper}`);
         console.log(`[SearchImages] Searching for: "${query}"`);
         
         const images = await searchRelevantImages(query, count);
@@ -25,6 +29,7 @@ export async function POST(request: NextRequest) {
             success: true,
             images,
             query,
+            debug: { hasBrave, hasSerper }, // Return debug info
         });
 
     } catch (error) {

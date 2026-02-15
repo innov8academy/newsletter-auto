@@ -271,11 +271,21 @@ export default function StudioPage() {
             if (!response.ok) throw new Error('Search failed');
             
             const data = await response.json();
+            console.log('[Studio] Search response:', data);
+            
             if (data.images && data.images.length > 0) {
                 setWebRefImages(prev => ({ ...prev, [index]: data.images }));
+            } else {
+                // Show debug info if no images found
+                const debugMsg = data.debug 
+                    ? `No images found. API keys: Brave=${data.debug.hasBrave}, Serper=${data.debug.hasSerper}`
+                    : 'No images found';
+                console.warn('[Studio]', debugMsg);
+                alert(debugMsg);
             }
         } catch (err) {
             console.error('Failed to search images:', err);
+            alert('Search failed - check console');
         } finally {
             setSearchingRefs(prev => ({ ...prev, [index]: false }));
         }
