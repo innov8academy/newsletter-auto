@@ -742,19 +742,24 @@ ${(localStory.l8rsTake || []).map(p => `• ${p}`).join('\n')}`;
                         ))}
                     </div>
                     <div className="w-px h-6 bg-white/10" />
-                    {/* Generate All button */}
+                    {/* Generate All / Generate Remaining button */}
                     {(() => {
                         const pendingCount = selectedReports.filter((_, i) => !completed.stories[i]?.title).length;
-                        return pendingCount > 1 && !isGeneratingAll ? (
+                        const currentHasContent = !!completed.stories[currentStoryIndex]?.title;
+                        
+                        // Show button if: any pending stories AND (more than 1 pending OR current story needs generation)
+                        const showButton = pendingCount > 0 && !isGeneratingAll && !isGenerating;
+                        
+                        return showButton ? (
                             <Button
                                 onClick={generateAllStories}
                                 size="sm"
                                 className="bg-gradient-to-r from-teal-500 to-emerald-500 text-black text-xs"
                             >
                                 <Sparkles className="w-3 h-3 mr-1" />
-                                Gen All ({pendingCount})
+                                {pendingCount === 1 ? 'Generate' : `Gen All (${pendingCount})`}
                             </Button>
-                        ) : isGeneratingAll ? (
+                        ) : isGeneratingAll || isGenerating ? (
                             <Button size="sm" disabled className="bg-teal-500/20 text-teal-300 text-xs">
                                 <Loader2 className="w-3 h-3 mr-1 animate-spin" />
                                 Generating...
