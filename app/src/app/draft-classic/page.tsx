@@ -68,6 +68,12 @@ export default function DraftPage() {
     const [storyRegenPrompt, setStoryRegenPrompt] = useState('');
     const [storyRegenModel, setStoryRegenModel] = useState<DraftModelId>('google/gemini-3-pro-preview');
     const [storyPopoverOpen, setStoryPopoverOpen] = useState<number | null>(null);
+    
+    // Bulk regeneration state
+    const [bulkRegenPopoverOpen, setBulkRegenPopoverOpen] = useState(false);
+    const [bulkRegenPrompt, setBulkRegenPrompt] = useState('');
+    const [bulkRegenModel, setBulkRegenModel] = useState<DraftModelId>('google/gemini-3-pro-preview');
+    const [bulkRegenProgress, setBulkRegenProgress] = useState<{ current: number; total: number } | null>(null);
 
     // Section generation state
     const [generatingSections, setGeneratingSections] = useState<Set<string>>(new Set());
@@ -430,6 +436,67 @@ ${(story.whatsNext || []).map(p => `• ${p}`).join('\n')}
         }
     }
 
+    // Bulk regenerate ALL stories with a single prompt
+    async function handleBulkRegenerateStories() {
+        if (!draft || !bulkRegenPrompt.trim() || !draft.stories || draft.stories.length === 0) return;
+
+        const total = draft.stories.length;
+        setBulkRegenProgress({ current: 0, total });
+
+        for (let storyIndex = 0; storyIndex < total; storyIndex++) {
+            setBulkRegenProgress({ current: storyIndex, total });
+            setRegeneratingStoryIndex(storyIndex);
+
+            try {
+                const currentStory = draft.stories[storyIndex];
+                const context = getStoryContext(storyIndex);
+
+                const response = await fetch('/api/regenerate-story', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        currentStory,
+                        userPrompt: bulkRegenPrompt,
+                        modelId: bulkRegenModel,
+                        apiKey,
+                        context
+                    }),
+                });
+
+                const data = await response.json();
+
+                if (data.success && data.story) {
+                    data.story.emoji = currentStory.emoji;
+                    replaceStory(storyIndex, data.story);
+
+                    if (data.cost) {
+                        addCost({
+                            source: data.costSource || 'bulk-regen-story',
+                            model: data.model || bulkRegenModel,
+                            cost: data.cost,
+                            description: `Bulk regen story ${storyIndex + 1}/${total}`,
+                        });
+                    }
+                } else {
+                    console.error(`Failed to regenerate story ${storyIndex}:`, data.error);
+                }
+            } catch (err) {
+                console.error(`Error regenerating story ${storyIndex}:`, err);
+            }
+
+            setRegeneratingStoryIndex(null);
+            
+            // Small delay between stories to avoid rate limits
+            if (storyIndex < total - 1) {
+                await new Promise(r => setTimeout(r, 500));
+            }
+        }
+
+        setBulkRegenProgress(null);
+        setBulkRegenPopoverOpen(false);
+        setBulkRegenPrompt('');
+    }
+
     // IMAGE GENERATION HANDLING
     // Image generation moved to Studio Page
 
@@ -772,6 +839,78 @@ ${(story.whatsNext || []).map(p => `• ${p}`).join('\n')}
                                             </SelectContent>
                                         </Select>
                                     </div>
+                                    {draft && draft.stories && draft.stories.length > 0 && (
+                                        <Popover open={bulkRegenPopoverOpen} onOpenChange={setBulkRegenPopoverOpen}>
+                                            <PopoverTrigger asChild>
+                                                <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    disabled={bulkRegenProgress !== null}
+                                                    className="text-white/50 hover:text-purple-400 hover:bg-purple-500/10"
+                                                >
+                                                    <Wand2 className={`w-4 h-4 mr-2 ${bulkRegenProgress !== null ? 'animate-pulse' : ''}`} />
+                                                    {bulkRegenProgress !== null 
+                                                        ? `${bulkRegenProgress.current + 1}/${bulkRegenProgress.total}...` 
+                                                        : 'Rewrite All Stories'}
+                                                </Button>
+                                            </PopoverTrigger>
+                                            <PopoverContent className="w-80 bg-surface-elevated border-white/10 p-4" align="end">
+                                                <div className="space-y-3">
+                                                    <h4 className="font-semibold text-white text-sm flex items-center gap-2">
+                                                        <Wand2 className="w-4 h-4 text-purple-400" />
+                                                        Rewrite All {draft.stories.length} Stories
+                                                    </h4>
+                                                    <p className="text-xs text-white/50">
+                                                        Apply the same style/tone change to all stories at once.
+                                                    </p>
+                                                    <Textarea
+                                                        value={bulkRegenPrompt}
+                                                        onChange={(e) => setBulkRegenPrompt(e.target.value)}
+                                                        placeholder="e.g. 'Make all stories more conversational and add humor'"
+                                                        className="bg-black/30 border-white/10 text-white text-sm min-h-[80px] resize-none focus:border-purple-500/50 focus:ring-1 focus:ring-purple-500/20"
+                                                    />
+                                                    <Select value={bulkRegenModel} onValueChange={(v) => setBulkRegenModel(v as DraftModelId)}>
+                                                        <SelectTrigger className="w-full bg-black/30 border-white/10 text-white text-sm h-9">
+                                                            <SelectValue placeholder="Select model" />
+                                                        </SelectTrigger>
+                                                        <SelectContent className="bg-surface-elevated border-white/10">
+                                                            {DRAFT_MODELS.map((model) => (
+                                                                <SelectItem
+                                                                    key={model.id}
+                                                                    value={model.id}
+                                                                    className="text-white focus:bg-white/10 focus:text-white"
+                                                                >
+                                                                    <span className="font-medium">{model.name}</span>
+                                                                </SelectItem>
+                                                            ))}
+                                                        </SelectContent>
+                                                    </Select>
+                                                    <div className="flex gap-2">
+                                                        <Button
+                                                            onClick={() => setBulkRegenPopoverOpen(false)}
+                                                            variant="ghost"
+                                                            size="sm"
+                                                            className="flex-1 text-white/60 hover:text-white"
+                                                        >
+                                                            Cancel
+                                                        </Button>
+                                                        <Button
+                                                            onClick={handleBulkRegenerateStories}
+                                                            disabled={!bulkRegenPrompt.trim() || bulkRegenProgress !== null}
+                                                            size="sm"
+                                                            className="flex-1 bg-purple-500 hover:bg-purple-600 text-white font-semibold"
+                                                        >
+                                                            {bulkRegenProgress !== null ? (
+                                                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                                            ) : (
+                                                                'Rewrite All'
+                                                            )}
+                                                        </Button>
+                                                    </div>
+                                                </div>
+                                            </PopoverContent>
+                                        </Popover>
+                                    )}
                                     {draft && (
                                         <Button
                                             variant="ghost"
