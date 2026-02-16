@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { getApiKey } from '@/lib/storage';
 
 // Google Fonts that work well for memes
 const FONTS = [
@@ -269,9 +270,9 @@ export default function MemeEditorPage() {
       return;
     }
     
-    const apiKey = localStorage.getItem('openrouter_api_key');
+    const apiKey = getApiKey();
     if (!apiKey) {
-      alert('Please set your OpenRouter API key in the main app');
+      alert('Please set your OpenRouter API key in Settings');
       return;
     }
 
