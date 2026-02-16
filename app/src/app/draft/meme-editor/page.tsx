@@ -85,6 +85,9 @@ export default function MemeEditorPage() {
   const [textElements, setTextElements] = useState<TextElement[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [editingTextId, setEditingTextId] = useState<string | null>(null);
+  const [editingText, setEditingText] = useState<string>('');
+  const [editingPosition, setEditingPosition] = useState<{ x: number; y: number } | null>(null);
+  const editInputRef = useRef<HTMLInputElement>(null);
   
   // Text settings
   const [currentFont, setCurrentFont] = useState(FONTS[0].value);
@@ -179,16 +182,44 @@ export default function MemeEditorPage() {
   };
 
   // Handle text double-click for editing
-  const handleTextDblClick = (id: string) => {
+  const handleTextDblClick = (id: string, e: any) => {
     const textNode = textElements.find(t => t.id === id);
     if (!textNode) return;
     
-    const newText = prompt('Edit text:', textNode.text);
-    if (newText !== null) {
+    // Get stage position for overlay input
+    const stage = stageRef.current;
+    if (!stage) return;
+    
+    const stageBox = stage.container().getBoundingClientRect();
+    
+    setEditingTextId(id);
+    setEditingText(textNode.text);
+    setEditingPosition({
+      x: stageBox.left + textNode.x,
+      y: stageBox.top + textNode.y,
+    });
+    
+    // Focus input after render
+    setTimeout(() => editInputRef.current?.focus(), 10);
+  };
+  
+  // Save edited text
+  const handleEditSave = () => {
+    if (editingTextId && editingText.trim()) {
       setTextElements(textElements.map(t => 
-        t.id === id ? { ...t, text: newText } : t
+        t.id === editingTextId ? { ...t, text: editingText } : t
       ));
     }
+    setEditingTextId(null);
+    setEditingText('');
+    setEditingPosition(null);
+  };
+  
+  // Cancel editing
+  const handleEditCancel = () => {
+    setEditingTextId(null);
+    setEditingText('');
+    setEditingPosition(null);
   };
 
   // Update selected text properties
@@ -510,7 +541,7 @@ export default function MemeEditorPage() {
                       shadowOffsetY={textEl.shadowOffsetY}
                       draggable={textEl.draggable}
                       onClick={() => { setSelectedId(textEl.id); setActiveTool('select'); }}
-                      onDblClick={() => handleTextDblClick(textEl.id)}
+                      onDblClick={(e) => handleTextDblClick(textEl.id, e)}
                       onDragEnd={(e) => {
                         setTextElements(textElements.map(t =>
                           t.id === textEl.id ? { ...t, x: e.target.x(), y: e.target.y() } : t
@@ -524,6 +555,39 @@ export default function MemeEditorPage() {
                   />
                 </Layer>
               </Stage>
+            )}
+            
+            {/* Inline Text Editor Overlay */}
+            {editingTextId && editingPosition && (
+              <div 
+                className="fixed z-50 bg-zinc-900 border border-zinc-600 rounded-lg shadow-xl p-2"
+                style={{ 
+                  left: editingPosition.x, 
+                  top: editingPosition.y,
+                  minWidth: '200px'
+                }}
+              >
+                <input
+                  ref={editInputRef}
+                  type="text"
+                  value={editingText}
+                  onChange={(e) => setEditingText(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') handleEditSave();
+                    if (e.key === 'Escape') handleEditCancel();
+                  }}
+                  className="w-full bg-zinc-800 border border-zinc-600 rounded px-3 py-2 text-white text-sm focus:outline-none focus:border-purple-500"
+                  placeholder="Enter text..."
+                />
+                <div className="flex gap-2 mt-2">
+                  <Button size="sm" onClick={handleEditSave} className="flex-1 bg-purple-600 hover:bg-purple-700">
+                    Save
+                  </Button>
+                  <Button size="sm" variant="ghost" onClick={handleEditCancel} className="flex-1">
+                    Cancel
+                  </Button>
+                </div>
+              </div>
             )}
           </div>
         </div>
