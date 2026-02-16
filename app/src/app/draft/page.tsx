@@ -37,7 +37,9 @@ import {
     ChevronDown,
     Copy,
     History,
+    Palette,
 } from 'lucide-react';
+import Link from 'next/link';
 
 // Helper function to convert wizard state to NewsletterDraft and save to localStorage
 function saveWizardStateToCurrentDraft(completed: {
@@ -404,6 +406,16 @@ function GenerationStep({ title, sectionType, content, onSave, placeholder }: Ge
                         <RefreshCw className={`w-4 h-4 mr-1 ${isGenerating ? 'animate-spin' : ''}`} />
                         Regen
                     </Button>
+                    <Link href="/draft/meme-editor">
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-white/50 hover:text-purple-400"
+                        >
+                            <Palette className="w-4 h-4 mr-1" />
+                            Meme Editor
+                        </Button>
+                    </Link>
                 </div>
             </div>
 
