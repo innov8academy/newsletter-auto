@@ -16,7 +16,7 @@ function getSupabase() {
 async function uploadImageToSupabase(base64Data: string, filename: string): Promise<string | null> {
   const supabase = getSupabase();
   if (!supabase) {
-    console.log('[meme-generate] Supabase not configured');
+    console.error('[meme-generate] Supabase not configured - need NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY');
     return null;
   }
 
@@ -45,7 +45,7 @@ async function uploadImageToSupabase(base64Data: string, filename: string): Prom
       });
     
     if (error) {
-      console.error('[meme-generate] Supabase upload error:', error);
+      console.error('[meme-generate] Supabase upload error:', error.message);
       return null;
     }
     
@@ -67,11 +67,13 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { canvasImage, referenceImage, hasReference, width, height } = body;
 
+    // Check KIE API key
     const kieApiKey = process.env.KIE_API_KEY;
-    
     if (!kieApiKey) {
-      console.log('[meme-generate] KIE_API_KEY not set, using OpenRouter');
-      return handleOpenRouter(body);
+      return NextResponse.json(
+        { success: false, error: 'KIE_API_KEY not configured in environment variables' },
+        { status: 500 }
+      );
     }
 
     if (!canvasImage) {
@@ -81,34 +83,42 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Upload images to Supabase to get hosted URLs
-    console.log('[meme-generate] Uploading images to Supabase...');
+    // Step 1: Upload images to Supabase to get hosted URLs (KIE requires URLs, not base64)
+    console.log('[meme-generate] Uploading canvas image to Supabase...');
     const canvasUrl = await uploadImageToSupabase(canvasImage, 'canvas');
     
     if (!canvasUrl) {
-      console.log('[meme-generate] Failed to upload canvas, falling back to OpenRouter');
-      return handleOpenRouter(body);
+      return NextResponse.json(
+        { success: false, error: 'Failed to upload image. Make sure Supabase is configured and "temp-images" bucket exists.' },
+        { status: 500 }
+      );
     }
     
     const imageUrls = [canvasUrl];
     
+    // Upload reference image if provided
     if (referenceImage) {
+      console.log('[meme-generate] Uploading reference image to Supabase...');
       const refUrl = await uploadImageToSupabase(referenceImage, 'reference');
       if (refUrl) {
         imageUrls.push(refUrl);
+      } else {
+        console.warn('[meme-generate] Failed to upload reference image, continuing without it');
       }
     }
 
-    // Build prompt for face swap / inpainting
+    // Step 2: Build prompt for face swap / inpainting
     const aspectInfo = width && height ? `Output image should be ${width}x${height} pixels.` : '';
     
     const prompt = hasReference 
       ? `Replace the red-marked face/head area in the first image with the face from the second reference image. Match lighting, angle, and scale perfectly. Keep the body, clothing, and background exactly the same. Blend naturally with no visible seams. ${aspectInfo}`
       : `Remove the red-marked area and fill it naturally with appropriate content that matches the surroundings. Keep everything else exactly the same. ${aspectInfo}`;
 
-    console.log('[meme-generate] Creating KIE task with URLs:', imageUrls);
+    console.log('[meme-generate] Creating KIE task...');
+    console.log('[meme-generate] Image URLs:', imageUrls);
+    console.log('[meme-generate] Prompt:', prompt);
 
-    // Create task with KIE
+    // Step 3: Create task with KIE API
     const createResponse = await fetch(`${KIE_API_URL}/createTask`, {
       method: 'POST',
       headers: {
@@ -127,23 +137,29 @@ export async function POST(request: NextRequest) {
     if (!createResponse.ok) {
       const errorText = await createResponse.text();
       console.error('[meme-generate] KIE create task error:', createResponse.status, errorText);
-      return handleOpenRouter(body);
+      return NextResponse.json(
+        { success: false, error: `KIE API error: ${createResponse.status} - ${errorText}` },
+        { status: createResponse.status }
+      );
     }
 
     const createData = await createResponse.json();
-    console.log('[meme-generate] KIE response:', JSON.stringify(createData, null, 2));
+    console.log('[meme-generate] KIE create response:', JSON.stringify(createData, null, 2));
 
     // Extract taskId from response
     const taskId = createData.data?.taskId || createData.taskId || createData.task_id || createData.id;
     
     if (!taskId) {
-      console.error('[meme-generate] No taskId in response:', createData);
-      return handleOpenRouter(body);
+      console.error('[meme-generate] No taskId in KIE response');
+      return NextResponse.json(
+        { success: false, error: `KIE did not return a task ID. Response: ${JSON.stringify(createData)}` },
+        { status: 500 }
+      );
     }
 
-    console.log('[meme-generate] Task created:', taskId);
+    console.log('[meme-generate] Task created with ID:', taskId);
 
-    // Poll for result (max 90 seconds for image generation)
+    // Step 4: Poll for result (max 90 seconds for image generation)
     const maxAttempts = 45;
     const pollInterval = 2000;
     
@@ -166,12 +182,13 @@ export async function POST(request: NextRequest) {
       console.log(`[meme-generate] Poll ${i + 1}/${maxAttempts}: state=${state}`);
       
       if (state === 'success' || state === 'completed') {
-        // Try multiple paths for image URL
+        // Try multiple paths for image URL in the response
         const imageUrl = statusData.data?.output?.image_url ||
                         statusData.data?.output?.images?.[0] ||
                         statusData.data?.videoInfo?.imageUrl ||
                         statusData.data?.imageUrl ||
                         statusData.data?.result?.image_url ||
+                        statusData.data?.result?.images?.[0] ||
                         statusData.output?.image_url ||
                         statusData.imageUrl;
         
@@ -179,21 +196,21 @@ export async function POST(request: NextRequest) {
           console.log('[meme-generate] Success! Image URL:', imageUrl);
           return NextResponse.json({ success: true, imageUrl });
         } else {
-          console.error('[meme-generate] Success but no image URL:', statusData);
+          console.error('[meme-generate] Success state but no image URL found:', JSON.stringify(statusData));
           return NextResponse.json(
-            { success: false, error: 'No image URL in success response' },
+            { success: false, error: 'Generation succeeded but no image URL in response' },
             { status: 500 }
           );
         }
       } else if (state === 'failed' || state === 'error') {
-        const errorMsg = statusData.data?.failMsg || statusData.failMsg || 'Generation failed';
-        console.error('[meme-generate] Generation failed:', errorMsg);
+        const errorMsg = statusData.data?.failMsg || statusData.data?.error || statusData.failMsg || 'Generation failed';
+        console.error('[meme-generate] KIE generation failed:', errorMsg);
         return NextResponse.json(
-          { success: false, error: errorMsg },
+          { success: false, error: `KIE generation failed: ${errorMsg}` },
           { status: 500 }
         );
       }
-      // Continue polling for 'pending', 'processing', 'running', etc.
+      // Continue polling for 'pending', 'processing', 'running', 'queued', etc.
     }
     
     return NextResponse.json(
@@ -204,138 +221,8 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('[meme-generate] Error:', error);
     return NextResponse.json(
-      { success: false, error: 'Internal server error' },
+      { success: false, error: `Server error: ${error instanceof Error ? error.message : 'Unknown error'}` },
       { status: 500 }
     );
   }
-}
-
-// Fallback to OpenRouter/Gemini if KIE not available
-async function handleOpenRouter(body: any) {
-  const { canvasImage, referenceImage, hasReference, width, height } = body;
-  
-  const apiKey = process.env.OPENROUTER_API_KEY;
-  if (!apiKey) {
-    return NextResponse.json(
-      { success: false, error: 'No API key configured (KIE_API_KEY or OPENROUTER_API_KEY)' },
-      { status: 500 }
-    );
-  }
-
-  const aspectInfo = width && height 
-    ? `The output image MUST be exactly ${width}x${height} pixels.` 
-    : 'Maintain exact same dimensions as input.';
-  
-  const faceSwapPrompt = `Replace ONLY the red-marked head/face area with the face from the reference image. Match lighting, angle, scale. Blend naturally. Keep everything else EXACTLY the same. No text/watermarks. ${aspectInfo} Output ONLY the final image.`;
-  const inpaintPrompt = `Remove the red-marked area and fill naturally. Keep everything else the same. ${aspectInfo} Output ONLY the final image.`;
-
-  const messages: any[] = [{
-    role: 'user',
-    content: [
-      { type: 'text', text: hasReference ? faceSwapPrompt : inpaintPrompt },
-      { type: 'image_url', image_url: { url: canvasImage } },
-    ]
-  }];
-
-  if (referenceImage) {
-    messages[0].content.push({ type: 'image_url', image_url: { url: referenceImage } });
-  }
-
-  const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model: 'google/gemini-3-pro-image-preview',
-      messages,
-    })
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    console.error('[meme-generate] OpenRouter error:', response.status, errorText);
-    return NextResponse.json(
-      { success: false, error: `API error: ${response.status}` },
-      { status: response.status }
-    );
-  }
-
-  const data = await response.json();
-  console.log('[meme-generate] OpenRouter response structure:', JSON.stringify({
-    hasChoices: !!data.choices,
-    choiceCount: data.choices?.length,
-    messageKeys: data.choices?.[0]?.message ? Object.keys(data.choices[0].message) : [],
-    contentType: typeof data.choices?.[0]?.message?.content,
-    contentIsArray: Array.isArray(data.choices?.[0]?.message?.content),
-  }));
-  
-  const message = data.choices?.[0]?.message;
-  let imageUrl: string | null = null;
-  
-  // Method 1: Content is array with image parts (Gemini multimodal format)
-  if (Array.isArray(message?.content)) {
-    for (const part of message.content) {
-      if (part.type === 'image_url' && part.image_url?.url) {
-        imageUrl = part.image_url.url;
-        console.log('[meme-generate] Found image in content array (image_url)');
-        break;
-      }
-      if (part.type === 'image' && part.url) {
-        imageUrl = part.url;
-        console.log('[meme-generate] Found image in content array (image)');
-        break;
-      }
-      // Gemini sometimes returns inline_data
-      if (part.inline_data?.data && part.inline_data?.mime_type) {
-        imageUrl = `data:${part.inline_data.mime_type};base64,${part.inline_data.data}`;
-        console.log('[meme-generate] Found inline_data in content array');
-        break;
-      }
-    }
-  }
-  
-  // Method 2: Content is string with URL
-  if (!imageUrl && typeof message?.content === 'string') {
-    const content = message.content;
-    
-    // Try HTTP URL
-    const urlMatch = content.match(/(https?:\/\/[^\s)"'\]]+)/i);
-    if (urlMatch) {
-      imageUrl = urlMatch[0];
-      console.log('[meme-generate] Found URL in string content');
-    }
-    
-    // Try base64 data URL
-    if (!imageUrl) {
-      const dataUrlMatch = content.match(/data:image\/[a-zA-Z]+;base64,[A-Za-z0-9+/=]+/);
-      if (dataUrlMatch) {
-        imageUrl = dataUrlMatch[0];
-        console.log('[meme-generate] Found data URL in string content');
-      }
-    }
-  }
-  
-  // Method 3: Images array in message
-  if (!imageUrl && message?.images?.[0]?.image_url?.url) {
-    imageUrl = message.images[0].image_url.url;
-    console.log('[meme-generate] Found image in message.images array');
-  }
-  
-  // Method 4: Direct image_url on message
-  if (!imageUrl && message?.image_url?.url) {
-    imageUrl = message.image_url.url;
-    console.log('[meme-generate] Found image in message.image_url');
-  }
-  
-  if (imageUrl) {
-    return NextResponse.json({ success: true, imageUrl });
-  }
-
-  console.error('[meme-generate] No image found. Full response:', JSON.stringify(data).slice(0, 1000));
-  return NextResponse.json(
-    { success: false, error: 'No image in response' },
-    { status: 500 }
-  );
 }
