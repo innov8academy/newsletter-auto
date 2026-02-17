@@ -12,6 +12,7 @@ export const RESEARCH_MODELS = [
     // NOTE: o4-mini-deep-research removed - takes 5-10min, exceeds Vercel timeout
     { id: 'perplexity/sonar-deep-research', name: 'Perplexity Deep Research', description: '🔬 Best deep research - fast & reliable', category: 'research' },
     { id: 'x-ai/grok-4.1-fast', name: 'Grok 4.1 Fast (Reasoning)', description: '🚀 10x cheaper! Deep reasoning + 2M context', category: 'research', reasoning: true },
+    { id: 'moonshotai/kimi-k2.5', name: 'Kimi K2.5', description: '🧠 262K context, strong research & reports', category: 'research' },
     { id: 'perplexity/sonar', name: 'Perplexity Sonar', description: '💰 Web search - $1/1M tokens', category: 'research' },
     { id: 'perplexity/sonar-pro', name: 'Perplexity Sonar Pro', description: '🔥 Advanced web research', category: 'research' },
     { id: 'google/gemini-3-pro-preview', name: 'Gemini 3 Pro', description: 'Google flagship - 1M context', category: 'research' },
@@ -57,12 +58,19 @@ export async function generateResearchReport(
     const selectedModel = modelId || DEFAULT_MODEL;
     console.log('[generateResearchReport] Selected model:', selectedModel);
 
-    // Check if using Perplexity model - use cost-optimized prompt
+    // Check model type for specialized prompts
     const isPerplexity = selectedModel.toLowerCase().includes('perplexity');
+    const isKimi = selectedModel.toLowerCase().includes('kimi');
 
-    const systemPrompt = isPerplexity
-        ? getCostOptimizedPrompt()
-        : getVerbosePrompt();
+    // Select appropriate prompt based on model
+    let systemPrompt: string;
+    if (isPerplexity) {
+        systemPrompt = getCostOptimizedPrompt();
+    } else if (isKimi) {
+        systemPrompt = getKimiResearchPrompt();
+    } else {
+        systemPrompt = getVerbosePrompt();
+    }
 
     const userPrompt = `Research and write about this story for the newsletter:
 
@@ -76,7 +84,7 @@ export async function generateResearchReport(
 
 ${story.originalUrl ? `**Source URL:** ${story.originalUrl}` : ''}
 
-${isPerplexity ? 'Extract the key insights and thinking. Keep it under 800 words.' : 'Write this up for the newsletter. Make it engaging and newsletter-ready. Focus on what\'s actually interesting about this story.'}`;
+${isPerplexity ? 'Extract the key insights and thinking. Keep it under 800 words.' : isKimi ? 'Provide comprehensive research and analysis. Use your deep reasoning capabilities to uncover insights and connections. Be thorough but focused.' : 'Write this up for the newsletter. Make it engaging and newsletter-ready. Focus on what\'s actually interesting about this story.'}`;
 
     try {
         // Call the selected model
@@ -286,6 +294,58 @@ RULES:
 - Be specific: names, numbers, dates
 - Skip sources/URLs (not needed)
 - NO prose paragraphs`;
+}
+
+/**
+ * Specialized prompt for Kimi K2.5 - optimized for its research and analysis strengths
+ * Kimi excels at: deep analysis, structured reports, multi-perspective analysis, thorough research
+ */
+function getKimiResearchPrompt(): string {
+    return `You are a senior technology analyst writing for "Innov8 AI", a newsletter that delivers deep, insightful analysis of AI news.
+
+YOUR STRENGTHS TO LEVERAGE:
+- Deep analytical reasoning and comprehensive research
+- Structured, well-organized reporting
+- Multi-perspective analysis
+- Finding connections and implications others miss
+
+WRITING APPROACH:
+- Be thorough but concise - every point should add value
+- Provide substantive analysis, not surface-level summaries
+- Include specific facts, numbers, and names
+- Draw connections to broader industry trends
+- Offer unique insights from multiple angles
+
+STRUCTURE YOUR RESPONSE AS:
+
+## The Story
+[3-4 paragraphs with comprehensive coverage of WHAT happened, WHO is involved, and WHY this matters. Include key facts, timeline if relevant, and immediate implications. Make it engaging and informative.]
+
+## The Context
+[2-3 paragraphs providing deeper analysis:
+- How does this fit into the broader AI/tech landscape?
+- What are the market/competitive implications?
+- Historical context: what led to this?
+- Who are the winners and losers?]
+
+## The Hot Take 🔥
+[Your sharp, analytical take in 2-3 sentences. What's the real story that headlines miss? Be bold and specific.]
+
+## What's Next
+[3-5 bullet points on concrete things to watch:
+- Specific timelines or milestones
+- Companies or people to track
+- Potential second-order effects
+- Risks or opportunities]
+
+## Quotables
+[Include 1-2 notable quotes from key figures if available. Format: "[Quote]" — Person Name, Title]
+
+QUALITY STANDARDS:
+- Ready to publish with minimal editing
+- Substantive analysis, not generic observations
+- Specific and actionable insights
+- Professional but accessible tone`;
 }
 
 /**
