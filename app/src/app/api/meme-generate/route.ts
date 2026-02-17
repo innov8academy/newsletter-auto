@@ -263,26 +263,77 @@ async function handleOpenRouter(body: any) {
   }
 
   const data = await response.json();
-  const content = data.choices?.[0]?.message?.content || '';
+  console.log('[meme-generate] OpenRouter response structure:', JSON.stringify({
+    hasChoices: !!data.choices,
+    choiceCount: data.choices?.length,
+    messageKeys: data.choices?.[0]?.message ? Object.keys(data.choices[0].message) : [],
+    contentType: typeof data.choices?.[0]?.message?.content,
+    contentIsArray: Array.isArray(data.choices?.[0]?.message?.content),
+  }));
   
-  // Try to extract image URL from response
-  const urlMatch = content.match(/(https?:\/\/[^\s)"']+\.(png|jpg|jpeg|webp|gif)[^\s)"']*)/i);
-  if (urlMatch) {
-    return NextResponse.json({ success: true, imageUrl: urlMatch[0] });
+  const message = data.choices?.[0]?.message;
+  let imageUrl: string | null = null;
+  
+  // Method 1: Content is array with image parts (Gemini multimodal format)
+  if (Array.isArray(message?.content)) {
+    for (const part of message.content) {
+      if (part.type === 'image_url' && part.image_url?.url) {
+        imageUrl = part.image_url.url;
+        console.log('[meme-generate] Found image in content array (image_url)');
+        break;
+      }
+      if (part.type === 'image' && part.url) {
+        imageUrl = part.url;
+        console.log('[meme-generate] Found image in content array (image)');
+        break;
+      }
+      // Gemini sometimes returns inline_data
+      if (part.inline_data?.data && part.inline_data?.mime_type) {
+        imageUrl = `data:${part.inline_data.mime_type};base64,${part.inline_data.data}`;
+        console.log('[meme-generate] Found inline_data in content array');
+        break;
+      }
+    }
   }
   
-  // Try base64 data URL
-  const dataUrlMatch = content.match(/data:image\/[a-zA-Z]+;base64,[^\s)"']+/);
-  if (dataUrlMatch) {
-    return NextResponse.json({ success: true, imageUrl: dataUrlMatch[0] });
+  // Method 2: Content is string with URL
+  if (!imageUrl && typeof message?.content === 'string') {
+    const content = message.content;
+    
+    // Try HTTP URL
+    const urlMatch = content.match(/(https?:\/\/[^\s)"'\]]+)/i);
+    if (urlMatch) {
+      imageUrl = urlMatch[0];
+      console.log('[meme-generate] Found URL in string content');
+    }
+    
+    // Try base64 data URL
+    if (!imageUrl) {
+      const dataUrlMatch = content.match(/data:image\/[a-zA-Z]+;base64,[A-Za-z0-9+/=]+/);
+      if (dataUrlMatch) {
+        imageUrl = dataUrlMatch[0];
+        console.log('[meme-generate] Found data URL in string content');
+      }
+    }
   }
   
-  // Check for images array in response
-  if (data.choices?.[0]?.message?.images?.[0]?.image_url?.url) {
-    return NextResponse.json({ success: true, imageUrl: data.choices[0].message.images[0].image_url.url });
+  // Method 3: Images array in message
+  if (!imageUrl && message?.images?.[0]?.image_url?.url) {
+    imageUrl = message.images[0].image_url.url;
+    console.log('[meme-generate] Found image in message.images array');
+  }
+  
+  // Method 4: Direct image_url on message
+  if (!imageUrl && message?.image_url?.url) {
+    imageUrl = message.image_url.url;
+    console.log('[meme-generate] Found image in message.image_url');
+  }
+  
+  if (imageUrl) {
+    return NextResponse.json({ success: true, imageUrl });
   }
 
-  console.error('[meme-generate] No image in OpenRouter response:', content.slice(0, 500));
+  console.error('[meme-generate] No image found. Full response:', JSON.stringify(data).slice(0, 1000));
   return NextResponse.json(
     { success: false, error: 'No image in response' },
     { status: 500 }
