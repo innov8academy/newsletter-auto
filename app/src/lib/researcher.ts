@@ -12,7 +12,7 @@ export const RESEARCH_MODELS = [
     // NOTE: o4-mini-deep-research removed - takes 5-10min, exceeds Vercel timeout
     { id: 'perplexity/sonar-deep-research', name: 'Perplexity Deep Research', description: '🔬 Best deep research - fast & reliable', category: 'research' },
     { id: 'x-ai/grok-4.1-fast', name: 'Grok 4.1 Fast (Reasoning)', description: '🚀 10x cheaper! Deep reasoning + 2M context', category: 'research', reasoning: true },
-    { id: 'moonshotai/kimi-k2.5', name: 'Kimi K2.5', description: '🧠 262K context, strong research & reports', category: 'research' },
+    { id: 'moonshotai/kimi-k2.5', name: 'Kimi K2.5 (Agent)', description: '🤖 262K + web search + tool-calling', category: 'research', agentic: true },
     { id: 'perplexity/sonar', name: 'Perplexity Sonar', description: '💰 Web search - $1/1M tokens', category: 'research' },
     { id: 'perplexity/sonar-pro', name: 'Perplexity Sonar Pro', description: '🔥 Advanced web research', category: 'research' },
     { id: 'google/gemini-3-pro-preview', name: 'Gemini 3 Pro', description: 'Google flagship - 1M context', category: 'research' },
@@ -58,9 +58,19 @@ export async function generateResearchReport(
     const selectedModel = modelId || DEFAULT_MODEL;
     console.log('[generateResearchReport] Selected model:', selectedModel);
 
-    // Check model type for specialized prompts
+    // Check model type for specialized handling
     const isPerplexity = selectedModel.toLowerCase().includes('perplexity');
     const isKimi = selectedModel.toLowerCase().includes('kimi');
+    
+    // Check if model supports agentic mode (tool-calling)
+    const modelConfig = RESEARCH_MODELS.find(m => m.id === selectedModel);
+    const isAgentic = modelConfig && 'agentic' in modelConfig && modelConfig.agentic;
+    
+    // Use agentic research for Kimi with tool-calling
+    if (isKimi && isAgentic) {
+        console.log('[generateResearchReport] Using agentic mode for Kimi');
+        return await generateAgenticResearch(story, apiKey, selectedModel);
+    }
 
     // Select appropriate prompt based on model
     let systemPrompt: string;
@@ -284,6 +294,280 @@ ${isPerplexity ? 'Extract the key insights and thinking. Keep it under 800 words
             error: error instanceof Error ? error.message : 'Unknown error'
         };
     }
+}
+
+/**
+ * Agentic research using Kimi with tool-calling (web search)
+ * Implements a multi-step agent loop that searches the web and synthesizes findings
+ */
+async function generateAgenticResearch(
+    story: CuratedStory,
+    apiKey: string,
+    model: string
+): Promise<ResearchResult> {
+    console.log('[AgenticResearch] Starting with model:', model);
+    
+    // Define available tools
+    const tools = [
+        {
+            type: 'function',
+            function: {
+                name: 'web_search',
+                description: 'Search the web for current information, news, facts, and data. Use this to verify claims, find recent developments, get statistics, and gather source material.',
+                parameters: {
+                    type: 'object',
+                    properties: {
+                        query: {
+                            type: 'string',
+                            description: 'The search query. Be specific and include relevant keywords.'
+                        }
+                    },
+                    required: ['query']
+                }
+            }
+        }
+    ];
+    
+    const systemPrompt = getKimiAgenticPrompt();
+    
+    const userPrompt = `Research this topic thoroughly for a newsletter article:
+
+**Topic:** ${story.headline}
+
+**Context:** ${story.summary}
+
+**Category:** ${story.category}
+
+${story.originalUrl ? `**Source URL:** ${story.originalUrl}` : ''}
+
+Instructions:
+1. Use web_search to find current, verified information about this topic
+2. Search for: recent news, official announcements, expert opinions, statistics, and context
+3. Verify key claims with multiple searches if needed
+4. After gathering information, write a comprehensive newsletter-ready report
+
+Start by searching for the most relevant and recent information.`;
+
+    const messages: Array<{role: string; content?: string; tool_calls?: any[]; tool_call_id?: string; name?: string}> = [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt }
+    ];
+    
+    const maxIterations = 8; // Prevent infinite loops
+    let iteration = 0;
+    let finalContent = '';
+    
+    while (iteration < maxIterations) {
+        iteration++;
+        console.log(`[AgenticResearch] Iteration ${iteration}/${maxIterations}`);
+        
+        try {
+            const response = await fetch(OPENROUTER_API_URL, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${apiKey}`,
+                    'HTTP-Referer': 'https://newsletter-auto.vercel.app',
+                    'X-Title': 'Innov8 AI Newsletter - Agentic Research'
+                },
+                body: JSON.stringify({
+                    model,
+                    messages,
+                    tools,
+                    tool_choice: iteration === 1 ? 'auto' : 'auto', // Let model decide
+                    max_tokens: 8000,
+                    temperature: 0.3,
+                })
+            });
+            
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error('[AgenticResearch] API error:', errorText);
+                return { success: false, error: `API error: ${response.status}` };
+            }
+            
+            const data = await response.json();
+            const choice = data.choices?.[0];
+            const message = choice?.message;
+            
+            if (!message) {
+                console.error('[AgenticResearch] No message in response');
+                break;
+            }
+            
+            // Check for tool calls
+            if (message.tool_calls && message.tool_calls.length > 0) {
+                console.log(`[AgenticResearch] Model requested ${message.tool_calls.length} tool calls`);
+                
+                // Add assistant message with tool calls
+                messages.push({
+                    role: 'assistant',
+                    content: message.content || '',
+                    tool_calls: message.tool_calls
+                });
+                
+                // Execute each tool call
+                for (const toolCall of message.tool_calls) {
+                    const functionName = toolCall.function?.name;
+                    const functionArgs = JSON.parse(toolCall.function?.arguments || '{}');
+                    
+                    console.log(`[AgenticResearch] Executing tool: ${functionName}`, functionArgs);
+                    
+                    let toolResult = '';
+                    
+                    if (functionName === 'web_search') {
+                        try {
+                            // Call our web search API
+                            const searchResponse = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'https://newsletter-auto.vercel.app'}/api/web-search`, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ query: functionArgs.query, num: 5 })
+                            });
+                            
+                            const searchData = await searchResponse.json();
+                            
+                            if (searchData.success && searchData.results) {
+                                toolResult = formatSearchResults(searchData.results);
+                                console.log(`[AgenticResearch] Search returned ${searchData.results.length} results`);
+                            } else {
+                                toolResult = `Search failed: ${searchData.error || 'Unknown error'}`;
+                            }
+                        } catch (searchError) {
+                            console.error('[AgenticResearch] Search error:', searchError);
+                            toolResult = `Search error: ${searchError instanceof Error ? searchError.message : 'Unknown'}`;
+                        }
+                    } else {
+                        toolResult = `Unknown tool: ${functionName}`;
+                    }
+                    
+                    // Add tool result to messages
+                    messages.push({
+                        role: 'tool',
+                        tool_call_id: toolCall.id,
+                        name: functionName,
+                        content: toolResult
+                    });
+                }
+                
+                // Continue loop to get next response
+                continue;
+            }
+            
+            // No tool calls - this is the final response
+            // Extract content from message (handle Kimi's reasoning field)
+            finalContent = message.content || '';
+            
+            if (!finalContent && message.reasoning) {
+                finalContent = typeof message.reasoning === 'string' 
+                    ? message.reasoning 
+                    : message.reasoning.content || message.reasoning.text || '';
+            }
+            
+            if (!finalContent && message.reasoning_details) {
+                if (typeof message.reasoning_details === 'string') {
+                    finalContent = message.reasoning_details;
+                } else if (Array.isArray(message.reasoning_details)) {
+                    finalContent = message.reasoning_details
+                        .map((r: any) => r.content || r.text || r)
+                        .filter(Boolean)
+                        .join('\n\n');
+                }
+            }
+            
+            if (finalContent) {
+                console.log(`[AgenticResearch] Got final content (${finalContent.length} chars) after ${iteration} iterations`);
+                break;
+            }
+            
+        } catch (error) {
+            console.error('[AgenticResearch] Error in iteration:', error);
+            return { 
+                success: false, 
+                error: error instanceof Error ? error.message : 'Unknown error' 
+            };
+        }
+    }
+    
+    if (!finalContent) {
+        return { 
+            success: false, 
+            error: `No final content after ${iteration} iterations` 
+        };
+    }
+    
+    const report = parseResearchContent(story, finalContent);
+    return { success: true, report };
+}
+
+/**
+ * Format search results for the model
+ */
+function formatSearchResults(results: any[]): string {
+    if (!results || results.length === 0) {
+        return 'No results found.';
+    }
+    
+    let formatted = 'Search Results:\n\n';
+    
+    for (const result of results) {
+        if (result.type === 'knowledge') {
+            formatted += `[Knowledge Panel] ${result.title}\n${result.description}\nSource: ${result.source}\n\n`;
+        } else if (result.type === 'news') {
+            formatted += `[News] ${result.title}\n${result.snippet}\nSource: ${result.source} | ${result.date || 'Recent'}\nURL: ${result.url}\n\n`;
+        } else {
+            formatted += `[Web] ${result.title}\n${result.snippet}\n${result.date ? `Date: ${result.date}\n` : ''}URL: ${result.url}\n\n`;
+        }
+    }
+    
+    return formatted;
+}
+
+/**
+ * Specialized prompt for Kimi agentic mode with tool-calling
+ */
+function getKimiAgenticPrompt(): string {
+    return `You are an elite AI research agent for "Innov8 AI" newsletter. You have access to web search to gather current, verified information.
+
+YOUR MISSION: Produce thoroughly researched, fact-checked newsletter content.
+
+RESEARCH APPROACH:
+1. START with web searches to gather current information
+2. Search for: official announcements, news coverage, expert opinions, statistics
+3. VERIFY key claims with multiple searches when important
+4. Cite your sources in the final report
+
+TOOL USAGE:
+- Use web_search to find current information
+- Be specific in your queries (include names, dates, companies)
+- Search multiple angles: news, official sources, expert analysis
+- Do 3-6 searches to build comprehensive understanding
+
+AFTER RESEARCH, write your report in this format:
+
+## The Story
+[3-4 paragraphs with VERIFIED facts from your searches. Include specific details: names, dates, numbers. Cite sources inline like (Source: TechCrunch).]
+
+## The Context
+[2-3 paragraphs analyzing the bigger picture. What does this mean for the industry? Who wins/loses? Historical context if relevant.]
+
+## The Hot Take 🔥
+[Your sharp analytical take in 2-3 sentences. What's the real story others are missing?]
+
+## What's Next
+[3-5 bullet points of specific things to watch, based on your research findings]
+
+## Quotables
+[Include 1-2 real quotes you found in your research, with proper attribution]
+
+## Sources
+[List the key sources you used]
+
+QUALITY STANDARDS:
+- Every fact must come from your web searches
+- Include specific numbers, dates, and names
+- Cite sources for major claims
+- Be analytical, not just descriptive
+- Ready to publish with minimal editing`;
 }
 
 /**
