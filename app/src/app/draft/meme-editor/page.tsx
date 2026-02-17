@@ -333,6 +333,38 @@ export default function MemeEditorPage() {
     return dataUrl;
   };
 
+  // Get canvas WITHOUT text - only base image + mask (for AI processing)
+  const getCanvasForAI = (): string => {
+    if (!stageRef.current || !baseImage) return '';
+    
+    // Create a temporary canvas with just the base image and mask
+    const tempCanvas = document.createElement('canvas');
+    tempCanvas.width = canvasSize.width;
+    tempCanvas.height = canvasSize.height;
+    const ctx = tempCanvas.getContext('2d');
+    if (!ctx) return '';
+    
+    // Draw base image
+    ctx.drawImage(baseImage, 0, 0, canvasSize.width, canvasSize.height);
+    
+    // Draw mask lines
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    maskLines.forEach(line => {
+      if (line.globalCompositeOperation === 'destination-out') return; // Skip eraser for AI
+      ctx.beginPath();
+      ctx.strokeStyle = line.stroke;
+      ctx.lineWidth = line.strokeWidth;
+      for (let i = 0; i < line.points.length - 2; i += 2) {
+        ctx.moveTo(line.points[i], line.points[i + 1]);
+        ctx.lineTo(line.points[i + 2], line.points[i + 3]);
+      }
+      ctx.stroke();
+    });
+    
+    return tempCanvas.toDataURL('image/png');
+  };
+
   // Save API key handler
   const handleSaveApiKey = () => {
     if (apiKey.trim()) {
@@ -359,16 +391,38 @@ export default function MemeEditorPage() {
     setIsGenerating(true);
     
     try {
-      const canvasDataUrl = getCanvasWithMask();
+      // Get canvas WITHOUT text overlays - only base image + mask
+      const canvasDataUrl = getCanvasForAI();
+      
+      // Improved prompts for face/head replacement
+      const faceSwapPrompt = `You are an expert image editor. The first image shows a person with their HEAD/FACE area marked in RED. 
+The second image is a REFERENCE FACE to use.
+
+Your task:
+1. REPLACE ONLY the red-marked head/face area with the face from the reference image
+2. Match the lighting, angle, and scale of the original image
+3. Blend naturally - the face should look like it belongs on that body
+4. Keep the body, clothing, background, and everything else EXACTLY the same
+5. Do NOT add any text or watermarks
+
+Output ONLY the final edited image.`;
+
+      const inpaintPrompt = `You are an expert image editor. This image has an area marked in RED that needs to be removed/replaced.
+
+Your task:
+1. Remove the red-marked area
+2. Fill it naturally with appropriate content that matches the surrounding area
+3. Make it look seamless and realistic
+4. Keep everything else EXACTLY the same
+
+Output ONLY the final edited image.`;
       
       const messages: any[] = [{
         role: 'user',
         content: [
           { 
             type: 'text', 
-            text: referenceImage 
-              ? 'Replace the area marked in red/highlighted in the first image with the person/character from the second image. Keep everything else unchanged. Output only the final edited image.'
-              : 'Remove or replace the area marked in red/highlighted in this image naturally. Fill it with appropriate background or content. Output only the final edited image.'
+            text: referenceImage ? faceSwapPrompt : inpaintPrompt
           },
           { type: 'image_url', image_url: { url: canvasDataUrl } },
         ]
@@ -386,26 +440,55 @@ export default function MemeEditorPage() {
           'HTTP-Referer': window.location.origin,
         },
         body: JSON.stringify({
-          model: 'google/gemini-3-pro-image-preview',
+          model: 'google/gemini-2.0-flash-exp-image-generation',
           messages,
         })
       });
 
       if (!response.ok) {
+        const errorText = await response.text();
+        console.error('API error response:', errorText);
         throw new Error(`API error: ${response.status}`);
       }
 
       const data = await response.json();
+      console.log('[MemeEditor] AI response:', data);
       
       // Extract image URL from response
       const content = data.choices?.[0]?.message?.content || '';
-      const urlMatch = content.match(/(https?:\/\/[^\s)]+|data:image\/[a-zA-Z]+;base64,[^\s)]+)/);
+      let imageUrl = null;
       
+      // Try different response formats
+      const urlMatch = content.match(/(https?:\/\/[^\s)"']+|data:image\/[a-zA-Z]+;base64,[^\s)"']+)/);
       if (urlMatch) {
-        setGeneratedImage(urlMatch[0]);
+        imageUrl = urlMatch[0];
       } else if (data.choices?.[0]?.message?.images?.[0]?.image_url?.url) {
-        setGeneratedImage(data.choices[0].message.images[0].image_url.url);
+        imageUrl = data.choices[0].message.images[0].image_url.url;
+      } else if (Array.isArray(data.choices?.[0]?.message?.content)) {
+        // Handle multimodal response format
+        const imgPart = data.choices[0].message.content.find((p: any) => p.type === 'image_url' || p.image_url);
+        if (imgPart?.image_url?.url) {
+          imageUrl = imgPart.image_url.url;
+        }
+      }
+      
+      if (imageUrl) {
+        setGeneratedImage(imageUrl);
+        
+        // Load the generated image as the new base image (replaces main canvas)
+        const img = new window.Image();
+        img.crossOrigin = 'anonymous';
+        img.onload = () => {
+          setBaseImage(img);
+          setMaskLines([]); // Clear mask after successful generation
+          setHistory([]);
+        };
+        img.onerror = () => {
+          console.log('[MemeEditor] Could not load generated image into canvas, keeping in sidebar');
+        };
+        img.src = imageUrl;
       } else {
+        console.error('No image found in response:', data);
         throw new Error('No image in response');
       }
       
