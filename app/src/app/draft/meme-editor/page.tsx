@@ -21,7 +21,7 @@ import {
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { getApiKey, saveApiKey } from '@/lib/storage';
+// API key now handled server-side via env var
 
 // Google Fonts that work well for memes
 const FONTS = [
@@ -118,16 +118,6 @@ export default function MemeEditorPage() {
   
   // History for undo
   const [history, setHistory] = useState<MaskLine[][]>([]);
-  
-  // API Key
-  const [apiKey, setApiKey] = useState<string>('');
-  const [showApiKeyInput, setShowApiKeyInput] = useState(false);
-  
-  // Load API key on mount
-  useEffect(() => {
-    const key = getApiKey();
-    if (key) setApiKey(key);
-  }, []);
 
   // Load base image
   const handleBaseImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -365,26 +355,10 @@ export default function MemeEditorPage() {
     return tempCanvas.toDataURL('image/png');
   };
 
-  // Save API key handler
-  const handleSaveApiKey = () => {
-    if (apiKey.trim()) {
-      saveApiKey(apiKey.trim());
-      setShowApiKeyInput(false);
-    }
-  };
-
-  // Generate with AI
+  // Generate with AI - uses server API route with env var
   const handleGenerate = async () => {
     if (!baseImage || maskLines.length === 0) {
       alert('Please upload an image and draw a mask first');
-      return;
-    }
-    
-    // Check for API key (from state, which loads from localStorage)
-    console.log('[MemeEditor] API key check:', apiKey ? `Found (${apiKey.slice(0,8)}...)` : 'Not found');
-    
-    if (!apiKey) {
-      setShowApiKeyInput(true);
       return;
     }
 
@@ -394,83 +368,23 @@ export default function MemeEditorPage() {
       // Get canvas WITHOUT text overlays - only base image + mask
       const canvasDataUrl = getCanvasForAI();
       
-      // Improved prompts for face/head replacement
-      const faceSwapPrompt = `You are an expert image editor. The first image shows a person with their HEAD/FACE area marked in RED. 
-The second image is a REFERENCE FACE to use.
-
-Your task:
-1. REPLACE ONLY the red-marked head/face area with the face from the reference image
-2. Match the lighting, angle, and scale of the original image
-3. Blend naturally - the face should look like it belongs on that body
-4. Keep the body, clothing, background, and everything else EXACTLY the same
-5. Do NOT add any text or watermarks
-
-Output ONLY the final edited image.`;
-
-      const inpaintPrompt = `You are an expert image editor. This image has an area marked in RED that needs to be removed/replaced.
-
-Your task:
-1. Remove the red-marked area
-2. Fill it naturally with appropriate content that matches the surrounding area
-3. Make it look seamless and realistic
-4. Keep everything else EXACTLY the same
-
-Output ONLY the final edited image.`;
-      
-      const messages: any[] = [{
-        role: 'user',
-        content: [
-          { 
-            type: 'text', 
-            text: referenceImage ? faceSwapPrompt : inpaintPrompt
-          },
-          { type: 'image_url', image_url: { url: canvasDataUrl } },
-        ]
-      }];
-      
-      if (refImageUrl) {
-        messages[0].content.push({ type: 'image_url', image_url: { url: refImageUrl } });
-      }
-
-      const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      const response = await fetch('/api/meme-generate', {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${apiKey}`,
-          'Content-Type': 'application/json',
-          'HTTP-Referer': window.location.origin,
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          model: 'google/gemini-2.0-flash-exp-image-generation',
-          messages,
+          canvasImage: canvasDataUrl,
+          referenceImage: refImageUrl || null,
+          hasReference: !!referenceImage,
         })
       });
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('API error response:', errorText);
-        throw new Error(`API error: ${response.status}`);
-      }
-
       const data = await response.json();
-      console.log('[MemeEditor] AI response:', data);
       
-      // Extract image URL from response
-      const content = data.choices?.[0]?.message?.content || '';
-      let imageUrl = null;
-      
-      // Try different response formats
-      const urlMatch = content.match(/(https?:\/\/[^\s)"']+|data:image\/[a-zA-Z]+;base64,[^\s)"']+)/);
-      if (urlMatch) {
-        imageUrl = urlMatch[0];
-      } else if (data.choices?.[0]?.message?.images?.[0]?.image_url?.url) {
-        imageUrl = data.choices[0].message.images[0].image_url.url;
-      } else if (Array.isArray(data.choices?.[0]?.message?.content)) {
-        // Handle multimodal response format
-        const imgPart = data.choices[0].message.content.find((p: any) => p.type === 'image_url' || p.image_url);
-        if (imgPart?.image_url?.url) {
-          imageUrl = imgPart.image_url.url;
-        }
+      if (!data.success) {
+        throw new Error(data.error || 'Generation failed');
       }
+      
+      const imageUrl = data.imageUrl;
       
       if (imageUrl) {
         setGeneratedImage(imageUrl);
@@ -901,34 +815,9 @@ Output ONLY the final edited image.`;
               Paint red mask over area to replace, then upload reference image (optional).
             </p>
             
-            {/* API Key Input */}
-            {(showApiKeyInput || !apiKey) && (
-              <div className="mb-3 p-3 bg-zinc-800/50 rounded-lg border border-zinc-700">
-                <label className="text-xs text-zinc-400 mb-1.5 block">OpenRouter API Key</label>
-                <input
-                  type="password"
-                  value={apiKey}
-                  onChange={(e) => setApiKey(e.target.value)}
-                  placeholder="sk-or-..."
-                  className="w-full bg-zinc-900 border border-zinc-600 rounded px-2 py-1.5 text-sm mb-2 focus:outline-none focus:border-purple-500"
-                />
-                <Button 
-                  size="sm" 
-                  onClick={handleSaveApiKey}
-                  disabled={!apiKey.trim()}
-                  className="w-full bg-purple-600 hover:bg-purple-700"
-                >
-                  Save Key
-                </Button>
-                <p className="text-xs text-zinc-500 mt-2">
-                  Get key at <a href="https://openrouter.ai/keys" target="_blank" rel="noopener" className="text-purple-400 hover:underline">openrouter.ai/keys</a>
-                </p>
-              </div>
-            )}
-            
             <Button 
               onClick={handleGenerate} 
-              disabled={isGenerating || !baseImage || !apiKey}
+              disabled={isGenerating || !baseImage}
               className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
             >
               {isGenerating ? (
