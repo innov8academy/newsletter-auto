@@ -375,6 +375,8 @@ export default function MemeEditorPage() {
           canvasImage: canvasDataUrl,
           referenceImage: refImageUrl || null,
           hasReference: !!referenceImage,
+          width: canvasSize.width,
+          height: canvasSize.height,
         })
       });
 
@@ -389,13 +391,33 @@ export default function MemeEditorPage() {
       if (imageUrl) {
         setGeneratedImage(imageUrl);
         
-        // Load the generated image as the new base image (replaces main canvas)
+        // Load the generated image and resize to match canvas dimensions
         const img = new window.Image();
         img.crossOrigin = 'anonymous';
         img.onload = () => {
-          setBaseImage(img);
-          setMaskLines([]); // Clear mask after successful generation
-          setHistory([]);
+          // Create a canvas to resize the image to match original dimensions
+          const resizeCanvas = document.createElement('canvas');
+          resizeCanvas.width = canvasSize.width;
+          resizeCanvas.height = canvasSize.height;
+          const ctx = resizeCanvas.getContext('2d');
+          if (ctx) {
+            // Draw the AI result scaled to fit the original canvas size
+            ctx.drawImage(img, 0, 0, canvasSize.width, canvasSize.height);
+            
+            // Convert back to image
+            const resizedImg = new window.Image();
+            resizedImg.onload = () => {
+              setBaseImage(resizedImg);
+              setMaskLines([]); // Clear mask after successful generation
+              setHistory([]);
+            };
+            resizedImg.src = resizeCanvas.toDataURL('image/png');
+          } else {
+            // Fallback: use original image
+            setBaseImage(img);
+            setMaskLines([]);
+            setHistory([]);
+          }
         };
         img.onerror = () => {
           console.log('[MemeEditor] Could not load generated image into canvas, keeping in sidebar');

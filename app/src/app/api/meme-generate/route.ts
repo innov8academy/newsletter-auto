@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { canvasImage, referenceImage, hasReference } = body;
+    const { canvasImage, referenceImage, hasReference, width, height } = body;
 
     const apiKey = process.env.OPENROUTER_API_KEY;
     if (!apiKey) {
@@ -20,6 +20,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Get aspect ratio info for prompt
+    const aspectInfo = width && height ? `The output image MUST be exactly ${width}x${height} pixels (same dimensions as input).` : 'The output image MUST have the exact same dimensions and aspect ratio as the input image.';
+    
     // Improved prompts for face/head replacement
     const faceSwapPrompt = `You are an expert image editor. The first image shows a person with their HEAD/FACE area marked in RED. 
 The second image is a REFERENCE FACE to use.
@@ -30,8 +33,9 @@ Your task:
 3. Blend naturally - the face should look like it belongs on that body
 4. Keep the body, clothing, background, and everything else EXACTLY the same
 5. Do NOT add any text or watermarks
+6. ${aspectInfo}
 
-Output ONLY the final edited image.`;
+Output ONLY the final edited image with the EXACT same dimensions as the input.`;
 
     const inpaintPrompt = `You are an expert image editor. This image has an area marked in RED that needs to be removed/replaced.
 
@@ -40,8 +44,9 @@ Your task:
 2. Fill it naturally with appropriate content that matches the surrounding area
 3. Make it look seamless and realistic
 4. Keep everything else EXACTLY the same
+5. ${aspectInfo}
 
-Output ONLY the final edited image.`;
+Output ONLY the final edited image with the EXACT same dimensions as the input.`;
 
     const messages: any[] = [{
       role: 'user',
