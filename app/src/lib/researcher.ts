@@ -227,6 +227,41 @@ ${isPerplexity ? 'Extract the key insights and thinking. Keep it under 800 words
             }
         }
 
+        // Kimi K2.5 specific: content may be in reasoning or reasoning_details field
+        if (!content && isKimi && data.choices?.[0]?.message) {
+            const message = data.choices[0].message;
+            console.log('[Kimi] Checking reasoning fields. Message keys:', Object.keys(message));
+            
+            // Try reasoning field (may be string or object)
+            if (message.reasoning) {
+                if (typeof message.reasoning === 'string') {
+                    content = message.reasoning;
+                    console.log('[Kimi] Found content in reasoning field (string)');
+                } else if (message.reasoning.content) {
+                    content = message.reasoning.content;
+                    console.log('[Kimi] Found content in reasoning.content');
+                } else if (message.reasoning.text) {
+                    content = message.reasoning.text;
+                    console.log('[Kimi] Found content in reasoning.text');
+                }
+            }
+            
+            // Try reasoning_details field
+            if (!content && message.reasoning_details) {
+                if (typeof message.reasoning_details === 'string') {
+                    content = message.reasoning_details;
+                    console.log('[Kimi] Found content in reasoning_details (string)');
+                } else if (Array.isArray(message.reasoning_details)) {
+                    // May be array of reasoning steps
+                    content = message.reasoning_details
+                        .map((r: any) => r.content || r.text || r)
+                        .filter(Boolean)
+                        .join('\n\n');
+                    console.log('[Kimi] Found content in reasoning_details array');
+                }
+            }
+        }
+
         if (!content) {
             // Log more details about what we received
             const choiceKeys = data.choices?.[0] ? Object.keys(data.choices[0]) : [];
