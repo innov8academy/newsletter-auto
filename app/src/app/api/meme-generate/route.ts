@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
-// KIE API for grok-imagine image-to-image
-const KIE_API_URL = 'https://api.kie.ai/api/v1/jobs';
+// KIE API endpoints
+const KIE_CREATE_URL = 'https://api.kie.ai/api/v1/jobs/createTask';
+const KIE_QUERY_URL = 'https://api.kie.ai/api/v1/jobs/recordInfo';
 
 // Initialize Supabase client for image uploads
 function getSupabase() {
@@ -16,12 +17,11 @@ function getSupabase() {
 async function uploadImageToSupabase(base64Data: string, filename: string): Promise<string | null> {
   const supabase = getSupabase();
   if (!supabase) {
-    console.error('[meme-generate] Supabase not configured - need NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY');
+    console.error('[meme-generate] Supabase not configured');
     return null;
   }
 
   try {
-    // Extract base64 content and mime type
     const matches = base64Data.match(/^data:([^;]+);base64,(.+)$/);
     if (!matches) {
       console.error('[meme-generate] Invalid base64 format');
@@ -32,12 +32,10 @@ async function uploadImageToSupabase(base64Data: string, filename: string): Prom
     const base64Content = matches[2];
     const buffer = Buffer.from(base64Content, 'base64');
     
-    // Generate unique filename
     const ext = mimeType.split('/')[1] || 'png';
     const uniqueName = `meme-editor/${Date.now()}-${filename}.${ext}`;
     
-    // Upload to Supabase storage
-    const { data, error } = await supabase.storage
+    const { error } = await supabase.storage
       .from('temp-images')
       .upload(uniqueName, buffer, {
         contentType: mimeType,
@@ -49,12 +47,11 @@ async function uploadImageToSupabase(base64Data: string, filename: string): Prom
       return null;
     }
     
-    // Get public URL
     const { data: urlData } = supabase.storage
       .from('temp-images')
       .getPublicUrl(uniqueName);
     
-    console.log('[meme-generate] Uploaded to Supabase:', urlData.publicUrl);
+    console.log('[meme-generate] Uploaded:', urlData.publicUrl);
     return urlData.publicUrl;
   } catch (err) {
     console.error('[meme-generate] Upload error:', err);
@@ -62,16 +59,36 @@ async function uploadImageToSupabase(base64Data: string, filename: string): Prom
   }
 }
 
+// Calculate aspect ratio string from dimensions
+function getAspectRatio(width: number, height: number): string {
+  const ratio = width / height;
+  
+  // Map to supported aspect ratios
+  if (Math.abs(ratio - 1) < 0.1) return '1:1';
+  if (Math.abs(ratio - 4/3) < 0.1) return '4:3';
+  if (Math.abs(ratio - 3/4) < 0.1) return '3:4';
+  if (Math.abs(ratio - 16/9) < 0.1) return '16:9';
+  if (Math.abs(ratio - 9/16) < 0.1) return '9:16';
+  if (Math.abs(ratio - 2/3) < 0.1) return '2:3';
+  if (Math.abs(ratio - 3/2) < 0.1) return '3:2';
+  if (Math.abs(ratio - 21/9) < 0.1) return '21:9';
+  
+  // Default to closest common ratio
+  if (ratio > 1.5) return '16:9';
+  if (ratio < 0.67) return '9:16';
+  if (ratio > 1) return '4:3';
+  return '3:4';
+}
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const { canvasImage, referenceImage, hasReference, width, height } = body;
 
-    // Check KIE API key
     const kieApiKey = process.env.KIE_API_KEY;
     if (!kieApiKey) {
       return NextResponse.json(
-        { success: false, error: 'KIE_API_KEY not configured in environment variables' },
+        { success: false, error: 'KIE_API_KEY not configured' },
         { status: 500 }
       );
     }
@@ -83,57 +100,50 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Step 1: Upload images to Supabase to get hosted URLs (KIE requires URLs, not base64)
-    console.log('[meme-generate] Uploading canvas image to Supabase...');
+    // Step 1: Upload image to Supabase
+    console.log('[meme-generate] Uploading image to Supabase...');
     const canvasUrl = await uploadImageToSupabase(canvasImage, 'canvas');
     
     if (!canvasUrl) {
       return NextResponse.json(
-        { success: false, error: 'Failed to upload image. Make sure Supabase is configured and "temp-images" bucket exists.' },
+        { success: false, error: 'Failed to upload image. Check Supabase config and temp-images bucket.' },
         { status: 500 }
       );
     }
-    
-    // KIE grok-imagine/image-to-image only supports 1 image
-    // For face swap: we need to describe it in the prompt (reference image described textually)
-    // The user paints red mask on the face they want to replace
-    
-    // Step 2: Build prompt for face swap / inpainting
-    const aspectInfo = width && height ? `Output image should maintain the same ${width}x${height} dimensions.` : '';
-    
-    let prompt: string;
-    if (hasReference && referenceImage) {
-      // Face swap mode - but KIE only takes 1 image, so we describe what to do
-      // The red mask shows WHERE to replace, the prompt describes what to put there
-      prompt = `Edit this image: The red/highlighted area marks a face that needs to be replaced. Replace ONLY the red-marked face area with a different face that fits naturally. The new face should match the lighting, angle, and scale of the original image. Keep the body, clothing, hair outline, and background EXACTLY the same. Blend seamlessly with no visible edges. ${aspectInfo}`;
-    } else {
-      // Inpainting mode - remove/fill the masked area
-      prompt = `Edit this image: Remove the red/highlighted marked area and fill it naturally with appropriate content that matches the surrounding area seamlessly. Keep everything else exactly the same. ${aspectInfo}`;
-    }
 
-    console.log('[meme-generate] Creating KIE task...');
+    // Step 2: Build prompt
+    const prompt = hasReference 
+      ? `Edit this image: Replace the red/highlighted marked area with a new face that fits naturally. Match the lighting, angle, and scale. Keep the body, clothing, and background exactly the same. Blend seamlessly.`
+      : `Edit this image: Remove the red/highlighted marked area and fill it naturally with content that matches the surrounding area. Keep everything else exactly the same.`;
+
+    // Step 3: Determine aspect ratio
+    const aspectRatio = width && height ? getAspectRatio(width, height) : '1:1';
+
+    console.log('[meme-generate] Creating KIE task with seedream/4.5-edit...');
     console.log('[meme-generate] Image URL:', canvasUrl);
-    console.log('[meme-generate] Prompt:', prompt);
+    console.log('[meme-generate] Aspect ratio:', aspectRatio);
 
-    // Step 3: Create task with KIE API
-    const createResponse = await fetch(`${KIE_API_URL}/createTask`, {
+    // Step 4: Create task with KIE seedream/4.5-edit model
+    const createResponse = await fetch(KIE_CREATE_URL, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${kieApiKey}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'grok-imagine/image-to-image',
+        model: 'seedream/4.5-edit',
         input: {
           prompt,
-          image_urls: [canvasUrl],  // KIE only supports 1 image
+          image_urls: [canvasUrl],
+          aspect_ratio: aspectRatio,
+          quality: 'basic',  // Use 'high' for 4K output
         }
       })
     });
 
     if (!createResponse.ok) {
       const errorText = await createResponse.text();
-      console.error('[meme-generate] KIE create task error:', createResponse.status, errorText);
+      console.error('[meme-generate] KIE create error:', createResponse.status, errorText);
       return NextResponse.json(
         { success: false, error: `KIE API error: ${createResponse.status} - ${errorText}` },
         { status: createResponse.status }
@@ -141,84 +151,90 @@ export async function POST(request: NextRequest) {
     }
 
     const createData = await createResponse.json();
-    console.log('[meme-generate] KIE create response:', JSON.stringify(createData, null, 2));
+    console.log('[meme-generate] KIE create response:', JSON.stringify(createData));
 
-    // Extract taskId from response
-    const taskId = createData.data?.taskId || createData.taskId || createData.task_id || createData.id;
-    
-    if (!taskId) {
-      console.error('[meme-generate] No taskId in KIE response');
+    if (createData.code !== 200) {
       return NextResponse.json(
-        { success: false, error: `KIE did not return a task ID. Response: ${JSON.stringify(createData)}` },
+        { success: false, error: `KIE error: ${createData.msg}` },
         { status: 500 }
       );
     }
 
-    console.log('[meme-generate] Task created with ID:', taskId);
+    const taskId = createData.data?.taskId;
+    if (!taskId) {
+      return NextResponse.json(
+        { success: false, error: 'No taskId returned from KIE' },
+        { status: 500 }
+      );
+    }
 
-    // Step 4: Poll for result (max 90 seconds for image generation)
-    const maxAttempts = 45;
+    console.log('[meme-generate] Task created:', taskId);
+
+    // Step 5: Poll for result using recordInfo endpoint
+    const maxAttempts = 60;  // 2 minutes max
     const pollInterval = 2000;
     
     for (let i = 0; i < maxAttempts; i++) {
       await new Promise(resolve => setTimeout(resolve, pollInterval));
       
-      const statusResponse = await fetch(`${KIE_API_URL}/${taskId}`, {
+      const statusResponse = await fetch(`${KIE_QUERY_URL}?taskId=${taskId}`, {
         headers: {
           'Authorization': `Bearer ${kieApiKey}`,
         }
       });
       
       if (!statusResponse.ok) {
-        console.error('[meme-generate] KIE status check failed:', statusResponse.status);
+        console.error('[meme-generate] Status check failed:', statusResponse.status);
         continue;
       }
       
       const statusData = await statusResponse.json();
-      const state = statusData.data?.state || statusData.state;
+      const state = statusData.data?.state;
       console.log(`[meme-generate] Poll ${i + 1}/${maxAttempts}: state=${state}`);
       
-      if (state === 'success' || state === 'completed') {
-        // Try multiple paths for image URL in the response
-        const imageUrl = statusData.data?.output?.image_url ||
-                        statusData.data?.output?.images?.[0] ||
-                        statusData.data?.videoInfo?.imageUrl ||
-                        statusData.data?.imageUrl ||
-                        statusData.data?.result?.image_url ||
-                        statusData.data?.result?.images?.[0] ||
-                        statusData.output?.image_url ||
-                        statusData.imageUrl;
-        
-        if (imageUrl) {
-          console.log('[meme-generate] Success! Image URL:', imageUrl);
-          return NextResponse.json({ success: true, imageUrl });
-        } else {
-          console.error('[meme-generate] Success state but no image URL found:', JSON.stringify(statusData));
+      if (state === 'success') {
+        // Parse resultJson to get the image URL
+        try {
+          const resultJson = JSON.parse(statusData.data.resultJson || '{}');
+          const imageUrl = resultJson.resultUrls?.[0];
+          
+          if (imageUrl) {
+            console.log('[meme-generate] Success! Image:', imageUrl);
+            return NextResponse.json({ success: true, imageUrl });
+          } else {
+            console.error('[meme-generate] No resultUrls in response:', resultJson);
+            return NextResponse.json(
+              { success: false, error: 'No image URL in success response' },
+              { status: 500 }
+            );
+          }
+        } catch (parseErr) {
+          console.error('[meme-generate] Failed to parse resultJson:', statusData.data.resultJson);
           return NextResponse.json(
-            { success: false, error: 'Generation succeeded but no image URL in response' },
+            { success: false, error: 'Failed to parse result' },
             { status: 500 }
           );
         }
-      } else if (state === 'failed' || state === 'error') {
-        const errorMsg = statusData.data?.failMsg || statusData.data?.error || statusData.failMsg || 'Generation failed';
-        console.error('[meme-generate] KIE generation failed:', errorMsg);
+      } else if (state === 'fail') {
+        const errorMsg = statusData.data?.failMsg || 'Generation failed';
+        console.error('[meme-generate] Failed:', errorMsg);
         return NextResponse.json(
           { success: false, error: `KIE generation failed: ${errorMsg}` },
           { status: 500 }
         );
       }
-      // Continue polling for 'pending', 'processing', 'running', 'queued', etc.
+      // Continue polling for 'waiting' state
     }
     
     return NextResponse.json(
-      { success: false, error: 'Generation timed out after 90 seconds' },
+      { success: false, error: 'Generation timed out after 2 minutes' },
       { status: 504 }
     );
 
   } catch (error) {
     console.error('[meme-generate] Error:', error);
     return NextResponse.json(
-      { success: false, error: `Server error: ${error instanceof Error ? error.message : 'Unknown error'}` },
+      { success: false, error: `Server error: ${error instanceof Error ? error.message : 'Unknown'}` },
       { status: 500 }
     );
   }
