@@ -361,6 +361,17 @@ Start by searching for the most relevant and recent information.`;
         iteration++;
         console.log(`[AgenticResearch] Iteration ${iteration}/${maxIterations}`);
         
+        // After 4 searches, force the model to write the report
+        const forceCompletion = iteration >= 5;
+        
+        if (forceCompletion && iteration === 5) {
+            console.log('[AgenticResearch] Forcing completion - adding instruction to write report');
+            messages.push({
+                role: 'user',
+                content: 'STOP SEARCHING. You have gathered enough information from the searches above. Now write your final comprehensive newsletter report based on all the information you found. Use the format specified in your instructions. Do NOT request any more searches.'
+            });
+        }
+        
         try {
             const response = await fetch(OPENROUTER_API_URL, {
                 method: 'POST',
@@ -373,8 +384,7 @@ Start by searching for the most relevant and recent information.`;
                 body: JSON.stringify({
                     model,
                     messages,
-                    tools,
-                    tool_choice: iteration === 1 ? 'auto' : 'auto', // Let model decide
+                    ...(forceCompletion ? {} : { tools, tool_choice: 'auto' }), // Remove tools after iteration 4
                     max_tokens: 8000,
                     temperature: 0.3,
                 })
