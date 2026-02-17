@@ -1,16 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+// KIE API for grok-imagine image-to-image
+const KIE_API_URL = 'https://api.kie.ai/api/v1/jobs';
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const { canvasImage, referenceImage, hasReference, width, height } = body;
 
-    const apiKey = process.env.OPENROUTER_API_KEY;
+    const apiKey = process.env.KIE_API_KEY;
     if (!apiKey) {
-      return NextResponse.json(
-        { success: false, error: 'OPENROUTER_API_KEY not configured on server' },
-        { status: 500 }
-      );
+      // Fallback to OpenRouter if KIE not configured
+      return handleOpenRouter(body);
     }
 
     if (!canvasImage) {
@@ -20,101 +21,107 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Get aspect ratio info for prompt
-    const aspectInfo = width && height ? `The output image MUST be exactly ${width}x${height} pixels (same dimensions as input).` : 'The output image MUST have the exact same dimensions and aspect ratio as the input image.';
+    // Build prompt for face swap / inpainting
+    const aspectInfo = width && height ? `Output exactly ${width}x${height} pixels.` : '';
     
-    // Improved prompts for face/head replacement
-    const faceSwapPrompt = `You are an expert image editor. The first image shows a person with their HEAD/FACE area marked in RED. 
-The second image is a REFERENCE FACE to use.
+    const prompt = hasReference 
+      ? `Replace the red-marked face/head area in this image with the face from the reference image. Match lighting, angle, scale. Keep body, clothing, background exactly the same. Blend naturally. No text or watermarks. ${aspectInfo}`
+      : `Remove the red-marked area and fill naturally with appropriate content that matches surroundings. Keep everything else the same. ${aspectInfo}`;
 
-Your task:
-1. REPLACE ONLY the red-marked head/face area with the face from the reference image
-2. Match the lighting, angle, and scale of the original image
-3. Blend naturally - the face should look like it belongs on that body
-4. Keep the body, clothing, background, and everything else EXACTLY the same
-5. Do NOT add any text or watermarks
-6. ${aspectInfo}
-
-Output ONLY the final edited image with the EXACT same dimensions as the input.`;
-
-    const inpaintPrompt = `You are an expert image editor. This image has an area marked in RED that needs to be removed/replaced.
-
-Your task:
-1. Remove the red-marked area
-2. Fill it naturally with appropriate content that matches the surrounding area
-3. Make it look seamless and realistic
-4. Keep everything else EXACTLY the same
-5. ${aspectInfo}
-
-Output ONLY the final edited image with the EXACT same dimensions as the input.`;
-
-    const messages: any[] = [{
-      role: 'user',
-      content: [
-        { 
-          type: 'text', 
-          text: hasReference ? faceSwapPrompt : inpaintPrompt
-        },
-        { type: 'image_url', image_url: { url: canvasImage } },
-      ]
-    }];
-
+    // Prepare image URLs - KIE needs URLs, not data URLs
+    // We'll need to handle this - for now use the data URL directly (some APIs support it)
+    const imageUrls = [canvasImage];
     if (referenceImage) {
-      messages[0].content.push({ type: 'image_url', image_url: { url: referenceImage } });
+      imageUrls.push(referenceImage);
     }
 
-    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+    // Create task
+    const createResponse = await fetch(`${KIE_API_URL}/createTask`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
-        'HTTP-Referer': request.headers.get('origin') || 'https://newsletter-auto.vercel.app',
       },
       body: JSON.stringify({
-        model: 'google/gemini-3-pro-image-preview',
-        messages,
+        model: 'grok-imagine/image-to-image',
+        input: {
+          prompt,
+          image_urls: imageUrls,
+        }
       })
     });
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('[meme-generate] API error:', response.status, errorText);
+    if (!createResponse.ok) {
+      const errorText = await createResponse.text();
+      console.error('[meme-generate] KIE create task error:', createResponse.status, errorText);
       return NextResponse.json(
-        { success: false, error: `API error: ${response.status} - ${errorText.slice(0, 200)}` },
-        { status: response.status }
+        { success: false, error: `KIE API error: ${createResponse.status}` },
+        { status: createResponse.status }
       );
     }
 
-    const data = await response.json();
-    console.log('[meme-generate] AI response received');
+    const createData = await createResponse.json();
+    console.log('[meme-generate] KIE task created:', createData);
 
-    // Extract image URL from response
-    const content = data.choices?.[0]?.message?.content || '';
-    let imageUrl = null;
-
-    // Try different response formats
-    const urlMatch = content.match(/(https?:\/\/[^\s)"']+|data:image\/[a-zA-Z]+;base64,[^\s)"']+)/);
-    if (urlMatch) {
-      imageUrl = urlMatch[0];
-    } else if (data.choices?.[0]?.message?.images?.[0]?.image_url?.url) {
-      imageUrl = data.choices[0].message.images[0].image_url.url;
-    } else if (Array.isArray(data.choices?.[0]?.message?.content)) {
-      // Handle multimodal response format
-      const imgPart = data.choices[0].message.content.find((p: any) => p.type === 'image_url' || p.image_url);
-      if (imgPart?.image_url?.url) {
-        imageUrl = imgPart.image_url.url;
-      }
-    }
-
-    if (imageUrl) {
-      return NextResponse.json({ success: true, imageUrl });
-    } else {
-      console.error('[meme-generate] No image in response:', data);
+    const taskId = createData.data?.taskId;
+    if (!taskId) {
       return NextResponse.json(
-        { success: false, error: 'No image in AI response' },
+        { success: false, error: 'No taskId returned from KIE' },
         { status: 500 }
       );
     }
+
+    // Poll for result (max 60 seconds)
+    const maxAttempts = 30;
+    const pollInterval = 2000;
+    
+    for (let i = 0; i < maxAttempts; i++) {
+      await new Promise(resolve => setTimeout(resolve, pollInterval));
+      
+      const statusResponse = await fetch(`${KIE_API_URL}/${taskId}`, {
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+        }
+      });
+      
+      if (!statusResponse.ok) {
+        console.error('[meme-generate] KIE status check failed:', statusResponse.status);
+        continue;
+      }
+      
+      const statusData = await statusResponse.json();
+      console.log('[meme-generate] KIE status:', statusData.data?.state);
+      
+      const state = statusData.data?.state;
+      
+      if (state === 'success') {
+        // Get image URL from response
+        const imageUrl = statusData.data?.videoInfo?.imageUrl || 
+                        statusData.data?.imageUrl ||
+                        statusData.data?.output?.image_url;
+        
+        if (imageUrl) {
+          return NextResponse.json({ success: true, imageUrl });
+        } else {
+          console.error('[meme-generate] No image URL in success response:', statusData);
+          return NextResponse.json(
+            { success: false, error: 'No image URL in response' },
+            { status: 500 }
+          );
+        }
+      } else if (state === 'failed' || state === 'error') {
+        return NextResponse.json(
+          { success: false, error: statusData.data?.failMsg || 'Generation failed' },
+          { status: 500 }
+        );
+      }
+      // Otherwise keep polling (state is likely 'pending' or 'processing')
+    }
+    
+    return NextResponse.json(
+      { success: false, error: 'Generation timed out' },
+      { status: 504 }
+    );
 
   } catch (error) {
     console.error('[meme-generate] Error:', error);
@@ -123,4 +130,74 @@ Output ONLY the final edited image with the EXACT same dimensions as the input.`
       { status: 500 }
     );
   }
+}
+
+// Fallback to OpenRouter if KIE not configured
+async function handleOpenRouter(body: any) {
+  const { canvasImage, referenceImage, hasReference, width, height } = body;
+  
+  const apiKey = process.env.OPENROUTER_API_KEY;
+  if (!apiKey) {
+    return NextResponse.json(
+      { success: false, error: 'No API key configured (KIE_API_KEY or OPENROUTER_API_KEY)' },
+      { status: 500 }
+    );
+  }
+
+  const aspectInfo = width && height 
+    ? `The output image MUST be exactly ${width}x${height} pixels.` 
+    : 'Maintain exact same dimensions as input.';
+  
+  const faceSwapPrompt = `Replace ONLY the red-marked head/face area with the face from the reference image. Match lighting, angle, scale. Blend naturally. Keep everything else EXACTLY the same. No text/watermarks. ${aspectInfo} Output ONLY the final image.`;
+  const inpaintPrompt = `Remove the red-marked area and fill naturally. Keep everything else the same. ${aspectInfo} Output ONLY the final image.`;
+
+  const messages: any[] = [{
+    role: 'user',
+    content: [
+      { type: 'text', text: hasReference ? faceSwapPrompt : inpaintPrompt },
+      { type: 'image_url', image_url: { url: canvasImage } },
+    ]
+  }];
+
+  if (referenceImage) {
+    messages[0].content.push({ type: 'image_url', image_url: { url: referenceImage } });
+  }
+
+  const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: 'google/gemini-3-pro-image-preview',
+      messages,
+    })
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error('[meme-generate] OpenRouter error:', response.status, errorText);
+    return NextResponse.json(
+      { success: false, error: `API error: ${response.status}` },
+      { status: response.status }
+    );
+  }
+
+  const data = await response.json();
+  const content = data.choices?.[0]?.message?.content || '';
+  
+  const urlMatch = content.match(/(https?:\/\/[^\s)"']+|data:image\/[a-zA-Z]+;base64,[^\s)"']+)/);
+  if (urlMatch) {
+    return NextResponse.json({ success: true, imageUrl: urlMatch[0] });
+  }
+  
+  if (data.choices?.[0]?.message?.images?.[0]?.image_url?.url) {
+    return NextResponse.json({ success: true, imageUrl: data.choices[0].message.images[0].image_url.url });
+  }
+
+  return NextResponse.json(
+    { success: false, error: 'No image in response' },
+    { status: 500 }
+  );
 }
