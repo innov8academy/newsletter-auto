@@ -21,7 +21,7 @@ import {
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { getApiKey } from '@/lib/storage';
+import { getApiKey, saveApiKey } from '@/lib/storage';
 
 // Google Fonts that work well for memes
 const FONTS = [
@@ -118,6 +118,16 @@ export default function MemeEditorPage() {
   
   // History for undo
   const [history, setHistory] = useState<MaskLine[][]>([]);
+  
+  // API Key
+  const [apiKey, setApiKey] = useState<string>('');
+  const [showApiKeyInput, setShowApiKeyInput] = useState(false);
+  
+  // Load API key on mount
+  useEffect(() => {
+    const key = getApiKey();
+    if (key) setApiKey(key);
+  }, []);
 
   // Load base image
   const handleBaseImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -323,6 +333,14 @@ export default function MemeEditorPage() {
     return dataUrl;
   };
 
+  // Save API key handler
+  const handleSaveApiKey = () => {
+    if (apiKey.trim()) {
+      saveApiKey(apiKey.trim());
+      setShowApiKeyInput(false);
+    }
+  };
+
   // Generate with AI
   const handleGenerate = async () => {
     if (!baseImage || maskLines.length === 0) {
@@ -330,12 +348,11 @@ export default function MemeEditorPage() {
       return;
     }
     
-    // Check localStorage for API key - same key used across the app
-    const apiKey = getApiKey();
+    // Check for API key (from state, which loads from localStorage)
     console.log('[MemeEditor] API key check:', apiKey ? `Found (${apiKey.slice(0,8)}...)` : 'Not found');
     
     if (!apiKey) {
-      alert('No OpenRouter API key found. Go to the main page and save your API key first.');
+      setShowApiKeyInput(true);
       return;
     }
 
@@ -800,9 +817,35 @@ export default function MemeEditorPage() {
             <p className="text-xs text-zinc-500 mb-3">
               Paint red mask over area to replace, then upload reference image (optional).
             </p>
+            
+            {/* API Key Input */}
+            {(showApiKeyInput || !apiKey) && (
+              <div className="mb-3 p-3 bg-zinc-800/50 rounded-lg border border-zinc-700">
+                <label className="text-xs text-zinc-400 mb-1.5 block">OpenRouter API Key</label>
+                <input
+                  type="password"
+                  value={apiKey}
+                  onChange={(e) => setApiKey(e.target.value)}
+                  placeholder="sk-or-..."
+                  className="w-full bg-zinc-900 border border-zinc-600 rounded px-2 py-1.5 text-sm mb-2 focus:outline-none focus:border-purple-500"
+                />
+                <Button 
+                  size="sm" 
+                  onClick={handleSaveApiKey}
+                  disabled={!apiKey.trim()}
+                  className="w-full bg-purple-600 hover:bg-purple-700"
+                >
+                  Save Key
+                </Button>
+                <p className="text-xs text-zinc-500 mt-2">
+                  Get key at <a href="https://openrouter.ai/keys" target="_blank" rel="noopener" className="text-purple-400 hover:underline">openrouter.ai/keys</a>
+                </p>
+              </div>
+            )}
+            
             <Button 
               onClick={handleGenerate} 
-              disabled={isGenerating || !baseImage}
+              disabled={isGenerating || !baseImage || !apiKey}
               className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
             >
               {isGenerating ? (
