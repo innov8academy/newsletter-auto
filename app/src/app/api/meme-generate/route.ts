@@ -66,16 +66,16 @@ Output ONLY the final edited image.`;
         'HTTP-Referer': request.headers.get('origin') || 'https://newsletter-auto.vercel.app',
       },
       body: JSON.stringify({
-        model: 'google/gemini-2.0-flash-exp-image-generation',
+        model: 'google/gemini-3-pro-image-preview',
         messages,
       })
     });
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('[meme-generate] API error:', errorText);
+      console.error('[meme-generate] API error:', response.status, errorText);
       return NextResponse.json(
-        { success: false, error: `API error: ${response.status}` },
+        { success: false, error: `API error: ${response.status} - ${errorText.slice(0, 200)}` },
         { status: response.status }
       );
     }
