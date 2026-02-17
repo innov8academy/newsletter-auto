@@ -32,6 +32,17 @@ const FONTS = [
   { name: 'Anton', value: 'Anton, sans-serif' },
   { name: 'Roboto Bold', value: 'Roboto, sans-serif' },
   { name: 'Oswald', value: 'Oswald, sans-serif' },
+  { name: 'Bangers', value: 'Bangers, cursive' },
+  { name: 'Permanent Marker', value: 'Permanent Marker, cursive' },
+  { name: 'Passion One', value: 'Passion One, cursive' },
+  { name: 'Black Ops One', value: 'Black Ops One, cursive' },
+  { name: 'Creepster', value: 'Creepster, cursive' },
+  { name: 'Bungee', value: 'Bungee, cursive' },
+  { name: 'Russo One', value: 'Russo One, sans-serif' },
+  { name: 'Righteous', value: 'Righteous, cursive' },
+  { name: 'Press Start 2P', value: 'Press Start 2P, cursive' },
+  { name: 'Titan One', value: 'Titan One, cursive' },
+  { name: 'Luckiest Guy', value: 'Luckiest Guy, cursive' },
 ];
 
 const COLORS = [
@@ -288,10 +299,28 @@ export default function MemeEditorPage() {
     setMaskLines([]);
   };
 
-  // Get canvas as data URL (with mask overlay)
+  // Get canvas as data URL (with mask overlay) - hides transformer first
   const getCanvasWithMask = (): string => {
     if (!stageRef.current) return '';
-    return stageRef.current.toDataURL({ pixelRatio: 2 });
+    
+    // Hide transformer before export to avoid selection box in image
+    if (transformerRef.current) {
+      transformerRef.current.nodes([]);
+      transformerRef.current.getLayer()?.batchDraw();
+    }
+    
+    const dataUrl = stageRef.current.toDataURL({ pixelRatio: 2 });
+    
+    // Restore transformer if something was selected
+    if (selectedId && transformerRef.current) {
+      const node = stageRef.current.findOne(`#${selectedId}`);
+      if (node) {
+        transformerRef.current.nodes([node]);
+        transformerRef.current.getLayer()?.batchDraw();
+      }
+    }
+    
+    return dataUrl;
   };
 
   // Generate with AI
@@ -301,9 +330,12 @@ export default function MemeEditorPage() {
       return;
     }
     
+    // Check localStorage for API key - same key used across the app
     const apiKey = getApiKey();
+    console.log('[MemeEditor] API key check:', apiKey ? `Found (${apiKey.slice(0,8)}...)` : 'Not found');
+    
     if (!apiKey) {
-      alert('Please set your OpenRouter API key in Settings');
+      alert('No OpenRouter API key found. Go to the main page and save your API key first.');
       return;
     }
 
