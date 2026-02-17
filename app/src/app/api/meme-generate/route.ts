@@ -54,21 +54,21 @@ export async function POST(request: NextRequest) {
     if (!createResponse.ok) {
       const errorText = await createResponse.text();
       console.error('[meme-generate] KIE create task error:', createResponse.status, errorText);
-      return NextResponse.json(
-        { success: false, error: `KIE API error: ${createResponse.status}` },
-        { status: createResponse.status }
-      );
+      // Fall back to OpenRouter if KIE fails
+      console.log('[meme-generate] Falling back to OpenRouter');
+      return handleOpenRouter(body);
     }
 
     const createData = await createResponse.json();
-    console.log('[meme-generate] KIE task created:', createData);
+    console.log('[meme-generate] KIE task created:', JSON.stringify(createData, null, 2));
 
-    const taskId = createData.data?.taskId;
+    // Try multiple paths for taskId
+    const taskId = createData.data?.taskId || createData.taskId || createData.task_id || createData.id;
     if (!taskId) {
-      return NextResponse.json(
-        { success: false, error: 'No taskId returned from KIE' },
-        { status: 500 }
-      );
+      console.error('[meme-generate] KIE response structure:', Object.keys(createData), createData.data ? Object.keys(createData.data) : 'no data');
+      // Fall back to OpenRouter
+      console.log('[meme-generate] No taskId, falling back to OpenRouter');
+      return handleOpenRouter(body);
     }
 
     // Poll for result (max 60 seconds)
