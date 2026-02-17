@@ -352,7 +352,37 @@ export default function MemeEditorPage() {
       ctx.stroke();
     });
     
-    return tempCanvas.toDataURL('image/png');
+    return tempCanvas.toDataURL('image/jpeg', 0.85); // Use JPEG for smaller size
+  };
+
+  // Compress image to reduce payload size for API
+  const compressImage = (dataUrl: string, maxWidth: number = 1024): Promise<string> => {
+    return new Promise((resolve) => {
+      const img = new window.Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let width = img.width;
+        let height = img.height;
+        
+        // Scale down if too large
+        if (width > maxWidth) {
+          height = (maxWidth / width) * height;
+          width = maxWidth;
+        }
+        
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, width, height);
+          resolve(canvas.toDataURL('image/jpeg', 0.8));
+        } else {
+          resolve(dataUrl);
+        }
+      };
+      img.onerror = () => resolve(dataUrl);
+      img.src = dataUrl;
+    });
   };
 
   // Generate with AI - uses server API route with env var
@@ -368,12 +398,16 @@ export default function MemeEditorPage() {
       // Get canvas WITHOUT text overlays - only base image + mask
       const canvasDataUrl = getCanvasForAI();
       
+      // Compress images to avoid 413 payload too large errors
+      const compressedCanvas = await compressImage(canvasDataUrl, 1024);
+      const compressedRef = refImageUrl ? await compressImage(refImageUrl, 512) : null;
+      
       const response = await fetch('/api/meme-generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          canvasImage: canvasDataUrl,
-          referenceImage: refImageUrl || null,
+          canvasImage: compressedCanvas,
+          referenceImage: compressedRef,
           hasReference: !!referenceImage,
           width: canvasSize.width,
           height: canvasSize.height,
