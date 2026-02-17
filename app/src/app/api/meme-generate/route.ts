@@ -94,28 +94,25 @@ export async function POST(request: NextRequest) {
       );
     }
     
-    const imageUrls = [canvasUrl];
+    // KIE grok-imagine/image-to-image only supports 1 image
+    // For face swap: we need to describe it in the prompt (reference image described textually)
+    // The user paints red mask on the face they want to replace
     
-    // Upload reference image if provided
-    if (referenceImage) {
-      console.log('[meme-generate] Uploading reference image to Supabase...');
-      const refUrl = await uploadImageToSupabase(referenceImage, 'reference');
-      if (refUrl) {
-        imageUrls.push(refUrl);
-      } else {
-        console.warn('[meme-generate] Failed to upload reference image, continuing without it');
-      }
+    // Step 2: Build prompt for face swap / inpainting
+    const aspectInfo = width && height ? `Output image should maintain the same ${width}x${height} dimensions.` : '';
+    
+    let prompt: string;
+    if (hasReference && referenceImage) {
+      // Face swap mode - but KIE only takes 1 image, so we describe what to do
+      // The red mask shows WHERE to replace, the prompt describes what to put there
+      prompt = `Edit this image: The red/highlighted area marks a face that needs to be replaced. Replace ONLY the red-marked face area with a different face that fits naturally. The new face should match the lighting, angle, and scale of the original image. Keep the body, clothing, hair outline, and background EXACTLY the same. Blend seamlessly with no visible edges. ${aspectInfo}`;
+    } else {
+      // Inpainting mode - remove/fill the masked area
+      prompt = `Edit this image: Remove the red/highlighted marked area and fill it naturally with appropriate content that matches the surrounding area seamlessly. Keep everything else exactly the same. ${aspectInfo}`;
     }
 
-    // Step 2: Build prompt for face swap / inpainting
-    const aspectInfo = width && height ? `Output image should be ${width}x${height} pixels.` : '';
-    
-    const prompt = hasReference 
-      ? `Replace the red-marked face/head area in the first image with the face from the second reference image. Match lighting, angle, and scale perfectly. Keep the body, clothing, and background exactly the same. Blend naturally with no visible seams. ${aspectInfo}`
-      : `Remove the red-marked area and fill it naturally with appropriate content that matches the surroundings. Keep everything else exactly the same. ${aspectInfo}`;
-
     console.log('[meme-generate] Creating KIE task...');
-    console.log('[meme-generate] Image URLs:', imageUrls);
+    console.log('[meme-generate] Image URL:', canvasUrl);
     console.log('[meme-generate] Prompt:', prompt);
 
     // Step 3: Create task with KIE API
@@ -129,7 +126,7 @@ export async function POST(request: NextRequest) {
         model: 'grok-imagine/image-to-image',
         input: {
           prompt,
-          image_urls: imageUrls,
+          image_urls: [canvasUrl],  // KIE only supports 1 image
         }
       })
     });
