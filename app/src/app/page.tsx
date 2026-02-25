@@ -116,10 +116,10 @@ export default function Home() {
         const newItems = data.items || [];
         
         if (refresh) {
-          // Merge: keep existing items, add new ones that aren't already shown
+          // Merge: deduplicate by title (Supabase generates new UUIDs each refresh)
           setXNews(prev => {
-            const existingIds = new Set(prev.map((i: any) => i.id));
-            const fresh = newItems.filter((i: any) => !existingIds.has(i.id));
+            const existingTitles = new Set(prev.map((i: any) => i.title?.toLowerCase().trim()));
+            const fresh = newItems.filter((i: any) => !existingTitles.has(i.title?.toLowerCase().trim()));
             return [...fresh, ...prev];
           });
         } else {
