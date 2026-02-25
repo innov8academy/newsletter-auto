@@ -99,16 +99,11 @@ async function extractStories(
 ): Promise<RawExtractedStory[]> {
     let content = item.content || item.summary || '';
 
-    // X/Twitter items are already individual stories — skip heavy extraction
+    // X/Twitter items — let AI score them properly like everything else
+    // but don't try to scrape the URL (it's a tweet)
     if (item.source === 'x_twitter') {
-        return [{
-            headline: item.title.length > 10 ? item.title : content.split('\n')[0].substring(0, 120),
-            summary: content.substring(0, 500),
-            category: 'news',
-            baseScore: 7, // X items are pre-filtered for high engagement
-            entities: [],
-            originalUrl: item.url,
-        }];
+        // Use tweet text as content directly, skip URL scraping
+        content = item.content || item.summary || item.title || '';
     }
 
     // INTELLIGENT UPGRADE:

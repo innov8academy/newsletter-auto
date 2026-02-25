@@ -120,10 +120,36 @@ for fname in sorted(os.listdir(temp_dir)):
             'fetched_at': datetime.now(timezone.utc).isoformat()
         })
 
+# Filter: only keep AI-related items
+AI_KEYWORDS = {'ai', 'artificial intelligence', 'gpt', 'claude', 'gemini', 'llm', 'openai', 
+    'anthropic', 'deepmind', 'machine learning', 'deep learning', 'neural', 'chatbot',
+    'copilot', 'midjourney', 'stable diffusion', 'dall-e', 'sora', 'model', 'benchmark',
+    'token', 'transformer', 'agent', 'reasoning', 'coding assistant', 'google ai',
+    'meta ai', 'mistral', 'llama', 'phi', 'nvidia', 'gpu', 'robotics', 'robot',
+    'automation', 'generative', 'prompt', 'fine-tun', 'rag', 'embedding', 'vector',
+    'hugging face', 'perplexity', 'cursor', 'v0', 'bolt', 'replit', 'devin',
+    'whisper', 'speech', 'vision', 'multimodal', 'foundation model', 'frontier',
+    'agi', 'alignment', 'safety', 'compute', 'inference', 'training', 'weights',
+    'open source ai', 'api', 'sdk', 'developer', 'startup', 'funding', 'acquisition'}
+
+STRONG_AI_KEYWORDS = {'ai ', ' ai', 'artificial intelligence', 'gpt', 'claude', 'gemini', 'llm', 
+    'openai', 'anthropic', 'deepmind', 'machine learning', 'chatbot', 'midjourney', 
+    'stable diffusion', 'dall-e', 'sora', 'copilot', 'cursor', 'perplexity', 'devin',
+    'hugging face', 'nvidia', 'gpu', 'robot', 'generative ai', 'foundation model',
+    'agi', 'coding agent', 'ai agent', 'ai model', 'benchmark', 'llama', 'mistral'}
+
+def is_ai_related(text):
+    t = text.lower()
+    # Strong match: must have at least one strong AI keyword
+    return any(kw in t for kw in STRONG_AI_KEYWORDS)
+
+ai_items = [item for item in all_items if is_ai_related(item['text'])]
+print(f"[Filter] {len(ai_items)} AI-related items out of {len(all_items)} total")
+
 # Deduplicate and sort
 seen = set()
 unique = []
-for item in all_items:
+for item in ai_items:
     key = item['text'][:80].lower().strip()
     if key not in seen:
         seen.add(key)
@@ -170,12 +196,17 @@ except Exception as e:
 
 # Insert fresh
 rows = []
-for item in data['items'][:30]:
+for item in data['items'][:10]:  # Cap at 10 to not overpower RSS
+    # Clean title: first sentence of tweet, not raw @handle format
+    text = item['text'].replace('\n', ' ').strip()
+    first_line = text.split('. ')[0][:150]
+    author = item.get('author', 'unknown')
+    
     rows.append({
         'source_id': source_id,
-        'url': item.get('url') or f"https://x.com/search?q={item['text'][:50]}",
-        'title': f"@{item.get('author','unknown')}: {item['text'][:180]}",
-        'raw_summary': item['text'][:500],
+        'url': item.get('url') or f"https://x.com/search?q={item['id']}",
+        'title': f"@{author}: {first_line}",
+        'raw_summary': text[:500],
         'is_processed': False
     })
 

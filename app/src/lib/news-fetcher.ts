@@ -217,7 +217,7 @@ async function fetchXNews(): Promise<NewsItem[]> {
 
         console.log('[X News] Fetching from Supabase...');
         const response = await fetch(
-            `${supabaseUrl}/rest/v1/news_items?source_id=eq.${X_SOURCE_ID}&order=created_at.desc&limit=30`,
+            `${supabaseUrl}/rest/v1/news_items?source_id=eq.${X_SOURCE_ID}&order=created_at.desc&limit=10`,
             {
                 headers: {
                     'apikey': supabaseKey,
