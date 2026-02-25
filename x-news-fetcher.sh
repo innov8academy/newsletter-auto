@@ -15,33 +15,40 @@ mkdir -p "$OUTPUT_DIR"
 echo "[$(date -u)] Starting X news fetch (using Alex's AI-primed feed)..."
 
 # LAYER 0: Alex's "For You" feed (best signal — algorithm-curated for AI)
-echo "[Layer 0] Fetching Alex's For You feed..."
-$BIRD $ALEX_AUTH home -n 30 --json > "$TEMP_DIR/home_feed.json" 2>/dev/null || echo "[]" > "$TEMP_DIR/home_feed.json"
+# LAYER 0: Alex's "For You" feed — get MORE pages for better coverage
+echo "[Layer 0] Fetching Alex's For You feed (50 items)..."
+$BIRD $ALEX_AUTH home -n 50 --json > "$TEMP_DIR/home_feed.json" 2>/dev/null || echo "[]" > "$TEMP_DIR/home_feed.json"
 sleep 2
 
-# LAYER 1: X's AI-curated trending news
-echo "[Layer 1] Fetching X trending AI news..."
+# LAYER 1: "Following" feed (chronological — catches things algorithm might miss)
+echo "[Layer 1] Fetching Alex's Following feed..."
+$BIRD $ALEX_AUTH home --following -n 30 --json > "$TEMP_DIR/following_feed.json" 2>/dev/null || echo "[]" > "$TEMP_DIR/following_feed.json"
+sleep 2
+
+# LAYER 2: X's AI-curated trending news  
+echo "[Layer 2] Fetching X trending AI news..."
 $BIRD news --ai-only -n 20 --json > "$TEMP_DIR/trending.json" 2>/dev/null || echo "[]" > "$TEMP_DIR/trending.json"
 
-# LAYER 2: High-engagement AI searches
-echo "[Layer 2] Running targeted searches..."
+# LAYER 3: Targeted searches — more specific to catch launches
+echo "[Layer 3] Running targeted searches..."
 SEARCHES=(
-  "AI launch OR release min_faves:500 -is:retweet"
-  "GPT OR Claude OR Gemini announcement min_faves:300 -is:retweet"
-  "OpenAI OR Anthropic OR Google AI min_faves:500 -is:retweet"
+  "AI launch OR AI release OR AI update min_faves:200 -is:retweet"
+  "Perplexity OR Cursor OR Claude OR Gemini new min_faves:100 -is:retweet"
+  "OpenAI OR Anthropic OR Google AI announcing min_faves:200 -is:retweet"
+  "AI agent OR AI tool launched today min_faves:100 -is:retweet"
 )
 search_idx=0
 for query in "${SEARCHES[@]}"; do
-  $BIRD search "$query" -n 10 --json > "$TEMP_DIR/search_${search_idx}.json" 2>/dev/null || echo "[]" > "$TEMP_DIR/search_${search_idx}.json"
+  $BIRD $ALEX_AUTH search "$query" -n 10 --json > "$TEMP_DIR/search_${search_idx}.json" 2>/dev/null || echo "[]" > "$TEMP_DIR/search_${search_idx}.json"
   search_idx=$((search_idx + 1))
   sleep 2
 done
 
-# LAYER 3: Key AI accounts
-echo "[Layer 3] Fetching from key AI accounts..."
-ACCOUNTS=("_akhaliq" "sama" "AnthropicAI" "GoogleAI" "OpenAI")
+# LAYER 4: Key AI accounts
+echo "[Layer 4] Fetching from key AI accounts..."
+ACCOUNTS=("_akhaliq" "sama" "AnthropicAI" "GoogleAI" "OpenAI" "perplexity_ai" "cursor_ai" "AravSrinivas" "karpathy" "cognition")
 for account in "${ACCOUNTS[@]}"; do
-  $BIRD user-tweets "$account" -n 5 --json > "$TEMP_DIR/account_${account}.json" 2>/dev/null || echo "[]" > "$TEMP_DIR/account_${account}.json"
+  $BIRD $ALEX_AUTH user-tweets "$account" -n 5 --json > "$TEMP_DIR/account_${account}.json" 2>/dev/null || echo "[]" > "$TEMP_DIR/account_${account}.json"
   sleep 1
 done
 
@@ -67,7 +74,34 @@ def safe_load(path):
 def make_id(text):
     return hashlib.md5(text.encode()).hexdigest()[:12]
 
-# Process home feed items (Alex's For You — best signal)
+# Process home feed + following feed items
+for feed_file in ['home_feed.json', 'following_feed.json']:
+  pass  # handled below
+
+for tweet in safe_load(f"{temp_dir}/following_feed.json"):
+    if not isinstance(tweet, dict):
+        continue
+    text = tweet.get('text', tweet.get('full_text', ''))
+    if not text or text.startswith('RT @'):
+        continue
+    author = tweet.get('author', tweet.get('username', ''))
+    if isinstance(author, dict):
+        author = author.get('screen_name', author.get('username', ''))
+    tweet_id = str(tweet.get('id', ''))
+    likes = int(tweet.get('favorite_count', tweet.get('likes', tweet.get('favoriteCount', 0))) or 0)
+    rts = int(tweet.get('retweet_count', tweet.get('retweets', tweet.get('retweetCount', 0))) or 0)
+    url = f"https://x.com/{author}/status/{tweet_id}" if author and tweet_id else ''
+    all_items.append({
+        'id': make_id(f"{text[:100]}-{author}"),
+        'text': text[:500],
+        'author': str(author),
+        'url': url,
+        'engagement': likes + rts * 2 + 50,  # +50 boost for following feed
+        'created_at': tweet.get('created_at', tweet.get('createdAt', '')),
+        'source_type': 'following_feed',
+        'fetched_at': datetime.now(timezone.utc).isoformat()
+    })
+
 for tweet in safe_load(f"{temp_dir}/home_feed.json"):
     if not isinstance(tweet, dict):
         continue
@@ -228,7 +262,7 @@ except Exception as e:
 
 # Insert fresh
 rows = []
-for item in data['items'][:10]:  # Cap at 10 to not overpower RSS
+for item in data['items'][:15]:  # Top 15 AI news from X
     # Clean title: first sentence of tweet, not raw @handle format
     text = item['text'].replace('\n', ' ').strip()
     first_line = text.split('. ')[0][:150]

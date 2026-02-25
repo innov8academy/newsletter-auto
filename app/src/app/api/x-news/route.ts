@@ -34,7 +34,7 @@ export async function GET() {
         }
 
         const response = await fetch(
-            `${supabaseUrl}/rest/v1/news_items?source_id=eq.${X_SOURCE_ID}&order=created_at.desc&limit=15`,
+            `${supabaseUrl}/rest/v1/news_items?source_id=eq.${X_SOURCE_ID}&order=created_at.desc&limit=20`,
             {
                 headers: {
                     'apikey': supabaseKey,
