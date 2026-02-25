@@ -754,6 +754,13 @@ export default function Home() {
                                 </div>
                               )}
 
+                              {story.sources.some(s => s.startsWith('X: @')) && (
+                                <div className="flex items-center gap-1.5 text-xs font-medium">
+                                  <span className="bg-white/90 text-black px-1.5 py-0.5 rounded font-bold text-[10px] leading-none">𝕏</span>
+                                  <span className="text-white/50">{story.sources.find(s => s.startsWith('X: @'))?.replace('X: ', '')}</span>
+                                </div>
+                              )}
+
                               {story.boosts.includes('+1 (recent)') && (
                                 <div className="flex items-center gap-1.5 text-xs text-teal-400/80">
                                   <Clock className="w-3 h-3" />
