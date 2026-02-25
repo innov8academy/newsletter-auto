@@ -60,6 +60,10 @@ export default function Home() {
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
 
+  // X/Twitter News State
+  const [xNews, setXNews] = useState<any[]>([]);
+  const [xLoading, setXLoading] = useState(false);
+
   // Custom Feeds State
   const [customFeeds, setCustomFeeds] = useState<RSSFeed[]>([]);
   const [showSourcesDialog, setShowSourcesDialog] = useState(false);
@@ -98,7 +102,25 @@ export default function Home() {
         }
       })
       .catch(err => console.error('Failed to check server status', err));
+
+    // Load X news from Supabase
+    fetchXNews();
   }, []);
+
+  async function fetchXNews() {
+    setXLoading(true);
+    try {
+      const res = await fetch('/api/x-news');
+      if (res.ok) {
+        const data = await res.json();
+        setXNews(data.items || []);
+      }
+    } catch (e) {
+      console.error('Failed to fetch X news', e);
+    } finally {
+      setXLoading(false);
+    }
+  }
 
   // Persist stories when they change
   useEffect(() => {
@@ -686,6 +708,67 @@ export default function Home() {
             <div className="grid grid-cols-12 gap-8 h-[calc(100vh-140px)]">
               {/* Main Feed */}
               <div className="col-span-8 flex flex-col h-full">
+                {/* X/Twitter AI News Section */}
+                {xNews.length > 0 && (
+                  <div className="mb-6">
+                    <div className="flex items-center gap-3 mb-4">
+                      <div className="flex items-center gap-2">
+                        <span className="bg-white text-black px-2 py-1 rounded-md font-bold text-sm leading-none">𝕏</span>
+                        <h2 className="font-display text-lg text-white tracking-tight">Trending on X</h2>
+                      </div>
+                      <span className="text-xs text-white/30 bg-white/5 px-2 py-0.5 rounded-full border border-white/5">
+                        {xNews.length} posts
+                      </span>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="ml-auto text-white/30 hover:text-white text-xs h-7"
+                        onClick={fetchXNews}
+                        disabled={xLoading}
+                      >
+                        <RefreshCw className={`w-3 h-3 mr-1 ${xLoading ? 'animate-spin' : ''}`} />
+                        Refresh
+                      </Button>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      {xNews.slice(0, 6).map((item: any) => (
+                        <a
+                          key={item.id}
+                          href={item.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="group rounded-lg border border-white/5 bg-surface hover:bg-surface-elevated hover:border-white/10 p-4 transition-all duration-200 cursor-pointer"
+                        >
+                          <div className="flex items-start gap-3">
+                            <div className="shrink-0 mt-0.5">
+                              <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-xs font-bold text-white/60">
+                                𝕏
+                              </div>
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium text-white/80 leading-snug line-clamp-2 group-hover:text-amber-300 transition-colors">
+                                {item.title}
+                              </p>
+                              <p className="text-xs text-white/30 mt-1.5">
+                                @{item.author}
+                              </p>
+                            </div>
+                            <ExternalLink className="w-3.5 h-3.5 text-white/20 group-hover:text-white/40 shrink-0 mt-1" />
+                          </div>
+                        </a>
+                      ))}
+                    </div>
+                    {xNews.length > 6 && (
+                      <button
+                        onClick={() => setXNews(prev => prev.length <= 6 ? xNews : xNews.slice(0, 6))}
+                        className="text-xs text-white/30 hover:text-white/50 mt-2 transition-colors"
+                      >
+                        {xNews.length > 6 ? `+${xNews.length - 6} more` : ''}
+                      </button>
+                    )}
+                  </div>
+                )}
+
                 <div className="flex items-center justify-between mb-6">
                   <div>
                     <h2 className="font-display text-2xl text-white tracking-tight flex items-center gap-3">
