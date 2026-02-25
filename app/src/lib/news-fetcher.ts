@@ -202,13 +202,15 @@ function cleanText(text: string): string {
         .trim();
 }
 
-// Fetch AI news from X/Twitter (via pre-cached gist)
-const X_NEWS_GIST_URL = process.env.X_NEWS_URL || 'https://gist.githubusercontent.com/innov8academy/58bd9d2317950e97c41d561081546c05/raw/latest.json';
+// Fetch AI news from X/Twitter (live from EC2 bird API)
+const X_NEWS_API_URL = process.env.X_NEWS_API_URL || 'https://ip-172-31-46-67.tail060601.ts.net/x-news';
+const X_NEWS_API_KEY = process.env.X_NEWS_API_KEY || 'innov8-x-news-2026';
 
 async function fetchXNews(): Promise<NewsItem[]> {
     try {
-        const response = await fetch(X_NEWS_GIST_URL, {
-            next: { revalidate: 600 } // Cache for 10 minutes
+        // Request fresh data — bird runs on-demand on EC2
+        const response = await fetch(`${X_NEWS_API_URL}?key=${X_NEWS_API_KEY}&fresh=true`, {
+            signal: AbortSignal.timeout(60000), // 60s timeout (bird takes ~30s)
         });
         if (!response.ok) return [];
         

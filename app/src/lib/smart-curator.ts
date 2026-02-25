@@ -99,6 +99,18 @@ async function extractStories(
 ): Promise<RawExtractedStory[]> {
     let content = item.content || item.summary || '';
 
+    // X/Twitter items are already individual stories — skip heavy extraction
+    if (item.source === 'x_twitter') {
+        return [{
+            headline: item.title.length > 10 ? item.title : content.split('\n')[0].substring(0, 120),
+            summary: content.substring(0, 500),
+            category: 'news',
+            baseScore: 7, // X items are pre-filtered for high engagement
+            entities: [],
+            originalUrl: item.url,
+        }];
+    }
+
     // INTELLIGENT UPGRADE:
     // Always attempt to get more context if the initial feed content is thin.
     // 600 chars is roughly 2 paragraphs. If less, we likely just have a teaser.
