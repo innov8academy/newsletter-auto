@@ -1,136 +1,396 @@
 {
-  "fetched_at": "2026-02-25T16:13:07.063Z",
-  "count": 10,
+  "fetched_at": "2026-02-25T17:33:54.689841+00:00",
+  "count": 39,
   "items": [
     {
+      "id": "edd76a26181e",
+      "text": "Jung Kook Dances into Calvin Klein's Spring 2026 Denim Campaign",
+      "author": "X_Trending",
+      "url": "",
+      "engagement": 700000,
+      "created_at": "1 day ago",
+      "source_type": "trending",
+      "fetched_at": "2026-02-25T17:33:54.689245+00:00"
+    },
+    {
+      "id": "2231f44d2a8d",
+      "text": "UK Grooming Gangs Inquiry Exposes Alleged Police Complicity in Child Abuse",
+      "author": "X_Trending",
+      "url": "",
+      "engagement": 648000,
+      "created_at": "2 days ago",
+      "source_type": "trending",
+      "fetched_at": "2026-02-25T17:33:54.689221+00:00"
+    },
+    {
+      "id": "eafd5250126b",
+      "text": "Stars Shine at 'The Stain' Premiere in Bangkok",
+      "author": "X_Trending",
+      "url": "",
+      "engagement": 560000,
+      "created_at": "2 days ago",
+      "source_type": "trending",
+      "fetched_at": "2026-02-25T17:33:54.689247+00:00"
+    },
+    {
+      "id": "b2d45d9aec19",
+      "text": "Tourette's Campaigner Shouts Slur Involuntarily at BAFTAs",
+      "author": "X_Trending",
+      "url": "",
+      "engagement": 470000,
+      "created_at": "2 days ago",
+      "source_type": "trending",
+      "fetched_at": "2026-02-25T17:33:54.689243+00:00"
+    },
+    {
+      "id": "e08c12923ae7",
+      "text": "AJ Styles Named First WWE Hall of Fame Inductee for 2026",
+      "author": "X_Trending",
+      "url": "",
+      "engagement": 196000,
+      "created_at": "2 days ago",
+      "source_type": "trending",
+      "fetched_at": "2026-02-25T17:33:54.689240+00:00"
+    },
+    {
+      "id": "b814a5a67c16",
+      "text": "U.S. Men's Hockey Wins First Olympic Gold Since 1980 Miracle, Celebrates at White House",
+      "author": "X_Trending",
+      "url": "",
+      "engagement": 166000,
+      "created_at": "1 day ago",
+      "source_type": "trending",
+      "fetched_at": "2026-02-25T17:33:54.689236+00:00"
+    },
+    {
+      "id": "5cbefd3f9a34",
+      "text": "Arsenal Crush Tottenham 4-1 as Eze and Gy\u00f6keres Shine in Derby Rout",
+      "author": "X_Trending",
+      "url": "",
+      "engagement": 151000,
+      "created_at": "2 days ago",
+      "source_type": "trending",
+      "fetched_at": "2026-02-25T17:33:54.689238+00:00"
+    },
+    {
+      "id": "7e0cce5259ec",
+      "text": "Bang Chan Shines at Fendi's Fall/Winter 2026-27 Show in Milan",
+      "author": "X_Trending",
+      "url": "",
+      "engagement": 79000,
+      "created_at": "1 day ago",
+      "source_type": "trending",
+      "fetched_at": "2026-02-25T17:33:54.689249+00:00"
+    },
+    {
+      "id": "6993c809f538",
+      "text": "Cursor Launches Autonomous Cloud Agents for Full Code Builds and Demos",
+      "author": "X_Trending",
+      "url": "",
+      "engagement": 5600,
+      "created_at": "22 hours ago",
+      "source_type": "trending",
+      "fetched_at": "2026-02-25T17:33:54.689231+00:00"
+    },
+    {
+      "id": "1ace39212f7d",
+      "text": "Great meeting with PM @narendramodi today to talk about the incredible energy around AI in India.\n\nIndia is our fastest growing market for codex globally, up 4x  in weekly users in the past 2 weeks alone.\n\n\ud83c\uddee\ud83c\uddf3! https://t.co/MRbw0UkotJ",
+      "author": "sama",
+      "url": "https://x.com/sama/status/2024826822060290508",
+      "engagement": 4972,
+      "created_at": "Fri Feb 20 12:41:48 +0000 2026",
+      "source_type": "account",
+      "fetched_at": "2026-02-25T17:33:54.689604+00:00"
+    },
+    {
       "id": "dc8ad3515c4a",
-      "tweet_id": "2010459893460066375",
-      "text": "Big/bad news for consumers. Google is out today with an announcement of how they plan to integrate shopping into their AI offerings including search and Gemini. The plan includes “personalized upselling.” I.e. Analyzing your chat data and using it to overcharge you. 1/2 https://t.co/AqDYxSgjk5",
+      "text": "Big/bad news for consumers. Google is out today with an announcement of how they plan to integrate shopping into their AI offerings including search and Gemini. The plan includes \u201cpersonalized upselling.\u201d I.e. Analyzing your chat data and using it to overcharge you. 1/2 https://t.co/AqDYxSgjk5",
       "author": "owenslindsay1",
       "url": "https://x.com/owenslindsay1/status/2010459893460066375",
-      "likes": 0,
-      "retweets": 1557,
-      "engagement": 3114,
+      "engagement": 3116,
       "created_at": "Sun Jan 11 21:12:45 +0000 2026",
       "source_type": "search",
-      "fetched_at": "2026-02-25T16:13:06.986Z"
+      "fetched_at": "2026-02-25T17:33:54.689769+00:00"
+    },
+    {
+      "id": "d6c46fb97849",
+      "text": "Introducing EVMbench\u2014a new benchmark that measures how well AI agents can detect, exploit, and patch high-severity smart contract vulnerabilities. https://t.co/op5zufgAGH",
+      "author": "OpenAI",
+      "url": "https://x.com/OpenAI/status/2024193883748651102",
+      "engagement": 2588,
+      "created_at": "Wed Feb 18 18:46:44 +0000 2026",
+      "source_type": "account",
+      "fetched_at": "2026-02-25T17:33:54.689505+00:00"
+    },
+    {
+      "id": "6cfa509eacd5",
+      "text": "\ud83e\udd9e",
+      "author": "sama",
+      "url": "https://x.com/sama/status/2023463428892094655",
+      "engagement": 1656,
+      "created_at": "Mon Feb 16 18:24:10 +0000 2026",
+      "source_type": "account",
+      "fetched_at": "2026-02-25T17:33:54.689616+00:00"
+    },
+    {
+      "id": "c80556bdec8a",
+      "text": "Perplexity Launches Computer: Cloud AI Agent for Complex Projects",
+      "author": "X_Trending",
+      "url": "",
+      "engagement": 1400,
+      "created_at": "",
+      "source_type": "trending",
+      "fetched_at": "2026-02-25T17:33:54.689200+00:00"
     },
     {
       "id": "6050c41fef6c",
-      "tweet_id": "2016566698305081386",
-      "text": "Building on last week’s announcement of practice SATs in Gemini, you can now also take full-length mock JEE Main tests in Gemini at no cost.",
+      "text": "Building on last week\u2019s announcement of practice SATs in Gemini, you can now also take full-length mock JEE Main tests in Gemini at no cost.",
       "author": "GeminiApp",
       "url": "https://x.com/GeminiApp/status/2016566698305081386",
-      "likes": 0,
-      "retweets": 455,
       "engagement": 910,
       "created_at": "Wed Jan 28 17:39:01 +0000 2026",
       "source_type": "search",
-      "fetched_at": "2026-02-25T16:13:06.986Z"
+      "fetched_at": "2026-02-25T17:33:54.689756+00:00"
+    },
+    {
+      "id": "0872d2c59047",
+      "text": "AI Cuts Software Build Costs But Distribution Remains the Real Hurdle",
+      "author": "X_Trending",
+      "url": "",
+      "engagement": 651,
+      "created_at": "21 hours ago",
+      "source_type": "trending",
+      "fetched_at": "2026-02-25T17:33:54.689226+00:00"
+    },
+    {
+      "id": "cc9bd61dfffa",
+      "text": "Elad Gil, swyx, and Dreamer CEO Build AI Agents Live with User Ideas",
+      "author": "X_Trending",
+      "url": "",
+      "engagement": 409,
+      "created_at": "22 hours ago",
+      "source_type": "trending",
+      "fetched_at": "2026-02-25T17:33:54.689229+00:00"
     },
     {
       "id": "3a849f4608ce",
-      "tweet_id": "2011541318229533063",
       "text": ".@trailofbits released our first batch of Claude Skills. Official announcement coming later.\nhttps://t.co/vI4amorZrc",
       "author": "dguido",
       "url": "https://x.com/dguido/status/2011541318229533063",
-      "likes": 0,
-      "retweets": 204,
       "engagement": 408,
       "created_at": "Wed Jan 14 20:49:57 +0000 2026",
       "source_type": "search",
-      "fetched_at": "2026-02-25T16:13:06.986Z"
+      "fetched_at": "2026-02-25T17:33:54.689765+00:00"
+    },
+    {
+      "id": "4b2040bf31c7",
+      "text": "Introducing Gemini 3.1 Pro \ud83d\ude80\n\n3.1 Pro represents a major step forward in core reasoning. It scored 77.1% (more than doubling 3 Pro\u2019s score) on ARC-AGI-2, the benchmark that evaluates a model's ability to solve new logic patterns and work through challenges it hasn\u2019t encountered before.\n\nThis demo illustrates how the model can go beyond the prompt. Instead of rendering a video or static graphic, 3.1 Pro codes a full environment, integrating generative audio and providing UI controls.",
+      "author": "GoogleAI",
+      "url": "https://x.com/GoogleAI/status/2024573281680887823",
+      "engagement": 376,
+      "created_at": "Thu Feb 19 19:54:19 +0000 2026",
+      "source_type": "account",
+      "fetched_at": "2026-02-25T17:33:54.689450+00:00"
+    },
+    {
+      "id": "12a1fa8c2a65",
+      "text": "Balaji Srinivasan Predicts AI Will Boost Trusted Tribes, Erode Outsider Trust",
+      "author": "X_Trending",
+      "url": "",
+      "engagement": 273,
+      "created_at": "4 hours ago",
+      "source_type": "trending",
+      "fetched_at": "2026-02-25T17:33:54.689233+00:00"
     },
     {
       "id": "3e5d1fa4a2d2",
-      "tweet_id": "2010401793881354617",
-      "text": "This is a massive $GOOGL announcement when you really think about it because Gemini is starting to look like the checkout infrastructure of the AI economy.\n\nGoogle is stitching together a universal commerce layer across $SHOP, $ETSY, $PYPL, $TGT & $WMT where AI agents actually complete transactions.\n\nRetail token usage on GCP is already ~100T per month  & that’s before agentic AI even takes off.",
+      "text": "This is a massive $GOOGL announcement when you really think about it because Gemini is starting to look like the checkout infrastructure of the AI economy.\n\nGoogle is stitching together a universal commerce layer across $SHOP, $ETSY, $PYPL, $TGT & $WMT where AI agents actually complete transactions.\n\nRetail token usage on GCP is already ~100T per month  & that\u2019s before agentic AI even takes off.",
       "author": "StockSavvyShay",
       "url": "https://x.com/StockSavvyShay/status/2010401793881354617",
-      "likes": 0,
-      "retweets": 106,
       "engagement": 212,
       "created_at": "Sun Jan 11 17:21:53 +0000 2026",
       "source_type": "search",
-      "fetched_at": "2026-02-25T16:13:06.986Z"
+      "fetched_at": "2026-02-25T17:33:54.689772+00:00"
     },
     {
-      "id": "b05d1aaf73e1",
-      "tweet_id": "1997665407499489465",
-      "text": "BREAKING 🚨: Google is planning to release Nano Banana 2 Flash in the coming weeks, as a new “Mayo” announcement has been added to Gemini web. \n\nAccording to tests, Nano Banana 2 Flash delivers almost the same quality as Pro at a lower price. \n\nMayo or Ketchup? 🌭 https://t.co/R1mKyJ2jIA",
+      "id": "ef4164fe02af",
+      "text": "Happy for my brother.\n\nAn absolute triumph for Benchmark.",
+      "author": "sama",
+      "url": "https://x.com/sama/status/2023839310764802349",
+      "engagement": 204,
+      "created_at": "Tue Feb 17 19:17:47 +0000 2026",
+      "source_type": "account",
+      "fetched_at": "2026-02-25T17:33:54.689609+00:00"
+    },
+    {
+      "id": "155c1be7a215",
+      "text": "Yesterday, @GoogleLabs' Pomelli launched Photoshoot, a new feature that generates on-brand, campaign-ready product visuals with a few clicks (for free!) \ud83d\udcf8\n\nThere are easy 3 ways to create images with Photoshoot:\n1. Templates: Upload an image of your product then select up to 4 shots from our auto-recommended photo templates, which will help you control the composition, framing, and style of your product shot\n\n2. Edit existing: You can make edits to existing images by prompting Photoshoot to do t",
+      "author": "GoogleAI",
+      "url": "https://x.com/GoogleAI/status/2024974516720484678",
+      "engagement": 202,
+      "created_at": "Fri Feb 20 22:28:41 +0000 2026",
+      "source_type": "account",
+      "fetched_at": "2026-02-25T17:33:54.689440+00:00"
+    },
+    {
+      "id": "c86a51ad3352",
+      "text": "We're updating our Responsible Scaling Policy to its third version.\n\nSince it came into effect in 2023, we\u2019ve learned a lot about the RSP\u2019s benefits and its shortcomings. This update improves the policy, reinforcing what worked and committing us to even greater transparency.",
+      "author": "AnthropicAI",
+      "url": "https://x.com/AnthropicAI/status/2026393790500540566",
+      "engagement": 194,
+      "created_at": "Tue Feb 24 20:28:22 +0000 2026",
+      "source_type": "account",
+      "fetched_at": "2026-02-25T17:33:54.689370+00:00"
+    },
+    {
+      "id": "c365ee9f0cf5",
+      "text": "AI is changing how work gets done, and we want to lead that transition responsibly.\n\nExcited to welcome Arvind KC as Chief People Officer to help OpenAI grow and be a model for how AI-enabled work can expand what people can do. https://t.co/uZe9zUthnS",
+      "author": "OpenAI",
+      "url": "https://x.com/OpenAI/status/2026412700583317815",
+      "engagement": 180,
+      "created_at": "Tue Feb 24 21:43:31 +0000 2026",
+      "source_type": "account",
+      "fetched_at": "2026-02-25T17:33:54.689499+00:00"
+    },
+    {
+      "id": "e6dc9287826c",
+      "text": "Extremely grateful to work with Josh. No one could ask for a more committed, more thoughtful, or harder-working investor.",
+      "author": "sama",
+      "url": "https://x.com/sama/status/2023838999341920283",
+      "engagement": 174,
+      "created_at": "Tue Feb 17 19:16:33 +0000 2026",
+      "source_type": "account",
+      "fetched_at": "2026-02-25T17:33:54.689612+00:00"
+    },
+    {
+      "id": "cc69ab2bf66a",
+      "text": "BREAKING \ud83d\udea8: Google is planning to release Nano Banana 2 Flash in the coming weeks, as a new \u201cMayo\u201d announcement has been added to Gemini web. \n\nAccording to tests, Nano Banana 2 Flash delivers almost the same quality as Pro at a lower price. \n\nMayo or Ketchup? \ud83c\udf2d https://t.co/R1mKyJ2jIA",
       "author": "testingcatalog",
       "url": "https://x.com/testingcatalog/status/1997665407499489465",
-      "likes": 0,
-      "retweets": 79,
       "engagement": 158,
       "created_at": "Sun Dec 07 13:52:02 +0000 2025",
       "source_type": "search",
-      "fetched_at": "2026-02-25T16:13:06.987Z"
+      "fetched_at": "2026-02-25T17:33:54.689784+00:00"
     },
     {
       "id": "9c6464900327",
-      "tweet_id": "2001337130640118164",
-      "text": "Gemini 3 Flash is now available in your terminal! ⚡️\n\nFast, efficient, and capable!\n\n ❯ npm install -g @google/gemini-cli@latest\n\n👇Read the announcement blog below https://t.co/episoTMa57",
+      "text": "Gemini 3 Flash is now available in your terminal! \u26a1\ufe0f\n\nFast, efficient, and capable!\n\n \u276f npm install -g @google/gemini-cli@latest\n\n\ud83d\udc47Read the announcement blog below https://t.co/episoTMa57",
       "author": "geminicli",
       "url": "https://x.com/geminicli/status/2001337130640118164",
-      "likes": 0,
-      "retweets": 74,
       "engagement": 148,
       "created_at": "Wed Dec 17 17:02:09 +0000 2025",
       "source_type": "search",
-      "fetched_at": "2026-02-25T16:13:06.986Z"
+      "fetched_at": "2026-02-25T17:33:54.689776+00:00"
     },
     {
       "id": "45c7ef237204",
-      "tweet_id": "2014915425465995329",
-      "text": "This looks like a product announcement. It’s actually a distribution masterclass.\n\nClaude is now inside Excel two different ways. Anthropic’s own add-in (this announcement) AND through Microsoft Copilot, where Claude powers Agent Mode for spreadsheets. Microsoft pays AWS for that access despite AWS being a direct cloud competitor.\n\nThat happened because Microsoft’s internal testing showed Claude outperforms OpenAI on Excel financial functions. GitHub Copilot users now “primarily rely on Claude S",
+      "text": "This looks like a product announcement. It\u2019s actually a distribution masterclass.\n\nClaude is now inside Excel two different ways. Anthropic\u2019s own add-in (this announcement) AND through Microsoft Copilot, where Claude powers Agent Mode for spreadsheets. Microsoft pays AWS for that access despite AWS being a direct cloud competitor.\n\nThat happened because Microsoft\u2019s internal testing showed Claude outperforms OpenAI on Excel financial functions. GitHub Copilot users now \u201cprimarily rely on Claude S",
       "author": "aakashgupta",
       "url": "https://x.com/aakashgupta/status/2014915425465995329",
-      "likes": 0,
-      "retweets": 56,
       "engagement": 112,
       "created_at": "Sat Jan 24 04:17:27 +0000 2026",
       "source_type": "search",
-      "fetched_at": "2026-02-25T16:13:06.986Z"
+      "fetched_at": "2026-02-25T17:33:54.689760+00:00"
+    },
+    {
+      "id": "91abf33405a5",
+      "text": "Anthropic has acquired @Vercept_ai to advance Claude\u2019s computer use capabilities. \n\nRead more: https://t.co/YVz1zh7Pqq",
+      "author": "AnthropicAI",
+      "url": "https://x.com/AnthropicAI/status/2026705792033026465",
+      "engagement": 108,
+      "created_at": "Wed Feb 25 17:08:09 +0000 2026",
+      "source_type": "account",
+      "fetched_at": "2026-02-25T17:33:54.689346+00:00"
+    },
+    {
+      "id": "169f61d84792",
+      "text": "Channeling the Fire Horse energy this week \ud83d\udd25\ud83d\udc0e here\u2019s what we launched: \n\n\u2014 Gemini 3.1 Pro, a step forward in core intelligence that helps you tackle complex workflows and projects\n\n\u2014 Photoshoot, a new feature for Pomelli by @GoogleLabs that transforms a single product image into studio-quality visuals for your business \n\n\u2014 Lyria 3, our most advanced generative music model yet, turns photos and text into dynamic tracks complete with vocals and lyrics\n\n\u2014 A new featured notebook in @NotebookLM that",
+      "author": "GoogleAI",
+      "url": "https://x.com/GoogleAI/status/2024931776167047587",
+      "engagement": 108,
+      "created_at": "Fri Feb 20 19:38:51 +0000 2026",
+      "source_type": "account",
+      "fetched_at": "2026-02-25T17:33:54.689446+00:00"
     },
     {
       "id": "5aab96c667f1",
-      "tweet_id": "2000052033542627328",
       "text": "Google cofounder, Sergey Brin, says he listens to the All-In Pod and @BenShapiroShow.\n\nPlease, nobody let the @jason hear this: the All-In egos cannot stand further inflation. \n\nBrin also drops a new AI product announcement:\n\nConversational Gemini Voice is getting a big upgrade. https://t.co/O0n8FGjScT",
       "author": "compound248",
       "url": "https://x.com/compound248/status/2000052033542627328",
-      "likes": 0,
-      "retweets": 46,
       "engagement": 92,
       "created_at": "Sun Dec 14 03:55:38 +0000 2025",
       "source_type": "search",
-      "fetched_at": "2026-02-25T16:13:06.986Z"
+      "fetched_at": "2026-02-25T17:33:54.689780+00:00"
     },
     {
       "id": "30ca6c188e4a",
-      "tweet_id": "2022774022778556762",
       "text": "Anthropic is preparing a new announcement banner in the Claude web app and Console codenamed \"Try Parsley\" - the last similar banner added to both was \"Try Cilantro\" which was the codename for Opus 4.6 https://t.co/dVdF5uc44L",
       "author": "btibor91",
       "url": "https://x.com/btibor91/status/2022774022778556762",
-      "likes": 0,
-      "retweets": 43,
       "engagement": 86,
       "created_at": "Sat Feb 14 20:44:43 +0000 2026",
       "source_type": "search",
-      "fetched_at": "2026-02-25T16:13:06.986Z"
+      "fetched_at": "2026-02-25T17:33:54.689751+00:00"
+    },
+    {
+      "id": "46915af29ccc",
+      "text": "We\u2019re now separating the safety commitments we\u2019ll make unilaterally and our recommendations for the industry. \n\nWe\u2019re also committing to publish new Frontier Safety Roadmaps with detailed safety goals, and Risk Reports that quantify risk across all our deployed models.",
+      "author": "AnthropicAI",
+      "url": "https://x.com/AnthropicAI/status/2026393792375411115",
+      "engagement": 72,
+      "created_at": "Tue Feb 24 20:28:23 +0000 2026",
+      "source_type": "account",
+      "fetched_at": "2026-02-25T17:33:54.689366+00:00"
+    },
+    {
+      "id": "fd7559f2d2c8",
+      "text": "Read more about version 3.0 of the Responsible Scaling Policy: https://t.co/gDp7VH9X8j",
+      "author": "AnthropicAI",
+      "url": "https://x.com/AnthropicAI/status/2026393794036351461",
+      "engagement": 50,
+      "created_at": "Tue Feb 24 20:28:23 +0000 2026",
+      "source_type": "account",
+      "fetched_at": "2026-02-25T17:33:54.689361+00:00"
     },
     {
       "id": "fb98941dbcb8",
-      "tweet_id": "1996858871940633022",
       "text": "After playing with Cursor for hours after the announcement I can confirm that GPT-5.1 Codex Max Extra High Fast is the best coding model right now with Opus 4.5 close second",
       "author": "amritwt",
       "url": "https://x.com/amritwt/status/1996858871940633022",
-      "likes": 0,
-      "retweets": 16,
       "engagement": 32,
       "created_at": "Fri Dec 05 08:27:09 +0000 2025",
       "source_type": "search",
-      "fetched_at": "2026-02-25T16:13:06.987Z"
+      "fetched_at": "2026-02-25T17:33:54.689788+00:00"
+    },
+    {
+      "id": "0b8d2506fbb0",
+      "text": "We're shipping 3.1 Pro across our consumer and developer products to bring this advancement in intelligence to your everyday applications. Start building your ideas into reality today! https://t.co/8CFWgbHSnH",
+      "author": "GoogleAI",
+      "url": "https://x.com/GoogleAI/status/2024574404181561594",
+      "engagement": 26,
+      "created_at": "Thu Feb 19 19:58:47 +0000 2026",
+      "source_type": "account",
+      "fetched_at": "2026-02-25T17:33:54.689454+00:00"
+    },
+    {
+      "id": "ecfc0d26f9e2",
+      "text": "Read our blog to learn more about the model \u2b07\ufe0f\nhttps://t.co/1VPrenVSua",
+      "author": "GoogleAI",
+      "url": "https://x.com/GoogleAI/status/2024575007267909685",
+      "engagement": 22,
+      "created_at": "Thu Feb 19 20:01:11 +0000 2026",
+      "source_type": "account",
+      "fetched_at": "2026-02-25T17:33:54.689458+00:00"
+    },
+    {
+      "id": "194c3294b0d4",
+      "text": "And you can find links to all relevant RSP documents, including the initial Frontier Safety Roadmap and the initial Risk Report, here: https://t.co/gLeduVVlpt",
+      "author": "AnthropicAI",
+      "url": "https://x.com/AnthropicAI/status/2026393795814666321",
+      "engagement": 16,
+      "created_at": "Tue Feb 24 20:28:24 +0000 2026",
+      "source_type": "account",
+      "fetched_at": "2026-02-25T17:33:54.689355+00:00"
     }
   ]
 }

@@ -202,33 +202,57 @@ function cleanText(text: string): string {
         .trim();
 }
 
-// Fetch AI news from X/Twitter (live from EC2 bird API)
-const X_NEWS_API_URL = process.env.X_NEWS_API_URL || 'https://ip-172-31-46-67.tail060601.ts.net/x-news';
-const X_NEWS_API_KEY = process.env.X_NEWS_API_KEY || 'innov8-x-news-2026';
+// Fetch AI news from X/Twitter (from newsletter's own Supabase — pushed by bird CLI on EC2)
+const X_SOURCE_ID = 'd5ec53f3-063c-4efa-a6b7-f6dd0781aff8';
 
 async function fetchXNews(): Promise<NewsItem[]> {
     try {
-        // Request fresh data — bird runs on-demand on EC2
-        const response = await fetch(`${X_NEWS_API_URL}?key=${X_NEWS_API_KEY}&fresh=true`, {
-            signal: AbortSignal.timeout(60000), // 60s timeout (bird takes ~30s)
+        const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+        const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+        
+        if (!supabaseUrl || !supabaseKey) {
+            console.log('[X News] Supabase not configured, skipping');
+            return [];
+        }
+
+        console.log('[X News] Fetching from Supabase...');
+        const response = await fetch(
+            `${supabaseUrl}/rest/v1/news_items?source_id=eq.${X_SOURCE_ID}&order=created_at.desc&limit=30`,
+            {
+                headers: {
+                    'apikey': supabaseKey,
+                    'Authorization': `Bearer ${supabaseKey}`,
+                },
+                cache: 'no-store',
+            }
+        );
+
+        if (!response.ok) {
+            console.error('[X News] Supabase fetch failed:', response.status);
+            return [];
+        }
+
+        const items = await response.json();
+        console.log(`[X News] Got ${items.length} items from Supabase`);
+        
+        return items.map((item: any) => {
+            // Extract @handle from title (format: "@handle: tweet text")
+            const handleMatch = item.title?.match(/^@(\w+):/);
+            const author = handleMatch ? handleMatch[1] : 'unknown';
+            
+            return {
+                id: `x_${item.id}`,
+                title: item.title || '',
+                url: item.url || '',
+                source: 'x_twitter',
+                sourceName: `X: @${author}`,
+                publishedAt: item.published_at || item.created_at || new Date().toISOString(),
+                summary: item.raw_summary || item.title || '',
+                imageUrl: '',
+                author: author,
+                content: item.raw_summary || item.title || '',
+            };
         });
-        if (!response.ok) return [];
-        
-        const data = await response.json();
-        const items = data.items || [];
-        
-        return items.slice(0, 30).map((tweet: any) => ({
-            id: `x_${tweet.id}`,
-            title: tweet.text.split('\n')[0].substring(0, 120), // First line as title
-            url: tweet.url,
-            source: 'x_twitter',
-            sourceName: `X: @${tweet.author}`,
-            publishedAt: tweet.created_at || tweet.fetched_at || new Date().toISOString(),
-            summary: tweet.text.substring(0, 500),
-            imageUrl: '',
-            author: tweet.author,
-            content: tweet.text,
-        }));
     } catch (error) {
         console.error('[X News] Error fetching:', error);
         return [];
