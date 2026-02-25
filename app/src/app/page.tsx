@@ -766,7 +766,7 @@ export default function Home() {
                       </Button>
                     </div>
                     <div className="grid grid-cols-2 gap-3">
-                      {xNews.slice(0, 6).map((item: any) => {
+                      {xNews.map((item: any) => {
                         const isSelected = selectedIds.has(`x_${item.id}`);
                         return (
                           <div
@@ -810,14 +810,7 @@ export default function Home() {
                         );
                       })}
                     </div>
-                    {xNews.length > 6 && (
-                      <button
-                        onClick={() => setXNews(prev => prev.length <= 6 ? xNews : xNews.slice(0, 6))}
-                        className="text-xs text-white/30 hover:text-white/50 mt-2 transition-colors"
-                      >
-                        {xNews.length > 6 ? `+${xNews.length - 6} more` : ''}
-                      </button>
-                    )}
+                    {/* All X items shown */}
                   </div>
                 )}
 
