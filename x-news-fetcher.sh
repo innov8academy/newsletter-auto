@@ -4,13 +4,20 @@
 set -euo pipefail
 
 BIRD="/home/ubuntu/.local/bin/bird"
+# Alex's personal account — AI-primed "For You" feed
+ALEX_AUTH="--auth-token ***REMOVED*** --ct0 ***REMOVED***"
 OUTPUT_DIR="/home/ubuntu/clawd/projects/newsletter-auto/x-news-cache"
 OUTPUT_FILE="$OUTPUT_DIR/latest.json"
 TEMP_DIR=$(mktemp -d)
 trap "rm -rf $TEMP_DIR" EXIT
 
 mkdir -p "$OUTPUT_DIR"
-echo "[$(date -u)] Starting X news fetch..."
+echo "[$(date -u)] Starting X news fetch (using Alex's AI-primed feed)..."
+
+# LAYER 0: Alex's "For You" feed (best signal — algorithm-curated for AI)
+echo "[Layer 0] Fetching Alex's For You feed..."
+$BIRD $ALEX_AUTH home -n 30 --json > "$TEMP_DIR/home_feed.json" 2>/dev/null || echo "[]" > "$TEMP_DIR/home_feed.json"
+sleep 2
 
 # LAYER 1: X's AI-curated trending news
 echo "[Layer 1] Fetching X trending AI news..."
@@ -59,6 +66,31 @@ def safe_load(path):
 
 def make_id(text):
     return hashlib.md5(text.encode()).hexdigest()[:12]
+
+# Process home feed items (Alex's For You — best signal)
+for tweet in safe_load(f"{temp_dir}/home_feed.json"):
+    if not isinstance(tweet, dict):
+        continue
+    text = tweet.get('text', tweet.get('full_text', ''))
+    if not text or text.startswith('RT @'):
+        continue
+    author = tweet.get('author', tweet.get('username', ''))
+    if isinstance(author, dict):
+        author = author.get('screen_name', author.get('username', ''))
+    tweet_id = str(tweet.get('id', ''))
+    likes = int(tweet.get('favorite_count', tweet.get('likes', tweet.get('favoriteCount', 0))) or 0)
+    rts = int(tweet.get('retweet_count', tweet.get('retweets', tweet.get('retweetCount', 0))) or 0)
+    url = f"https://x.com/{author}/status/{tweet_id}" if author and tweet_id else ''
+    all_items.append({
+        'id': make_id(f"{text[:100]}-{author}"),
+        'text': text[:500],
+        'author': str(author),
+        'url': url,
+        'engagement': likes + rts * 2 + 100,  # +100 boost for being in curated feed
+        'created_at': tweet.get('created_at', tweet.get('createdAt', '')),
+        'source_type': 'home_feed',
+        'fetched_at': datetime.now(timezone.utc).isoformat()
+    })
 
 # Process trending items (bird news format: {headline, category, postCount})
 for item in safe_load(f"{temp_dir}/trending.json"):

@@ -1,16 +1,26 @@
 {
-  "fetched_at": "2026-02-25T17:43:33.253359+00:00",
-  "count": 12,
+  "fetched_at": "2026-02-25T18:01:06.209286+00:00",
+  "count": 34,
   "items": [
+    {
+      "id": "d88eedc75d5c",
+      "text": "Anthropic Launches Remote Control for Claude Code",
+      "author": "X_Trending",
+      "url": "",
+      "engagement": 9200,
+      "created_at": "22 hours ago",
+      "source_type": "trending",
+      "fetched_at": "2026-02-25T18:01:06.208378+00:00"
+    },
     {
       "id": "e52be59380a0",
       "text": "Cursor Launches Autonomous Cloud Agents for Full Software Development",
       "author": "X_Trending",
       "url": "",
       "engagement": 5700,
-      "created_at": "22 hours ago",
+      "created_at": "23 hours ago",
       "source_type": "trending",
-      "fetched_at": "2026-02-25T17:43:33.252717+00:00"
+      "fetched_at": "2026-02-25T18:01:06.208374+00:00"
     },
     {
       "id": "1ace39212f7d",
@@ -20,7 +30,17 @@
       "engagement": 4972,
       "created_at": "Fri Feb 20 12:41:48 +0000 2026",
       "source_type": "account",
-      "fetched_at": "2026-02-25T17:43:33.253098+00:00"
+      "fetched_at": "2026-02-25T18:01:06.208673+00:00"
+    },
+    {
+      "id": "dc8ad3515c4a",
+      "text": "Big/bad news for consumers. Google is out today with an announcement of how they plan to integrate shopping into their AI offerings including search and Gemini. The plan includes \u201cpersonalized upselling.\u201d I.e. Analyzing your chat data and using it to overcharge you. 1/2 https://t.co/AqDYxSgjk5",
+      "author": "owenslindsay1",
+      "url": "https://x.com/owenslindsay1/status/2010459893460066375",
+      "engagement": 3116,
+      "created_at": "Sun Jan 11 21:12:45 +0000 2026",
+      "source_type": "search",
+      "fetched_at": "2026-02-25T18:01:06.208798+00:00"
     },
     {
       "id": "d6c46fb97849",
@@ -30,27 +50,67 @@
       "engagement": 2588,
       "created_at": "Wed Feb 18 18:46:44 +0000 2026",
       "source_type": "account",
-      "fetched_at": "2026-02-25T17:43:33.252977+00:00"
+      "fetched_at": "2026-02-25T18:01:06.208586+00:00"
     },
     {
-      "id": "c80556bdec8a",
-      "text": "Perplexity Launches Computer: Cloud AI Agent for Complex Projects",
+      "id": "0003e320465a",
+      "text": "OpenClaw Dev Replicates Cursor Feature in Five Minutes",
       "author": "X_Trending",
       "url": "",
-      "engagement": 1700,
-      "created_at": "",
+      "engagement": 1900,
+      "created_at": "6 hours ago",
       "source_type": "trending",
-      "fetched_at": "2026-02-25T17:43:33.252688+00:00"
+      "fetched_at": "2026-02-25T18:01:06.208376+00:00"
     },
     {
-      "id": "0872d2c59047",
-      "text": "AI Cuts Software Build Costs But Distribution Remains the Real Hurdle",
+      "id": "6050c41fef6c",
+      "text": "Building on last week\u2019s announcement of practice SATs in Gemini, you can now also take full-length mock JEE Main tests in Gemini at no cost.",
+      "author": "GeminiApp",
+      "url": "https://x.com/GeminiApp/status/2016566698305081386",
+      "engagement": 910,
+      "created_at": "Wed Jan 28 17:39:01 +0000 2026",
+      "source_type": "search",
+      "fetched_at": "2026-02-25T18:01:06.208785+00:00"
+    },
+    {
+      "id": "c136bef89046",
+      "text": "Claude AI Builds Anthropic's Plugins Feature Over One Weekend",
       "author": "X_Trending",
       "url": "",
-      "engagement": 654,
-      "created_at": "21 hours ago",
+      "engagement": 859,
+      "created_at": "16 hours ago",
       "source_type": "trending",
-      "fetched_at": "2026-02-25T17:43:33.252712+00:00"
+      "fetched_at": "2026-02-25T18:01:06.208372+00:00"
+    },
+    {
+      "id": "a6a646a6638b",
+      "text": "So Google has just released its own agent builder?!\n\nYou can now add the agent block in Google Opal and \"program it\" in plain English.\n\nAnd it has natively:\n\n- Tool call (with Nano Banana, Veo, web search...)\n- Memory to save infos between sessions\n- Conditional logic\n\nProbably the easiest way to build AI agents I've seen so far.",
+      "author": "itsPaulAi",
+      "url": "https://x.com/itsPaulAi/status/2026403523701641514",
+      "engagement": 490,
+      "created_at": "Tue Feb 24 21:07:03 +0000 2026",
+      "source_type": "home_feed",
+      "fetched_at": "2026-02-25T18:01:06.208231+00:00"
+    },
+    {
+      "id": "d9134099553e",
+      "text": "Hey @elonmusk, if you hate Anthropic so much, make a Grok CLI and I\u2019ll cancel my Anthropic subscription today",
+      "author": "UziObi",
+      "url": "https://x.com/UziObi/status/2026399091450671113",
+      "engagement": 438,
+      "created_at": "Tue Feb 24 20:49:26 +0000 2026",
+      "source_type": "home_feed",
+      "fetched_at": "2026-02-25T18:01:06.208275+00:00"
+    },
+    {
+      "id": "17e9b6e391c5",
+      "text": "this guy started vibe coding 139 days ago ON LIVE.  \n\ntoday, he just crossed $41,000 in revenue.  \n\ncrazy to think what you can do with JUST a Claude Code subscription https://t.co/R1zrEUMk4I",
+      "author": "om_patel5",
+      "url": "https://x.com/om_patel5/status/2026447080928002163",
+      "engagement": 414,
+      "created_at": "Wed Feb 25 00:00:08 +0000 2026",
+      "source_type": "home_feed",
+      "fetched_at": "2026-02-25T18:01:06.208203+00:00"
     },
     {
       "id": "cc9bd61dfffa",
@@ -58,9 +118,19 @@
       "author": "X_Trending",
       "url": "",
       "engagement": 409,
-      "created_at": "22 hours ago",
+      "created_at": "23 hours ago",
       "source_type": "trending",
-      "fetched_at": "2026-02-25T17:43:33.252715+00:00"
+      "fetched_at": "2026-02-25T18:01:06.208362+00:00"
+    },
+    {
+      "id": "3a849f4608ce",
+      "text": ".@trailofbits released our first batch of Claude Skills. Official announcement coming later.\nhttps://t.co/vI4amorZrc",
+      "author": "dguido",
+      "url": "https://x.com/dguido/status/2011541318229533063",
+      "engagement": 408,
+      "created_at": "Wed Jan 14 20:49:57 +0000 2026",
+      "source_type": "search",
+      "fetched_at": "2026-02-25T18:01:06.208793+00:00"
     },
     {
       "id": "4b2040bf31c7",
@@ -70,17 +140,47 @@
       "engagement": 376,
       "created_at": "Thu Feb 19 19:54:19 +0000 2026",
       "source_type": "account",
-      "fetched_at": "2026-02-25T17:43:33.252925+00:00"
+      "fetched_at": "2026-02-25T18:01:06.208539+00:00"
     },
     {
-      "id": "12a1fa8c2a65",
-      "text": "Balaji Srinivasan Predicts AI Will Boost Trusted Tribes, Erode Outsider Trust",
-      "author": "X_Trending",
-      "url": "",
-      "engagement": 274,
-      "created_at": "4 hours ago",
-      "source_type": "trending",
-      "fetched_at": "2026-02-25T17:43:33.252720+00:00"
+      "id": "6a8179444465",
+      "text": "For all the AI doomsdayers. As long as you\u2019re competing against people for your relative status, you still have the same competition: people. And you win the same way: just do more than the next guy. Remember: Some people just realized u can get email on your phone.",
+      "author": "AlexHormozi",
+      "url": "https://x.com/AlexHormozi/status/2026372864291516709",
+      "engagement": 276,
+      "created_at": "Tue Feb 24 19:05:13 +0000 2026",
+      "source_type": "home_feed",
+      "fetched_at": "2026-02-25T18:01:06.208223+00:00"
+    },
+    {
+      "id": "91abf33405a5",
+      "text": "Anthropic has acquired @Vercept_ai to advance Claude\u2019s computer use capabilities. \n\nRead more: https://t.co/YVz1zh7Pqq",
+      "author": "AnthropicAI",
+      "url": "https://x.com/AnthropicAI/status/2026705792033026465",
+      "engagement": 258,
+      "created_at": "Wed Feb 25 17:08:09 +0000 2026",
+      "source_type": "home_feed",
+      "fetched_at": "2026-02-25T18:01:06.208292+00:00"
+    },
+    {
+      "id": "2d8dc8d1d1e3",
+      "text": "\u2728 Built my own Guassian Splat viewer for my app \ud83c\udfe1 Interior AI\n\nIt takes splats generated from your interior with the @theworldlabs API so you can walk around them in 3d space\n\nIt's starting to look much more real than when I added splats 6 months ago, great work \ud83c\udf10 World Labs! https://t.co/Qjf9xoXjO7",
+      "author": "levelsio",
+      "url": "https://x.com/levelsio/status/2026398484232810621",
+      "engagement": 226,
+      "created_at": "Tue Feb 24 20:47:01 +0000 2026",
+      "source_type": "home_feed",
+      "fetched_at": "2026-02-25T18:01:06.208193+00:00"
+    },
+    {
+      "id": "3e5d1fa4a2d2",
+      "text": "This is a massive $GOOGL announcement when you really think about it because Gemini is starting to look like the checkout infrastructure of the AI economy.\n\nGoogle is stitching together a universal commerce layer across $SHOP, $ETSY, $PYPL, $TGT & $WMT where AI agents actually complete transactions.\n\nRetail token usage on GCP is already ~100T per month  & that\u2019s before agentic AI even takes off.",
+      "author": "StockSavvyShay",
+      "url": "https://x.com/StockSavvyShay/status/2010401793881354617",
+      "engagement": 214,
+      "created_at": "Sun Jan 11 17:21:53 +0000 2026",
+      "source_type": "search",
+      "fetched_at": "2026-02-25T18:01:06.208802+00:00"
     },
     {
       "id": "ef4164fe02af",
@@ -90,27 +190,97 @@
       "engagement": 204,
       "created_at": "Tue Feb 17 19:17:47 +0000 2026",
       "source_type": "account",
-      "fetched_at": "2026-02-25T17:43:33.253104+00:00"
+      "fetched_at": "2026-02-25T18:01:06.208677+00:00"
     },
     {
       "id": "c365ee9f0cf5",
       "text": "AI is changing how work gets done, and we want to lead that transition responsibly.\n\nExcited to welcome Arvind KC as Chief People Officer to help OpenAI grow and be a model for how AI-enabled work can expand what people can do. https://t.co/uZe9zUthnS",
       "author": "OpenAI",
       "url": "https://x.com/OpenAI/status/2026412700583317815",
-      "engagement": 180,
+      "engagement": 182,
       "created_at": "Tue Feb 24 21:43:31 +0000 2026",
       "source_type": "account",
-      "fetched_at": "2026-02-25T17:43:33.252971+00:00"
+      "fetched_at": "2026-02-25T18:01:06.208581+00:00"
     },
     {
-      "id": "91abf33405a5",
-      "text": "Anthropic has acquired @Vercept_ai to advance Claude\u2019s computer use capabilities. \n\nRead more: https://t.co/YVz1zh7Pqq",
-      "author": "AnthropicAI",
-      "url": "https://x.com/AnthropicAI/status/2026705792033026465",
-      "engagement": 126,
-      "created_at": "Wed Feb 25 17:08:09 +0000 2026",
-      "source_type": "account",
-      "fetched_at": "2026-02-25T17:43:33.252826+00:00"
+      "id": "3460660f8909",
+      "text": "okay, confirmed it.\n\nfuck antigravity and cursor atp.\n\nBuy GitHub Copilot pro (most expensive pack) \n\nlogin via it in opencode\n\nenjoy far more claude code limits that you normally would for double the price.",
+      "author": "wholyv",
+      "url": "https://x.com/wholyv/status/2026376932565414128",
+      "engagement": 174,
+      "created_at": "Tue Feb 24 19:21:23 +0000 2026",
+      "source_type": "home_feed",
+      "fetched_at": "2026-02-25T18:01:06.208207+00:00"
+    },
+    {
+      "id": "cc69ab2bf66a",
+      "text": "BREAKING \ud83d\udea8: Google is planning to release Nano Banana 2 Flash in the coming weeks, as a new \u201cMayo\u201d announcement has been added to Gemini web. \n\nAccording to tests, Nano Banana 2 Flash delivers almost the same quality as Pro at a lower price. \n\nMayo or Ketchup? \ud83c\udf2d https://t.co/R1mKyJ2jIA",
+      "author": "testingcatalog",
+      "url": "https://x.com/testingcatalog/status/1997665407499489465",
+      "engagement": 158,
+      "created_at": "Sun Dec 07 13:52:02 +0000 2025",
+      "source_type": "search",
+      "fetched_at": "2026-02-25T18:01:06.208815+00:00"
+    },
+    {
+      "id": "178ddcc6485d",
+      "text": "It's not perfect yet, but I'd say 90%.\n\nSeedance is sota, and I wonder when Google and OpenAI will finally catch up.\n\nh/t SadAd8761 reddit https://t.co/e2AoTTLknQ",
+      "author": "kimmonismus",
+      "url": "https://x.com/kimmonismus/status/2026594379843121340",
+      "engagement": 156,
+      "created_at": "Wed Feb 25 09:45:27 +0000 2026",
+      "source_type": "home_feed",
+      "fetched_at": "2026-02-25T18:01:06.208268+00:00"
+    },
+    {
+      "id": "9c6464900327",
+      "text": "Gemini 3 Flash is now available in your terminal! \u26a1\ufe0f\n\nFast, efficient, and capable!\n\n \u276f npm install -g @google/gemini-cli@latest\n\n\ud83d\udc47Read the announcement blog below https://t.co/episoTMa57",
+      "author": "geminicli",
+      "url": "https://x.com/geminicli/status/2001337130640118164",
+      "engagement": 148,
+      "created_at": "Wed Dec 17 17:02:09 +0000 2025",
+      "source_type": "search",
+      "fetched_at": "2026-02-25T18:01:06.208806+00:00"
+    },
+    {
+      "id": "0fc4b3c9fbac",
+      "text": "Just tried Paper MCP for Claude. This is wild\ud83d\udd25 https://t.co/TJiOQy3Cxi",
+      "author": "shashpicious_",
+      "url": "https://x.com/shashpicious_/status/2026531052613968019",
+      "engagement": 124,
+      "created_at": "Wed Feb 25 05:33:48 +0000 2026",
+      "source_type": "home_feed",
+      "fetched_at": "2026-02-25T18:01:06.208289+00:00"
+    },
+    {
+      "id": "d597ee627b2f",
+      "text": "Aravind and team absolutely cooked with this one. \n\nThis looks insane!!\n\nA single system that unifies files, tools, memory, and models, all working together for you. \n\nAlso, love the name - Perplexity Computer.\n\nCongrats! Team :) https://t.co/qIfgyhTd3k",
+      "author": "VaibhavSisinty",
+      "url": "https://x.com/VaibhavSisinty/status/2026700842884370730",
+      "engagement": 114,
+      "created_at": "Wed Feb 25 16:48:29 +0000 2026",
+      "source_type": "home_feed",
+      "fetched_at": "2026-02-25T18:01:06.208214+00:00"
+    },
+    {
+      "id": "46e52cb247f5",
+      "text": "BREAKING \ud83d\udea8: MiniMax launched MaxClaw, a new, always-on managed agent based on OpenClaw and powered by the MiniMax M2.5. \n\nPlus one AI chat on my Telegram \ud83d\udc40 https://t.co/R6DJSWcN3I",
+      "author": "testingcatalog",
+      "url": "https://x.com/testingcatalog/status/2026678621545320623",
+      "engagement": 114,
+      "created_at": "Wed Feb 25 15:20:11 +0000 2026",
+      "source_type": "home_feed",
+      "fetched_at": "2026-02-25T18:01:06.208282+00:00"
+    },
+    {
+      "id": "45c7ef237204",
+      "text": "This looks like a product announcement. It\u2019s actually a distribution masterclass.\n\nClaude is now inside Excel two different ways. Anthropic\u2019s own add-in (this announcement) AND through Microsoft Copilot, where Claude powers Agent Mode for spreadsheets. Microsoft pays AWS for that access despite AWS being a direct cloud competitor.\n\nThat happened because Microsoft\u2019s internal testing showed Claude outperforms OpenAI on Excel financial functions. GitHub Copilot users now \u201cprimarily rely on Claude S",
+      "author": "aakashgupta",
+      "url": "https://x.com/aakashgupta/status/2014915425465995329",
+      "engagement": 112,
+      "created_at": "Sat Jan 24 04:17:27 +0000 2026",
+      "source_type": "search",
+      "fetched_at": "2026-02-25T18:01:06.208790+00:00"
     },
     {
       "id": "169f61d84792",
@@ -120,7 +290,57 @@
       "engagement": 108,
       "created_at": "Fri Feb 20 19:38:51 +0000 2026",
       "source_type": "account",
-      "fetched_at": "2026-02-25T17:43:33.252921+00:00"
+      "fetched_at": "2026-02-25T18:01:06.208536+00:00"
+    },
+    {
+      "id": "362cbb66bb70",
+      "text": "Hey @grok, which of these AI platforms is the most private and secure? https://t.co/sxa2erODuE",
+      "author": "askOkara",
+      "url": "https://x.com/askOkara/status/2026532204105576565",
+      "engagement": 106,
+      "created_at": "Wed Feb 25 05:38:23 +0000 2026",
+      "source_type": "home_feed",
+      "fetched_at": "2026-02-25T18:01:06.208217+00:00"
+    },
+    {
+      "id": "6e97dc2f8922",
+      "text": "how to sell AI services when nobody knows who you are (7 easy methods)",
+      "author": "coreyganim",
+      "url": "https://x.com/coreyganim/status/2026666463675765106",
+      "engagement": 106,
+      "created_at": "Wed Feb 25 14:31:53 +0000 2026",
+      "source_type": "home_feed",
+      "fetched_at": "2026-02-25T18:01:06.208258+00:00"
+    },
+    {
+      "id": "5aab96c667f1",
+      "text": "Google cofounder, Sergey Brin, says he listens to the All-In Pod and @BenShapiroShow.\n\nPlease, nobody let the @jason hear this: the All-In egos cannot stand further inflation. \n\nBrin also drops a new AI product announcement:\n\nConversational Gemini Voice is getting a big upgrade. https://t.co/O0n8FGjScT",
+      "author": "compound248",
+      "url": "https://x.com/compound248/status/2000052033542627328",
+      "engagement": 92,
+      "created_at": "Sun Dec 14 03:55:38 +0000 2025",
+      "source_type": "search",
+      "fetched_at": "2026-02-25T18:01:06.208811+00:00"
+    },
+    {
+      "id": "30ca6c188e4a",
+      "text": "Anthropic is preparing a new announcement banner in the Claude web app and Console codenamed \"Try Parsley\" - the last similar banner added to both was \"Try Cilantro\" which was the codename for Opus 4.6 https://t.co/dVdF5uc44L",
+      "author": "btibor91",
+      "url": "https://x.com/btibor91/status/2022774022778556762",
+      "engagement": 86,
+      "created_at": "Sat Feb 14 20:44:43 +0000 2026",
+      "source_type": "search",
+      "fetched_at": "2026-02-25T18:01:06.208781+00:00"
+    },
+    {
+      "id": "fb98941dbcb8",
+      "text": "After playing with Cursor for hours after the announcement I can confirm that GPT-5.1 Codex Max Extra High Fast is the best coding model right now with Opus 4.5 close second",
+      "author": "amritwt",
+      "url": "https://x.com/amritwt/status/1996858871940633022",
+      "engagement": 32,
+      "created_at": "Fri Dec 05 08:27:09 +0000 2025",
+      "source_type": "search",
+      "fetched_at": "2026-02-25T18:01:06.208818+00:00"
     }
   ]
 }
