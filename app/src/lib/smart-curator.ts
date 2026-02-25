@@ -99,11 +99,19 @@ async function extractStories(
 ): Promise<RawExtractedStory[]> {
     let content = item.content || item.summary || '';
 
-    // X/Twitter items — let AI score them properly like everything else
-    // but don't try to scrape the URL (it's a tweet)
+    // X/Twitter items — extract as single story with engagement context
     if (item.source === 'x_twitter') {
-        // Use tweet text as content directly, skip URL scraping
-        content = item.content || item.summary || item.title || '';
+        const tweetText = item.content || item.summary || item.title || '';
+        // Clean the @handle prefix from title
+        const cleanTitle = (item.title || '').replace(/^@\w+:\s*/, '').substring(0, 120);
+        return [{
+            headline: cleanTitle || tweetText.split('\n')[0].substring(0, 120),
+            summary: tweetText.substring(0, 500),
+            category: 'news',
+            baseScore: 6, // Moderate base — let cross-source matching boost it
+            entities: [],
+            originalUrl: item.url,
+        }];
     }
 
     // INTELLIGENT UPGRADE:
@@ -229,9 +237,31 @@ export async function curateNews(
     });
 
     const QUOTA_PER_SOURCE = 2;
-    // Iterate through all sources to fill quota
+    const X_GUARANTEED_SLOTS = 5; // Guarantee X/Twitter gets at least 5 slots
+    
+    // Separate X items from RSS items
+    const xItems: NewsItem[] = [];
+    const rssItemsBySource = new Map<string, NewsItem[]>();
+    
     for (const [source, items] of itemsBySource) {
-        // Sort items by date (newest first) just in case
+        if (source.startsWith('X: @') || source === 'X/Twitter AI') {
+            xItems.push(...items);
+        } else {
+            rssItemsBySource.set(source, items);
+        }
+    }
+    
+    // Add guaranteed X items first (sorted by date, newest first)
+    xItems.sort((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime());
+    xItems.slice(0, X_GUARANTEED_SLOTS).forEach(item => {
+        if (!seenUrls.has(item.url)) {
+            candidateItems.push(item);
+            seenUrls.add(item.url);
+        }
+    });
+    
+    // Then quota round for RSS sources
+    for (const [source, items] of rssItemsBySource) {
         items.sort((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime());
 
         const quotaItems = items.slice(0, QUOTA_PER_SOURCE);
@@ -243,8 +273,8 @@ export async function curateNews(
         });
     }
 
-    // 2. Fill Round: If we have space left for the hard limit (e.g. 20), fill with newest ignoring source
-    const TOTAL_LIMIT = 20;
+    // 2. Fill Round: If we have space left for the hard limit, fill with newest ignoring source
+    const TOTAL_LIMIT = 25; // Increased from 20 to accommodate X items
     if (candidateItems.length < TOTAL_LIMIT) {
         const remainingNeeded = TOTAL_LIMIT - candidateItems.length;
         const remainingItems = allNews
