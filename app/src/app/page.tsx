@@ -237,6 +237,41 @@ export default function Home() {
     }
   }
 
+  function selectXItem(item: any) {
+    // Convert X item to CuratedStory format and add to stories + selection
+    const xStory: CuratedStory = {
+      id: `x_${item.id}`,
+      headline: item.title,
+      summary: item.summary || item.title,
+      category: 'x_twitter',
+      baseScore: 7,
+      finalScore: 7,
+      entities: [],
+      originalUrl: item.url,
+      sources: [`X: @${item.author}`],
+      publishedAt: item.publishedAt || new Date().toISOString(),
+      crossSourceCount: 1,
+      boosts: [],
+    };
+
+    // Add to stories if not already there
+    setStories(prev => {
+      if (prev.find(s => s.id === xStory.id)) return prev;
+      return [xStory, ...prev];
+    });
+
+    // Toggle selection
+    setSelectedIds(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(xStory.id)) {
+        newSet.delete(xStory.id);
+      } else {
+        newSet.add(xStory.id);
+      }
+      return newSet;
+    });
+  }
+
   function toggleSelect(story: CuratedStory) {
     setSelectedIds(prev => {
       const newSet = new Set(prev);
@@ -731,32 +766,49 @@ export default function Home() {
                       </Button>
                     </div>
                     <div className="grid grid-cols-2 gap-3">
-                      {xNews.slice(0, 6).map((item: any) => (
-                        <a
-                          key={item.id}
-                          href={item.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="group rounded-lg border border-white/5 bg-surface hover:bg-surface-elevated hover:border-white/10 p-4 transition-all duration-200 cursor-pointer"
-                        >
-                          <div className="flex items-start gap-3">
-                            <div className="shrink-0 mt-0.5">
-                              <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-xs font-bold text-white/60">
-                                𝕏
+                      {xNews.slice(0, 6).map((item: any) => {
+                        const isSelected = selectedIds.has(`x_${item.id}`);
+                        return (
+                          <div
+                            key={item.id}
+                            onClick={() => selectXItem(item)}
+                            className={`group rounded-lg border p-4 transition-all duration-200 cursor-pointer ${
+                              isSelected
+                                ? 'bg-amber-500/10 border-amber-500/30 shadow-glow-amber-sm'
+                                : 'border-white/5 bg-surface hover:bg-surface-elevated hover:border-white/10'
+                            }`}
+                          >
+                            <div className="flex items-start gap-3">
+                              <div className="shrink-0 mt-0.5">
+                                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
+                                  isSelected ? 'bg-amber-500 text-black' : 'bg-white/10 text-white/60'
+                                }`}>
+                                  {isSelected ? <Check className="w-4 h-4" /> : '𝕏'}
+                                </div>
                               </div>
+                              <div className="flex-1 min-w-0">
+                                <p className={`text-sm font-medium leading-snug line-clamp-2 transition-colors ${
+                                  isSelected ? 'text-amber-300' : 'text-white/80 group-hover:text-amber-300'
+                                }`}>
+                                  {item.title}
+                                </p>
+                                <p className="text-xs text-white/30 mt-1.5">
+                                  @{item.author}
+                                </p>
+                              </div>
+                              <a
+                                href={item.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                onClick={(e) => e.stopPropagation()}
+                                className="shrink-0 mt-1"
+                              >
+                                <ExternalLink className="w-3.5 h-3.5 text-white/20 hover:text-white/60 transition-colors" />
+                              </a>
                             </div>
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm font-medium text-white/80 leading-snug line-clamp-2 group-hover:text-amber-300 transition-colors">
-                                {item.title}
-                              </p>
-                              <p className="text-xs text-white/30 mt-1.5">
-                                @{item.author}
-                              </p>
-                            </div>
-                            <ExternalLink className="w-3.5 h-3.5 text-white/20 group-hover:text-white/40 shrink-0 mt-1" />
                           </div>
-                        </a>
-                      ))}
+                        );
+                      })}
                     </div>
                     {xNews.length > 6 && (
                       <button
