@@ -64,6 +64,9 @@ export default function Home() {
   const [xNews, setXNews] = useState<any[]>([]);
   const [xLoading, setXLoading] = useState(false);
 
+  // Research directions per story (lifted from ResearchPanel so cards can set it)
+  const [directions, setDirections] = useState<Record<string, string>>({});
+
   // Custom Feeds State
   const [customFeeds, setCustomFeeds] = useState<RSSFeed[]>([]);
   const [showSourcesDialog, setShowSourcesDialog] = useState(false);
@@ -817,9 +820,19 @@ export default function Home() {
                                 }`}>
                                   {item.title}
                                 </p>
-                                <p className="text-xs text-white/30 mt-1.5">
+                                <p className="text-xs text-white/30 mt-1">
                                   @{item.author}
                                 </p>
+                                {isSelected && (
+                                  <input
+                                    type="text"
+                                    placeholder="Research angle... (optional)"
+                                    value={directions[`x_${item.id}`] || ''}
+                                    onChange={(e) => setDirections(prev => ({ ...prev, [`x_${item.id}`]: e.target.value }))}
+                                    onClick={(e) => e.stopPropagation()}
+                                    className="w-full mt-1.5 text-xs bg-white/5 border border-white/10 rounded px-2 py-1 text-white/70 placeholder:text-white/20 focus:outline-none focus:border-amber-500/50"
+                                  />
+                                )}
                               </div>
                               <a
                                 href={item.url}
@@ -921,6 +934,17 @@ export default function Home() {
                                 </div>
                               )}
                             </div>
+
+                            {selectedIds.has(story.id) && (
+                              <input
+                                type="text"
+                                placeholder="📐 Add research angle... (e.g. 'focus on the Chinese perspective')"
+                                value={directions[story.id] || ''}
+                                onChange={(e) => setDirections(prev => ({ ...prev, [story.id]: e.target.value }))}
+                                onClick={(e) => e.stopPropagation()}
+                                className="w-full mt-2 text-xs bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-white/70 placeholder:text-white/25 focus:outline-none focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/20"
+                              />
+                            )}
                           </div>
 
                           {/* Action Area */}
@@ -1037,6 +1061,8 @@ export default function Home() {
                     <ResearchPanel
                       selectedStories={selectedItems}
                       apiKey={apiKey}
+                      directions={directions}
+                      onDirectionChange={(id, val) => setDirections(prev => ({ ...prev, [id]: val }))}
                       onReportGenerated={(report) => {
                         setResearchReports(prev => {
                           // Avoid duplicates

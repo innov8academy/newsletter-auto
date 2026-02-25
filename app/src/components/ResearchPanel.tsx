@@ -35,6 +35,8 @@ interface ResearchPanelProps {
     selectedStories: CuratedStory[];
     apiKey: string;
     onReportGenerated?: (report: ResearchReport) => void;
+    directions?: Record<string, string>;
+    onDirectionChange?: (storyId: string, direction: string) => void;
 }
 
 interface StoryResearchState {
@@ -46,12 +48,16 @@ interface StoryResearchState {
 // Default to Perplexity Deep Research for best quality + speed
 const DEFAULT_RESEARCH_MODEL: ResearchModelId = 'perplexity/sonar-deep-research';
 
-export function ResearchPanel({ selectedStories, apiKey, onReportGenerated }: ResearchPanelProps) {
+export function ResearchPanel({ selectedStories, apiKey, onReportGenerated, directions: propDirections, onDirectionChange }: ResearchPanelProps) {
     const [researchStates, setResearchStates] = useState<Record<string, StoryResearchState>>({});
     const [activeReportId, setActiveReportId] = useState<string | null>(null);
     const [isResearchingAll, setIsResearchingAll] = useState(false);
     const [selectedModel, setSelectedModel] = useState<ResearchModelId>(DEFAULT_RESEARCH_MODEL);
-    const [directions, setDirections] = useState<Record<string, string>>({});
+    const [localDirections, setLocalDirections] = useState<Record<string, string>>({});
+    const directions = propDirections || localDirections;
+    const setDirections = onDirectionChange 
+        ? (updater: any) => { /* handled via props */ }
+        : (updater: any) => setLocalDirections(updater);
 
     async function researchStory(story: CuratedStory) {
         setResearchStates(prev => ({
@@ -232,7 +238,7 @@ export function ResearchPanel({ selectedStories, apiKey, onReportGenerated }: Re
                                             type="text"
                                             placeholder="Add research angle... (optional)"
                                             value={directions[story.id] || ''}
-                                            onChange={(e) => setDirections(prev => ({ ...prev, [story.id]: e.target.value }))}
+                                            onChange={(e) => onDirectionChange ? onDirectionChange(story.id, e.target.value) : setLocalDirections(prev => ({ ...prev, [story.id]: e.target.value }))}
                                             onClick={(e) => e.stopPropagation()}
                                             className="w-full mt-1.5 text-xs bg-white/5 border border-white/10 rounded px-2 py-1 text-white/70 placeholder:text-white/20 focus:outline-none focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/20"
                                         />
