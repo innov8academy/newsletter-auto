@@ -176,6 +176,7 @@ export const SCORING_CONFIG = {
     },
     recencyBoostHours: 12, // Stories newer than this get +1
     tierWeight: {
+        0: 1.2,  // X/Twitter (real-time, high-engagement)
         1: 1.0,  // Newsletters
         2: 0.9,  // News sites
         3: 1.1,  // Official blogs (important)

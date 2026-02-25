@@ -202,9 +202,44 @@ function cleanText(text: string): string {
         .trim();
 }
 
+// Fetch AI news from X/Twitter (via pre-cached gist)
+const X_NEWS_GIST_URL = process.env.X_NEWS_URL || 'https://gist.githubusercontent.com/innov8academy/58bd9d2317950e97c41d561081546c05/raw/latest.json';
+
+async function fetchXNews(): Promise<NewsItem[]> {
+    try {
+        const response = await fetch(X_NEWS_GIST_URL, {
+            next: { revalidate: 600 } // Cache for 10 minutes
+        });
+        if (!response.ok) return [];
+        
+        const data = await response.json();
+        const items = data.items || [];
+        
+        return items.slice(0, 30).map((tweet: any) => ({
+            id: `x_${tweet.id}`,
+            title: tweet.text.split('\n')[0].substring(0, 120), // First line as title
+            url: tweet.url,
+            source: 'x_twitter',
+            sourceName: `X: @${tweet.author}`,
+            publishedAt: tweet.created_at || tweet.fetched_at || new Date().toISOString(),
+            summary: tweet.text.substring(0, 500),
+            imageUrl: '',
+            author: tweet.author,
+            content: tweet.text,
+        }));
+    } catch (error) {
+        console.error('[X News] Error fetching:', error);
+        return [];
+    }
+}
+
 // Fetch news from all configured feeds
 export async function fetchAllNews(feeds: RSSFeed[]): Promise<NewsItem[]> {
     const allPromises = feeds.map(feed => parseRSSFeed(feed));
+    
+    // Also fetch X/Twitter news in parallel
+    allPromises.push(fetchXNews());
+    
     const results = await Promise.all(allPromises);
 
     const allNews = results.flat();
