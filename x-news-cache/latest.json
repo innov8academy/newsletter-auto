@@ -1,26 +1,26 @@
 {
-  "fetched_at": "2026-02-25T18:23:22.794891+00:00",
-  "count": 23,
+  "fetched_at": "2026-02-25T18:27:33.143123+00:00",
+  "count": 38,
   "items": [
     {
       "id": "d88eedc75d5c",
       "text": "Anthropic Launches Remote Control for Claude Code",
       "author": "X_Trending",
       "url": "",
-      "engagement": 9200,
+      "engagement": 9500,
       "created_at": "22 hours ago",
       "source_type": "trending",
-      "fetched_at": "2026-02-25T18:23:22.794168+00:00"
+      "fetched_at": "2026-02-25T18:27:33.142187+00:00"
     },
     {
       "id": "e52be59380a0",
       "text": "Cursor Launches Autonomous Cloud Agents for Full Software Development",
       "author": "X_Trending",
       "url": "",
-      "engagement": 5800,
+      "engagement": 5900,
       "created_at": "23 hours ago",
       "source_type": "trending",
-      "fetched_at": "2026-02-25T18:23:22.794164+00:00"
+      "fetched_at": "2026-02-25T18:27:33.142183+00:00"
     },
     {
       "id": "1ace39212f7d",
@@ -30,7 +30,17 @@
       "engagement": 4972,
       "created_at": "Fri Feb 20 12:41:48 +0000 2026",
       "source_type": "account",
-      "fetched_at": "2026-02-25T18:23:22.794457+00:00"
+      "fetched_at": "2026-02-25T18:27:33.142493+00:00"
+    },
+    {
+      "id": "dc8ad3515c4a",
+      "text": "Big/bad news for consumers. Google is out today with an announcement of how they plan to integrate shopping into their AI offerings including search and Gemini. The plan includes \u201cpersonalized upselling.\u201d I.e. Analyzing your chat data and using it to overcharge you. 1/2 https://t.co/AqDYxSgjk5",
+      "author": "owenslindsay1",
+      "url": "https://x.com/owenslindsay1/status/2010459893460066375",
+      "engagement": 3116,
+      "created_at": "Sun Jan 11 21:12:45 +0000 2026",
+      "source_type": "search",
+      "fetched_at": "2026-02-25T18:27:33.142628+00:00"
     },
     {
       "id": "d6c46fb97849",
@@ -40,7 +50,7 @@
       "engagement": 2588,
       "created_at": "Wed Feb 18 18:46:44 +0000 2026",
       "source_type": "account",
-      "fetched_at": "2026-02-25T18:23:22.794381+00:00"
+      "fetched_at": "2026-02-25T18:27:33.142407+00:00"
     },
     {
       "id": "0003e320465a",
@@ -50,27 +60,27 @@
       "engagement": 2000,
       "created_at": "6 hours ago",
       "source_type": "trending",
-      "fetched_at": "2026-02-25T18:23:22.794166+00:00"
+      "fetched_at": "2026-02-25T18:27:33.142185+00:00"
     },
     {
-      "id": "b4536e37708b",
-      "text": "Introducing Seedance 2.0: Next-Gen Ad Creation in Zeely\n\n\ud83d\udd34 Red pill: paying agencies\n\ud83d\udd35 Blue pill: building ads with AI\n\nFor the next 12 hours: retweet, like, and comment \u201cZEELY\u201d \u2014 we\u2019ll DM you 1,000 free credits. https://t.co/5P6BIVSw4j",
-      "author": "zeely_ai",
-      "url": "https://x.com/zeely_ai/status/2026303230573953454",
-      "engagement": 1390,
-      "created_at": "Tue Feb 24 14:28:31 +0000 2026",
-      "source_type": "home_feed",
-      "fetched_at": "2026-02-25T18:23:22.794031+00:00"
+      "id": "6050c41fef6c",
+      "text": "Building on last week\u2019s announcement of practice SATs in Gemini, you can now also take full-length mock JEE Main tests in Gemini at no cost.",
+      "author": "GeminiApp",
+      "url": "https://x.com/GeminiApp/status/2016566698305081386",
+      "engagement": 910,
+      "created_at": "Wed Jan 28 17:39:01 +0000 2026",
+      "source_type": "search",
+      "fetched_at": "2026-02-25T18:27:33.142616+00:00"
     },
     {
       "id": "c136bef89046",
       "text": "Claude AI Builds Anthropic's Plugins Feature Over One Weekend",
       "author": "X_Trending",
       "url": "",
-      "engagement": 874,
+      "engagement": 878,
       "created_at": "16 hours ago",
       "source_type": "trending",
-      "fetched_at": "2026-02-25T18:23:22.794161+00:00"
+      "fetched_at": "2026-02-25T18:27:33.142181+00:00"
     },
     {
       "id": "0872d2c59047",
@@ -80,17 +90,27 @@
       "engagement": 661,
       "created_at": "22 hours ago",
       "source_type": "trending",
-      "fetched_at": "2026-02-25T18:23:22.794159+00:00"
+      "fetched_at": "2026-02-25T18:27:33.142178+00:00"
     },
     {
-      "id": "d9134099553e",
-      "text": "Hey @elonmusk, if you hate Anthropic so much, make a Grok CLI and I\u2019ll cancel my Anthropic subscription today",
-      "author": "UziObi",
-      "url": "https://x.com/UziObi/status/2026399091450671113",
-      "engagement": 452,
-      "created_at": "Tue Feb 24 20:49:26 +0000 2026",
+      "id": "068944eefba1",
+      "text": "Can we talk about how insane Gemini 3.1 Pro is at webgl https://t.co/brXhfd9Wy7",
+      "author": "MengTo",
+      "url": "https://x.com/MengTo/status/2026189291085607181",
+      "engagement": 512,
+      "created_at": "Tue Feb 24 06:55:46 +0000 2026",
       "source_type": "home_feed",
-      "fetched_at": "2026-02-25T18:23:22.794076+00:00"
+      "fetched_at": "2026-02-25T18:27:33.142058+00:00"
+    },
+    {
+      "id": "a6a646a6638b",
+      "text": "So Google has just released its own agent builder?!\n\nYou can now add the agent block in Google Opal and \"program it\" in plain English.\n\nAnd it has natively:\n\n- Tool call (with Nano Banana, Veo, web search...)\n- Memory to save infos between sessions\n- Conditional logic\n\nProbably the easiest way to build AI agents I've seen so far.",
+      "author": "itsPaulAi",
+      "url": "https://x.com/itsPaulAi/status/2026403523701641514",
+      "engagement": 492,
+      "created_at": "Tue Feb 24 21:07:03 +0000 2026",
+      "source_type": "home_feed",
+      "fetched_at": "2026-02-25T18:27:33.141995+00:00"
     },
     {
       "id": "cc9bd61dfffa",
@@ -100,7 +120,17 @@
       "engagement": 409,
       "created_at": "23 hours ago",
       "source_type": "trending",
-      "fetched_at": "2026-02-25T18:23:22.794151+00:00"
+      "fetched_at": "2026-02-25T18:27:33.142171+00:00"
+    },
+    {
+      "id": "3a849f4608ce",
+      "text": ".@trailofbits released our first batch of Claude Skills. Official announcement coming later.\nhttps://t.co/vI4amorZrc",
+      "author": "dguido",
+      "url": "https://x.com/dguido/status/2011541318229533063",
+      "engagement": 408,
+      "created_at": "Wed Jan 14 20:49:57 +0000 2026",
+      "source_type": "search",
+      "fetched_at": "2026-02-25T18:27:33.142624+00:00"
     },
     {
       "id": "4b2040bf31c7",
@@ -110,7 +140,17 @@
       "engagement": 376,
       "created_at": "Thu Feb 19 19:54:19 +0000 2026",
       "source_type": "account",
-      "fetched_at": "2026-02-25T18:23:22.794335+00:00"
+      "fetched_at": "2026-02-25T18:27:33.142360+00:00"
+    },
+    {
+      "id": "441623e471ff",
+      "text": "New in Cowork: scheduled tasks.\n\nClaude can now complete recurring tasks at specific times automatically: a morning brief, weekly spreadsheet updates, Friday team presentations. https://t.co/7ucKZbAVip",
+      "author": "claudeai",
+      "url": "https://x.com/claudeai/status/2026720870631354429",
+      "engagement": 304,
+      "created_at": "Wed Feb 25 18:08:04 +0000 2026",
+      "source_type": "home_feed",
+      "fetched_at": "2026-02-25T18:27:33.141927+00:00"
     },
     {
       "id": "6a8179444465",
@@ -120,17 +160,17 @@
       "engagement": 276,
       "created_at": "Tue Feb 24 19:05:13 +0000 2026",
       "source_type": "home_feed",
-      "fetched_at": "2026-02-25T18:23:22.794054+00:00"
+      "fetched_at": "2026-02-25T18:27:33.142020+00:00"
     },
     {
-      "id": "441623e471ff",
-      "text": "New in Cowork: scheduled tasks.\n\nClaude can now complete recurring tasks at specific times automatically: a morning brief, weekly spreadsheet updates, Friday team presentations. https://t.co/7ucKZbAVip",
-      "author": "claudeai",
-      "url": "https://x.com/claudeai/status/2026720870631354429",
-      "engagement": 256,
-      "created_at": "Wed Feb 25 18:08:04 +0000 2026",
+      "id": "9c08c4ef49fb",
+      "text": "\"Learning to program was so obviously the right thing in the recent past. Now it is not.\"\n\n~ Sam Altman on skill to survive the AI era.\n\nNow you need High agency, soft skills, being v. good at idea generation, adaptable to a rapidly changing world\nhttps://t.co/TGC3AL8oS5",
+      "author": "rohanpaul_ai",
+      "url": "https://x.com/rohanpaul_ai/status/2026445033675612581",
+      "engagement": 272,
+      "created_at": "Tue Feb 24 23:52:00 +0000 2026",
       "source_type": "home_feed",
-      "fetched_at": "2026-02-25T18:23:22.793916+00:00"
+      "fetched_at": "2026-02-25T18:27:33.142032+00:00"
     },
     {
       "id": "2d8dc8d1d1e3",
@@ -140,17 +180,27 @@
       "engagement": 226,
       "created_at": "Tue Feb 24 20:47:01 +0000 2026",
       "source_type": "home_feed",
-      "fetched_at": "2026-02-25T18:23:22.794012+00:00"
+      "fetched_at": "2026-02-25T18:27:33.142012+00:00"
+    },
+    {
+      "id": "3e5d1fa4a2d2",
+      "text": "This is a massive $GOOGL announcement when you really think about it because Gemini is starting to look like the checkout infrastructure of the AI economy.\n\nGoogle is stitching together a universal commerce layer across $SHOP, $ETSY, $PYPL, $TGT & $WMT where AI agents actually complete transactions.\n\nRetail token usage on GCP is already ~100T per month  & that\u2019s before agentic AI even takes off.",
+      "author": "StockSavvyShay",
+      "url": "https://x.com/StockSavvyShay/status/2010401793881354617",
+      "engagement": 214,
+      "created_at": "Sun Jan 11 17:21:53 +0000 2026",
+      "source_type": "search",
+      "fetched_at": "2026-02-25T18:27:33.142631+00:00"
     },
     {
       "id": "91abf33405a5",
       "text": "Anthropic has acquired @Vercept_ai to advance Claude\u2019s computer use capabilities. \n\nRead more: https://t.co/YVz1zh7Pqq",
       "author": "AnthropicAI",
       "url": "https://x.com/AnthropicAI/status/2026705792033026465",
-      "engagement": 206,
+      "engagement": 210,
       "created_at": "Wed Feb 25 17:08:09 +0000 2026",
       "source_type": "account",
-      "fetched_at": "2026-02-25T18:23:22.794258+00:00"
+      "fetched_at": "2026-02-25T18:27:33.142278+00:00"
     },
     {
       "id": "ef4164fe02af",
@@ -160,7 +210,7 @@
       "engagement": 204,
       "created_at": "Tue Feb 17 19:17:47 +0000 2026",
       "source_type": "account",
-      "fetched_at": "2026-02-25T18:23:22.794461+00:00"
+      "fetched_at": "2026-02-25T18:27:33.142497+00:00"
     },
     {
       "id": "c365ee9f0cf5",
@@ -170,27 +220,17 @@
       "engagement": 182,
       "created_at": "Tue Feb 24 21:43:31 +0000 2026",
       "source_type": "account",
-      "fetched_at": "2026-02-25T18:23:22.794377+00:00"
-    },
-    {
-      "id": "e46b238151e4",
-      "text": "BREAKING \ud83d\udea8: Inception has launched Mercury 2, the first reasoning diffusion LLM with 5x the performance of top-speed-optimised models. \n\nEarly access OPT-IN is open \ud83d\udc40\n\nFree public testing available too \ud83d\udc40 https://t.co/wD4B1NhfVt",
-      "author": "testingcatalog",
-      "url": "https://x.com/testingcatalog/status/2026375627373240467",
-      "engagement": 172,
-      "created_at": "Tue Feb 24 19:16:12 +0000 2026",
-      "source_type": "home_feed",
-      "fetched_at": "2026-02-25T18:23:22.794026+00:00"
+      "fetched_at": "2026-02-25T18:27:33.142402+00:00"
     },
     {
       "id": "6068fa72be6d",
       "text": "how to build an ai native vertical saas in the claude cowork era:\n\n1. pick a sub-niche inside a large, profitable market\n2. map one recurring workflow that drives revenue or saves time\n3. write the workflow step-by-step like you\u2019re training an intern\n4. separate mechanical steps from judgment calls\n5. connect claude to the actual stack: crm, sheets, inbox, slides, contracts\n6. remove exports and copy-paste from the process\n7. collapse raw data \u2192 reasoning \u2192 finished output into one session\n8. st",
       "author": "gregisenberg",
       "url": "https://x.com/gregisenberg/status/2026665189765005433",
-      "engagement": 172,
+      "engagement": 174,
       "created_at": "Wed Feb 25 14:26:49 +0000 2026",
       "source_type": "home_feed",
-      "fetched_at": "2026-02-25T18:23:22.794042+00:00"
+      "fetched_at": "2026-02-25T18:27:33.142016+00:00"
     },
     {
       "id": "178ddcc6485d",
@@ -200,17 +240,67 @@
       "engagement": 158,
       "created_at": "Wed Feb 25 09:45:27 +0000 2026",
       "source_type": "home_feed",
-      "fetched_at": "2026-02-25T18:23:22.793980+00:00"
+      "fetched_at": "2026-02-25T18:27:33.141999+00:00"
+    },
+    {
+      "id": "cc69ab2bf66a",
+      "text": "BREAKING \ud83d\udea8: Google is planning to release Nano Banana 2 Flash in the coming weeks, as a new \u201cMayo\u201d announcement has been added to Gemini web. \n\nAccording to tests, Nano Banana 2 Flash delivers almost the same quality as Pro at a lower price. \n\nMayo or Ketchup? \ud83c\udf2d https://t.co/R1mKyJ2jIA",
+      "author": "testingcatalog",
+      "url": "https://x.com/testingcatalog/status/1997665407499489465",
+      "engagement": 158,
+      "created_at": "Sun Dec 07 13:52:02 +0000 2025",
+      "source_type": "search",
+      "fetched_at": "2026-02-25T18:27:33.142647+00:00"
+    },
+    {
+      "id": "9c6464900327",
+      "text": "Gemini 3 Flash is now available in your terminal! \u26a1\ufe0f\n\nFast, efficient, and capable!\n\n \u276f npm install -g @google/gemini-cli@latest\n\n\ud83d\udc47Read the announcement blog below https://t.co/episoTMa57",
+      "author": "geminicli",
+      "url": "https://x.com/geminicli/status/2001337130640118164",
+      "engagement": 148,
+      "created_at": "Wed Dec 17 17:02:09 +0000 2025",
+      "source_type": "search",
+      "fetched_at": "2026-02-25T18:27:33.142639+00:00"
     },
     {
       "id": "d597ee627b2f",
       "text": "Aravind and team absolutely cooked with this one. \n\nThis looks insane!!\n\nA single system that unifies files, tools, memory, and models, all working together for you. \n\nAlso, love the name - Perplexity Computer.\n\nCongrats! Team :) https://t.co/qIfgyhTd3k",
       "author": "VaibhavSisinty",
       "url": "https://x.com/VaibhavSisinty/status/2026700842884370730",
-      "engagement": 118,
+      "engagement": 120,
       "created_at": "Wed Feb 25 16:48:29 +0000 2026",
       "source_type": "home_feed",
-      "fetched_at": "2026-02-25T18:23:22.793976+00:00"
+      "fetched_at": "2026-02-25T18:27:33.141991+00:00"
+    },
+    {
+      "id": "945149724a0c",
+      "text": "67 real production bugs. 10 different AI tools, same PRs, same standard.\n\nEntelligence benchmarked every major AI code reviewer on bugs that already shipped and broke things.\n\nThey put 10 tools through race conditions, security vulnerabilities, breaking API changes, and logic errors across 5 real open-source repos (Cal[.]com, Sentry, Discourse, Keycloak, Grafana).\n\nThe gap between top and bottom is not small.\n\nWhat separated them was not raw model power. It was whether the tool understood code r",
+      "author": "ai_for_success",
+      "url": "https://x.com/ai_for_success/status/2026365995712131115",
+      "engagement": 114,
+      "created_at": "Tue Feb 24 18:37:56 +0000 2026",
+      "source_type": "home_feed",
+      "fetched_at": "2026-02-25T18:27:33.141975+00:00"
+    },
+    {
+      "id": "45c7ef237204",
+      "text": "This looks like a product announcement. It\u2019s actually a distribution masterclass.\n\nClaude is now inside Excel two different ways. Anthropic\u2019s own add-in (this announcement) AND through Microsoft Copilot, where Claude powers Agent Mode for spreadsheets. Microsoft pays AWS for that access despite AWS being a direct cloud competitor.\n\nThat happened because Microsoft\u2019s internal testing showed Claude outperforms OpenAI on Excel financial functions. GitHub Copilot users now \u201cprimarily rely on Claude S",
+      "author": "aakashgupta",
+      "url": "https://x.com/aakashgupta/status/2014915425465995329",
+      "engagement": 112,
+      "created_at": "Sat Jan 24 04:17:27 +0000 2026",
+      "source_type": "search",
+      "fetched_at": "2026-02-25T18:27:33.142620+00:00"
+    },
+    {
+      "id": "b9f9bf2aa545",
+      "text": "We finally built the magical AI video machine, and we\u2019re using it to\u2026recreate everything, but with cats https://t.co/pvHVZxJ5kY",
+      "author": "venturetwins",
+      "url": "https://x.com/venturetwins/status/2026510438171832750",
+      "engagement": 110,
+      "created_at": "Wed Feb 25 04:11:53 +0000 2026",
+      "source_type": "home_feed",
+      "fetched_at": "2026-02-25T18:27:33.142096+00:00"
     },
     {
       "id": "169f61d84792",
@@ -220,17 +310,77 @@
       "engagement": 108,
       "created_at": "Fri Feb 20 19:38:51 +0000 2026",
       "source_type": "account",
-      "fetched_at": "2026-02-25T18:23:22.794331+00:00"
+      "fetched_at": "2026-02-25T18:27:33.142356+00:00"
     },
     {
-      "id": "362cbb66bb70",
-      "text": "Hey @grok, which of these AI platforms is the most private and secure? https://t.co/sxa2erODuE",
-      "author": "askOkara",
-      "url": "https://x.com/askOkara/status/2026532204105576565",
-      "engagement": 106,
-      "created_at": "Wed Feb 25 05:38:23 +0000 2026",
+      "id": "34db5d417fbf",
+      "text": "My v4 framework \u201cbait &amp; switch\u201d method \ud83d\udc47\ud83c\udffb\n\nRelevant hook -&gt; slick ad placement \n\nAll 100% AI UGC. \n\nThis ad is clearly satire and obviously a joke but it shows how well the framework engine works / can work for a legitimate product (with compliance) https://t.co/sFuEEQSU0Q",
+      "author": "frankyecom",
+      "url": "https://x.com/frankyecom/status/2026140299769282560",
+      "engagement": 104,
+      "created_at": "Tue Feb 24 03:41:05 +0000 2026",
       "source_type": "home_feed",
-      "fetched_at": "2026-02-25T18:23:22.794008+00:00"
+      "fetched_at": "2026-02-25T18:27:33.142047+00:00"
+    },
+    {
+      "id": "2d2faa5e2011",
+      "text": "Claude Skills are a cheat code for DTC creative teams \ud83e\udd2f\n\nOne setup, reusable forever.\n\nClaude automatically follows your exact creative process \u2014 briefs, hooks, ad copy, research \u2014 without you explaining anything twice.\n\nPerfect for e-comm brands and agencies who are using Claude for creative work but wasting time re-explaining context every single conversation.\n\nHere's the problem:\n\nYou open Claude: you paste in your brand guidelines, explain your brief format, write the copy, you close the cha",
+      "author": "mikefutia",
+      "url": "https://x.com/mikefutia/status/2026700490856345919",
+      "engagement": 102,
+      "created_at": "Wed Feb 25 16:47:05 +0000 2026",
+      "source_type": "home_feed",
+      "fetched_at": "2026-02-25T18:27:33.141979+00:00"
+    },
+    {
+      "id": "a56eac9f2baf",
+      "text": "Anthropic is rolling out scheduled tasks on Claude Cowork for macOS and Windows! https://t.co/5N2VHvjoxe",
+      "author": "testingcatalog",
+      "url": "https://x.com/testingcatalog/status/2026725217087689086",
+      "engagement": 100,
+      "created_at": "Wed Feb 25 18:25:21 +0000 2026",
+      "source_type": "home_feed",
+      "fetched_at": "2026-02-25T18:27:33.141963+00:00"
+    },
+    {
+      "id": "721117c61397",
+      "text": "wtf is going on with claude code?!\n\neven to just open it and say 'hi'\nit'll use up ~30k tokens (system prompts, random bs, etc.)\ni hope to god they're cached!\n\n$0.27 per startup or at least per new update i bet https://t.co/WXZpOJVSRZ",
+      "author": "zsakib_",
+      "url": "https://x.com/zsakib_/status/2026667176610959723",
+      "engagement": 100,
+      "created_at": "Wed Feb 25 14:34:43 +0000 2026",
+      "source_type": "home_feed",
+      "fetched_at": "2026-02-25T18:27:33.142089+00:00"
+    },
+    {
+      "id": "5aab96c667f1",
+      "text": "Google cofounder, Sergey Brin, says he listens to the All-In Pod and @BenShapiroShow.\n\nPlease, nobody let the @jason hear this: the All-In egos cannot stand further inflation. \n\nBrin also drops a new AI product announcement:\n\nConversational Gemini Voice is getting a big upgrade. https://t.co/O0n8FGjScT",
+      "author": "compound248",
+      "url": "https://x.com/compound248/status/2000052033542627328",
+      "engagement": 92,
+      "created_at": "Sun Dec 14 03:55:38 +0000 2025",
+      "source_type": "search",
+      "fetched_at": "2026-02-25T18:27:33.142643+00:00"
+    },
+    {
+      "id": "30ca6c188e4a",
+      "text": "Anthropic is preparing a new announcement banner in the Claude web app and Console codenamed \"Try Parsley\" - the last similar banner added to both was \"Try Cilantro\" which was the codename for Opus 4.6 https://t.co/dVdF5uc44L",
+      "author": "btibor91",
+      "url": "https://x.com/btibor91/status/2022774022778556762",
+      "engagement": 86,
+      "created_at": "Sat Feb 14 20:44:43 +0000 2026",
+      "source_type": "search",
+      "fetched_at": "2026-02-25T18:27:33.142612+00:00"
+    },
+    {
+      "id": "fb98941dbcb8",
+      "text": "After playing with Cursor for hours after the announcement I can confirm that GPT-5.1 Codex Max Extra High Fast is the best coding model right now with Opus 4.5 close second",
+      "author": "amritwt",
+      "url": "https://x.com/amritwt/status/1996858871940633022",
+      "engagement": 32,
+      "created_at": "Fri Dec 05 08:27:09 +0000 2025",
+      "source_type": "search",
+      "fetched_at": "2026-02-25T18:27:33.142651+00:00"
     }
   ]
 }

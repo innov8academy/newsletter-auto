@@ -51,6 +51,7 @@ export function ResearchPanel({ selectedStories, apiKey, onReportGenerated }: Re
     const [activeReportId, setActiveReportId] = useState<string | null>(null);
     const [isResearchingAll, setIsResearchingAll] = useState(false);
     const [selectedModel, setSelectedModel] = useState<ResearchModelId>(DEFAULT_RESEARCH_MODEL);
+    const [directions, setDirections] = useState<Record<string, string>>({});
 
     async function researchStory(story: CuratedStory) {
         setResearchStates(prev => ({
@@ -62,7 +63,7 @@ export function ResearchPanel({ selectedStories, apiKey, onReportGenerated }: Re
             const response = await fetch('/api/research', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ story, apiKey, modelId: selectedModel }),
+                body: JSON.stringify({ story, apiKey, modelId: selectedModel, direction: directions[story.id] || undefined }),
             });
 
             // Handle non-JSON responses gracefully
@@ -226,6 +227,21 @@ export function ResearchPanel({ selectedStories, apiKey, onReportGenerated }: Re
                                     <p className={`text-sm line-clamp-2 ${isActive ? 'text-white' : 'text-white/70'}`}>
                                         {story.headline}
                                     </p>
+                                    {state.status === 'idle' && (
+                                        <input
+                                            type="text"
+                                            placeholder="Add research angle... (optional)"
+                                            value={directions[story.id] || ''}
+                                            onChange={(e) => setDirections(prev => ({ ...prev, [story.id]: e.target.value }))}
+                                            onClick={(e) => e.stopPropagation()}
+                                            className="w-full mt-1.5 text-xs bg-white/5 border border-white/10 rounded px-2 py-1 text-white/70 placeholder:text-white/20 focus:outline-none focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/20"
+                                        />
+                                    )}
+                                    {directions[story.id] && state.status !== 'idle' && (
+                                        <p className="text-xs text-amber-400/60 mt-1 truncate" title={directions[story.id]}>
+                                            📐 {directions[story.id]}
+                                        </p>
+                                    )}
                                     {state.status === 'error' && (
                                         <p className="text-xs text-coral-400 mt-1 truncate" title={state.error}>{state.error}</p>
                                     )}

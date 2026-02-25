@@ -46,7 +46,8 @@ interface ResearchResult {
 export async function generateResearchReport(
     story: CuratedStory,
     apiKey: string,
-    modelId?: ResearchModelId
+    modelId?: ResearchModelId,
+    direction?: string
 ): Promise<ResearchResult> {
     console.log('[generateResearchReport] Called with:', {
         storyId: story.id,
@@ -93,6 +94,8 @@ export async function generateResearchReport(
 **Original Sources:** ${story.sources.join(', ')}
 
 ${story.originalUrl ? `**Source URL:** ${story.originalUrl}` : ''}
+
+${direction ? `**RESEARCH DIRECTION:** ${direction}\n\nIMPORTANT: Focus your research specifically on the angle/direction above. Find supporting evidence, counter-arguments, and sources that relate to this specific perspective.` : ''}
 
 ${isPerplexity ? 'Extract the key insights and thinking. Keep it under 800 words.' : isKimi ? 'Provide comprehensive research and analysis. Use your deep reasoning capabilities to uncover insights and connections. Be thorough but focused.' : 'Write this up for the newsletter. Make it engaging and newsletter-ready. Focus on what\'s actually interesting about this story.'}`;
 

@@ -115,15 +115,29 @@ export default function Home() {
         const data = await res.json();
         const newItems = data.items || [];
         
+        // Always deduplicate by normalized title
+        const normalize = (t: string) => t?.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 60) || '';
+        
         if (refresh) {
-          // Merge: deduplicate by title (Supabase generates new UUIDs each refresh)
           setXNews(prev => {
-            const existingTitles = new Set(prev.map((i: any) => i.title?.toLowerCase().trim()));
-            const fresh = newItems.filter((i: any) => !existingTitles.has(i.title?.toLowerCase().trim()));
-            return [...fresh, ...prev];
+            const combined = [...newItems, ...prev];
+            const seen = new Set<string>();
+            return combined.filter((i: any) => {
+              const key = normalize(i.title);
+              if (seen.has(key)) return false;
+              seen.add(key);
+              return true;
+            });
           });
         } else {
-          setXNews(newItems);
+          // Initial load — deduplicate within the batch
+          const seen = new Set<string>();
+          setXNews(newItems.filter((i: any) => {
+            const key = normalize(i.title);
+            if (seen.has(key)) return false;
+            seen.add(key);
+            return true;
+          }));
         }
       }
     } catch (e) {

@@ -22,10 +22,11 @@ export async function POST(request: NextRequest) {
             modelId: body.modelId
         });
 
-        const { story, apiKey: clientApiKey, modelId } = body as {
+        const { story, apiKey: clientApiKey, modelId, direction } = body as {
             story: CuratedStory;
             apiKey: string;
             modelId?: ResearchModelId;
+            direction?: string;
         };
 
         const apiKey = clientApiKey || process.env.OPENROUTER_API_KEY || '';
@@ -52,7 +53,7 @@ export async function POST(request: NextRequest) {
         const startTime = Date.now();
 
         console.log('[Research API] Calling generateResearchReport...');
-        const result = await generateResearchReport(story, apiKey, modelId);
+        const result = await generateResearchReport(story, apiKey, modelId, direction);
         console.log('[Research API] generateResearchReport returned:', { success: result.success, hasReport: !!result.report, error: result.error });
 
         const duration = ((Date.now() - startTime) / 1000).toFixed(1);
