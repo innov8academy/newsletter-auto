@@ -74,6 +74,8 @@ function normalizeItems(data) {
     return [];
 }
 
+const FETCHER_SCRIPT = '/home/ubuntu/clawd/projects/newsletter-auto/x-news-fetcher.sh';
+
 async function fetchFreshXNews() {
     if (isFetching) {
         log('Already fetching, returning cached...');
@@ -81,7 +83,24 @@ async function fetchFreshXNews() {
     }
 
     isFetching = true;
-    log('Starting fresh X news fetch...');
+    log('Running full fetcher script (Alex cookies + Supabase push)...');
+
+    try {
+        // Run the full fetcher script which uses Alex's cookies and pushes to Supabase
+        execSync(`bash ${FETCHER_SCRIPT}`, { timeout: 120000, encoding: 'utf-8' });
+        log('Fetcher script completed');
+        return getCached();
+    } catch (e) {
+        log(`Fetcher script error: ${e.message}`);
+        return getCached();
+    } finally {
+        isFetching = false;
+    }
+}
+
+async function fetchFreshXNews_OLD() {
+    // OLD: kept for reference
+    let _unused = true;
     const allItems = [];
 
     try {

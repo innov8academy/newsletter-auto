@@ -107,13 +107,24 @@ export default function Home() {
     fetchXNews();
   }, []);
 
-  async function fetchXNews() {
+  async function fetchXNews(refresh = false) {
     setXLoading(true);
     try {
-      const res = await fetch('/api/x-news');
+      const res = await fetch('/api/x-news', refresh ? { method: 'POST' } : {});
       if (res.ok) {
         const data = await res.json();
-        setXNews(data.items || []);
+        const newItems = data.items || [];
+        
+        if (refresh) {
+          // Merge: keep existing items, add new ones that aren't already shown
+          setXNews(prev => {
+            const existingIds = new Set(prev.map((i: any) => i.id));
+            const fresh = newItems.filter((i: any) => !existingIds.has(i.id));
+            return [...fresh, ...prev];
+          });
+        } else {
+          setXNews(newItems);
+        }
       }
     } catch (e) {
       console.error('Failed to fetch X news', e);
@@ -758,7 +769,7 @@ export default function Home() {
                         size="sm"
                         variant="ghost"
                         className="ml-auto text-white/30 hover:text-white text-xs h-7"
-                        onClick={fetchXNews}
+                        onClick={() => fetchXNews(true)}
                         disabled={xLoading}
                       >
                         <RefreshCw className={`w-3 h-3 mr-1 ${xLoading ? 'animate-spin' : ''}`} />
