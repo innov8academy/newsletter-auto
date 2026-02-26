@@ -23,29 +23,25 @@ OPENROUTER_API_KEY="${OPENROUTER_API_KEY:-$(grep OPENROUTER_API_KEY /home/ubuntu
 HISTORY_FILE="$OUTPUT_DIR/shown_history.json"
 
 mkdir -p "$OUTPUT_DIR"
-echo "[$(date -u)] Starting X news fetch (using Alex's AI-primed feed)..."
+echo "[$(date -u)] Starting X news fetch..."
 
-# LAYER 0: Alex's "For You" feed (best signal — algorithm-curated for AI)
-echo "[Layer 0] Fetching Alex's For You feed (50 items)..."
-$BIRD $ALEX_AUTH home -n 50 --json > "$TEMP_DIR/home_feed.json" 2>/dev/null || echo "[]" > "$TEMP_DIR/home_feed.json"
+# REMOVED: Home feed and Following feed — too noisy (opinions, jokes, random stuff)
+# Alex's feed changes too fast and picks up low-quality content
+
+# LAYER 1: X's AI-curated trending news (best signal for actual NEWS)
+echo "[Layer 1] Fetching X trending AI news..."
+$BIRD news --ai-only -n 30 --json > "$TEMP_DIR/trending.json" 2>/dev/null || echo "[]" > "$TEMP_DIR/trending.json"
 sleep 2
 
-# LAYER 1: "Following" feed (chronological — catches things algorithm might miss)
-echo "[Layer 1] Fetching Alex's Following feed..."
-$BIRD $ALEX_AUTH home --following -n 30 --json > "$TEMP_DIR/following_feed.json" 2>/dev/null || echo "[]" > "$TEMP_DIR/following_feed.json"
-sleep 2
-
-# LAYER 2: X's AI-curated trending news  
-echo "[Layer 2] Fetching X trending AI news..."
-$BIRD news --ai-only -n 20 --json > "$TEMP_DIR/trending.json" 2>/dev/null || echo "[]" > "$TEMP_DIR/trending.json"
-
-# LAYER 3: Targeted searches — more specific to catch launches
-echo "[Layer 3] Running targeted searches..."
+# LAYER 2: Targeted searches — specific to catch launches & announcements
+echo "[Layer 2] Running targeted searches..."
 SEARCHES=(
-  "AI launch OR AI release OR AI update min_faves:200 -is:retweet"
-  "Perplexity OR Cursor OR Claude OR Gemini new min_faves:100 -is:retweet"
-  "OpenAI OR Anthropic OR Google AI announcing min_faves:200 -is:retweet"
-  "AI agent OR AI tool launched today min_faves:100 -is:retweet"
+  "AI launch OR AI release OR AI update min_faves:500 -is:retweet"
+  "Perplexity OR Cursor OR Claude OR Gemini launched OR releasing min_faves:200 -is:retweet"
+  "OpenAI OR Anthropic OR Google AI announcing OR introduces min_faves:300 -is:retweet"
+  "AI tool launched OR shipping OR now available min_faves:200 -is:retweet"
+  "open source AI model released min_faves:100 -is:retweet"
+  "AI pricing OR free tier OR API cost min_faves:100 -is:retweet"
 )
 search_idx=0
 for query in "${SEARCHES[@]}"; do
@@ -54,9 +50,9 @@ for query in "${SEARCHES[@]}"; do
   sleep 2
 done
 
-# LAYER 4: Key AI accounts
-echo "[Layer 4] Fetching from key AI accounts..."
-ACCOUNTS=("_akhaliq" "sama" "AnthropicAI" "GoogleAI" "OpenAI" "perplexity_ai" "cursor_ai" "AravSrinivas" "karpathy" "cognition")
+# LAYER 3: Key AI accounts (official announcements, not opinions)
+echo "[Layer 3] Fetching from key AI accounts..."
+ACCOUNTS=("_akhaliq" "sama" "AnthropicAI" "GoogleAI" "OpenAI" "perplexity_ai" "cursor_ai" "AravSrinivas" "karpathy" "cognition" "xaborai" "GoogleDeepMind" "MetaAI" "ylaboratory" "demaborishassabis")
 for account in "${ACCOUNTS[@]}"; do
   $BIRD $ALEX_AUTH user-tweets "$account" -n 5 --json > "$TEMP_DIR/account_${account}.json" 2>/dev/null || echo "[]" > "$TEMP_DIR/account_${account}.json"
   sleep 1
@@ -141,17 +137,7 @@ def extract_tweet(tweet, source_type, boost=0):
         'fetched_at': datetime.now(timezone.utc).isoformat()
     }
 
-# Process home feed
-for tweet in safe_load(f"{temp_dir}/home_feed.json"):
-    item = extract_tweet(tweet, 'home_feed', boost=100)
-    if item:
-        all_items.append(item)
-
-# Process following feed
-for tweet in safe_load(f"{temp_dir}/following_feed.json"):
-    item = extract_tweet(tweet, 'following_feed', boost=50)
-    if item:
-        all_items.append(item)
+# Home feed and following feed REMOVED — too noisy with opinions/jokes
 
 # Process trending items
 for item in safe_load(f"{temp_dir}/trending.json"):
