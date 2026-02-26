@@ -5,14 +5,21 @@
 set -euo pipefail
 
 BIRD="/home/ubuntu/.local/bin/bird"
-# Alex's personal account — AI-primed "For You" feed
-ALEX_AUTH="--auth-token ***REMOVED*** --ct0 ***REMOVED***"
+
+# Load secrets from env file (NEVER hardcode keys in scripts)
+SECRETS_FILE="/home/ubuntu/clawd/projects/newsletter-auto/.env.secrets"
+if [ -f "$SECRETS_FILE" ]; then
+  set -a; source "$SECRETS_FILE"; set +a
+fi
+
+ALEX_AUTH="--auth-token ${ALEX_AUTH_TOKEN} --ct0 ${ALEX_CT0}"
 OUTPUT_DIR="/home/ubuntu/clawd/projects/newsletter-auto/x-news-cache"
 OUTPUT_FILE="$OUTPUT_DIR/latest.json"
 TEMP_DIR=$(mktemp -d)
 trap "rm -rf $TEMP_DIR" EXIT
 
-OPENROUTER_API_KEY="***REMOVED***"
+# Load API key from env file (NEVER hardcode keys)
+OPENROUTER_API_KEY="${OPENROUTER_API_KEY:-$(grep OPENROUTER_API_KEY /home/ubuntu/content-engine/app/.env.local 2>/dev/null | cut -d= -f2)}"
 HISTORY_FILE="$OUTPUT_DIR/shown_history.json"
 
 mkdir -p "$OUTPUT_DIR"
@@ -433,9 +440,10 @@ PYEOF
 
 # Push to Supabase
 echo "[$(date -u)] Pushing to Supabase..."
-SUPABASE_URL="https://auktufgyxhjrlanclsqh.supabase.co"
-SUPABASE_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF1a3R1Zmd5eGhqcmxhbmNsc3FoIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2NzcxNjkxNSwiZXhwIjoyMDgzMjkyOTE1fQ.6lXuAQ-YsLMS8WZ9WreKESQ7ZfkYiq2jB4Uo9hvbZDc"
-X_SOURCE_ID="d5ec53f3-063c-4efa-a6b7-f6dd0781aff8"
+# Secrets loaded from .env.secrets at top of script
+SUPABASE_URL="${SUPABASE_URL}"
+SUPABASE_KEY="${SUPABASE_KEY}"
+X_SOURCE_ID="${X_SOURCE_ID:-d5ec53f3-063c-4efa-a6b7-f6dd0781aff8}"
 
 export SUPABASE_URL SUPABASE_KEY X_SOURCE_ID OUTPUT_FILE
 
