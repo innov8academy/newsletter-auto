@@ -33,6 +33,7 @@ export const MODEL_PRICING: Record<string, { input: number; output: number; perI
     'google/gemini-flash-1.5': { input: 0.075, output: 0.30 },
     'google/gemini-pro-1.5': { input: 1.25, output: 5.00 },
     'google/gemini-2.5-pro-preview-05-06': { input: 1.25, output: 10.00 },
+    'google/gemini-3.1-flash-image-preview': { input: 0.10, output: 0.40, perImage: 0.025 },
     'google/gemini-3-pro-image-preview': { input: 0.50, output: 2.00, perImage: 0.039 },
 
     // Anthropic models

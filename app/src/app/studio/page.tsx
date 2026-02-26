@@ -35,6 +35,7 @@ import {
 } from 'lucide-react';
 
 const IMAGE_MODELS = [
+    { id: 'google/gemini-3.1-flash-image-preview', name: 'Nano Banana 2', description: 'Best & Cheapest Image Gen (Gemini 3.1 Flash)' },
     { id: 'google/gemini-3-pro-image-preview', name: 'Gemini 3 Pro', description: 'Google Flagship (High Fidelity)' },
     { id: 'google/gemini-2.0-flash-001', name: 'Gemini 2.0 Flash', description: 'Fastest Multimodal' },
     { id: 'bytedance-seed/seedream-4.5', name: 'SeedDream 4.5', description: 'Artistic consistency' },
@@ -48,7 +49,7 @@ export default function StudioPage() {
     const [selectedStoryIndex, setSelectedStoryIndex] = useState<number>(0);
     const [generatedPrompts, setGeneratedPrompts] = useState<{ [key: number]: string }>({});
     const [generatingStates, setGeneratingStates] = useState<{ [key: number]: boolean }>({});
-    const [globalModel, setGlobalModel] = useState<string>('google/gemini-3-pro-image-preview');
+    const [globalModel, setGlobalModel] = useState<string>('google/gemini-3.1-flash-image-preview');
     const [useStyleRefs, setUseStyleRefs] = useState(true);
 
     // Prompt Builder state

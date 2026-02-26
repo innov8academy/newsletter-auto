@@ -1,466 +1,389 @@
 {
-  "fetched_at": "2026-02-25T18:44:27.359984+00:00",
-  "count": 46,
+  "fetched_at": "2026-02-26T17:23:14.192651+00:00",
+  "count": 20,
   "items": [
     {
-      "id": "e52be59380a0",
-      "text": "Cursor Launches Autonomous Cloud Agents for Full Software Development",
-      "author": "X_Trending",
-      "url": "",
-      "engagement": 5900,
-      "created_at": "23 hours ago",
-      "source_type": "trending",
-      "fetched_at": "2026-02-25T18:44:27.358633+00:00"
-    },
-    {
-      "id": "1ace39212f7d",
-      "text": "Great meeting with PM @narendramodi today to talk about the incredible energy around AI in India.\n\nIndia is our fastest growing market for codex globally, up 4x  in weekly users in the past 2 weeks alone.\n\n\ud83c\uddee\ud83c\uddf3! https://t.co/MRbw0UkotJ",
-      "author": "sama",
-      "url": "https://x.com/sama/status/2024826822060290508",
-      "engagement": 4972,
-      "created_at": "Fri Feb 20 12:41:48 +0000 2026",
-      "source_type": "account",
-      "fetched_at": "2026-02-25T18:44:27.359227+00:00"
-    },
-    {
-      "id": "d6c46fb97849",
-      "text": "Introducing EVMbench\u2014a new benchmark that measures how well AI agents can detect, exploit, and patch high-severity smart contract vulnerabilities. https://t.co/op5zufgAGH",
-      "author": "OpenAI",
-      "url": "https://x.com/OpenAI/status/2024193883748651102",
-      "engagement": 2586,
-      "created_at": "Wed Feb 18 18:46:44 +0000 2026",
-      "source_type": "account",
-      "fetched_at": "2026-02-25T18:44:27.358893+00:00"
-    },
-    {
-      "id": "9f663ec2dc4b",
-      "text": "CLIs are super exciting precisely because they are a \"legacy\" technology, which means AI agents can natively and easily use them, combine them, interact with them via the entire terminal toolkit.\n\nE.g ask your Claude/Codex agent to install this new Polymarket CLI and ask for any arbitrary dashboards or interfaces or logic. The agents will build it for you. Install the Github CLI too and you can ask them to navigate the repo, see issues, PRs, discussions, even the code itself.\n\nExample: Claude bu",
+      "id": "4a5125c2d5e1",
+      "text": "It is hard to communicate how much programming has changed due to AI in the last 2 months: not gradually and over time in the \"progress as usual\" way, but specifically this last December. There are a number of asterisks but imo coding agents basically didn\u2019t work before December and basically work since - the models have significantly higher quality, long-term coherence and tenacity and they can power through large and long tasks, well past enough that it is extremely disruptive to the default p",
       "author": "karpathy",
-      "url": "https://x.com/karpathy/status/2026360908398862478",
-      "engagement": 1860,
-      "created_at": "Tue Feb 24 18:17:43 +0000 2026",
+      "url": "https://x.com/karpathy/status/2026731645169185220",
+      "raw_engagement": 7050,
+      "engagement": 10575,
+      "created_at": "Wed Feb 25 18:50:53 +0000 2026",
       "source_type": "account",
-      "fetched_at": "2026-02-25T18:44:27.359113+00:00"
+      "fetched_at": "2026-02-26T17:23:14.189752+00:00",
+      "cluster_size": 1,
+      "cluster_topic": "",
+      "cluster_urls": [
+        "https://x.com/karpathy/status/2026731645169185220"
+      ],
+      "recency": "recent",
+      "ai_headline": "Karpathy: AI Radically Changed Programming in December",
+      "ai_summary": "Andrej Karpathy notes a sudden, significant shift in AI's impact on programming, claiming coding agents 'basically work' now."
     },
     {
-      "id": "26bd09fbf5c4",
-      "text": "Introducing Perplexity Computer.\n\nComputer unifies every current AI capability into one system.\n\nIt can research, design, code, deploy, and manage any project end-to-end. https://t.co/dZUybl6VkY",
-      "author": "perplexity_ai",
-      "url": "https://x.com/perplexity_ai/status/2026695550771540489",
-      "engagement": 1194,
-      "created_at": "Wed Feb 25 16:27:28 +0000 2026",
-      "source_type": "account",
-      "fetched_at": "2026-02-25T18:44:27.359164+00:00"
-    },
-    {
-      "id": "b9f7f576ba55",
-      "text": "Cursor now shows you demos, not diffs.\n\nAgents can use the software they build and send you videos of their work. https://t.co/gBRJXWR7Vi",
-      "author": "cursor_ai",
-      "url": "https://x.com/cursor_ai/status/2026369873321013568",
-      "engagement": 990,
-      "created_at": "Tue Feb 24 18:53:20 +0000 2026",
-      "source_type": "account",
-      "fetched_at": "2026-02-25T18:44:27.359020+00:00"
-    },
-    {
-      "id": "c136bef89046",
-      "text": "Claude AI Builds Anthropic's Plugins Feature Over One Weekend",
-      "author": "X_Trending",
-      "url": "",
-      "engagement": 886,
-      "created_at": "16 hours ago",
-      "source_type": "trending",
-      "fetched_at": "2026-02-25T18:44:27.358638+00:00"
-    },
-    {
-      "id": "c3bdfc0cf6ca",
-      "text": "Claude AI Wins Praise for Excel and Coding Tools Amid Brief Outage",
-      "author": "X_Trending",
-      "url": "",
-      "engagement": 881,
-      "created_at": "2 hours ago",
-      "source_type": "trending",
-      "fetched_at": "2026-02-25T18:44:27.358635+00:00"
-    },
-    {
-      "id": "0fe1be1ef385",
-      "text": "With the coming tsunami of demand for tokens, there are significant opportunities to orchestrate the underlying memory+compute *just right* for LLMs.\n\nThe fundamental and non-obvious constraint is that due to the chip fabrication process, you get two completely distinct pools of memory (of different physical implementations too): 1) on-chip SRAM that is immediately next to the compute units that is incredibly fast but of very of low capacity, and 2) off-chip DRAM which has extremely high capacit",
-      "author": "karpathy",
-      "url": "https://x.com/karpathy/status/2026452488434651264",
-      "engagement": 860,
-      "created_at": "Wed Feb 25 00:21:37 +0000 2026",
-      "source_type": "account",
-      "fetched_at": "2026-02-25T18:44:27.359108+00:00"
-    },
-    {
-      "id": "cd276fb57aea",
-      "text": "Someone built this simple landing page.\n\nThe idea was simple but bold:\n\nYou paste your startup URL, and the site brutally roasts your landing page calling out vague claims, buzzwords, and overhyped messaging. https://t.co/74oH2F3xeL",
-      "author": "Amank1412",
-      "url": "https://x.com/Amank1412/status/2026007841321132285",
-      "engagement": 620,
-      "created_at": "Mon Feb 23 18:54:45 +0000 2026",
+      "id": "f7f1a9d4dedb",
+      "text": "JUST IN: \ud83c\udde8\ud83c\uddf3\ud83c\udde9\ud83c\uddea China showcases AI humanoid robots performing kung fu moves during Germany Chancellor Merz's visit. https://t.co/gkM0dGiOg3",
+      "author": "BRICSinfo",
+      "url": "https://x.com/BRICSinfo/status/2026977011592511553",
+      "raw_engagement": 4330,
+      "engagement": 8860,
+      "created_at": "Thu Feb 26 11:05:53 +0000 2026",
       "source_type": "home_feed",
-      "fetched_at": "2026-02-25T18:44:27.358515+00:00"
+      "fetched_at": "2026-02-26T17:23:14.187764+00:00",
+      "cluster_size": 1,
+      "cluster_topic": "",
+      "cluster_urls": [
+        "https://x.com/BRICSinfo/status/2026977011592511553"
+      ],
+      "recency": "today",
+      "ai_headline": "China Showcases AI Kung Fu Robots During German Visit",
+      "ai_summary": "China displayed AI-powered humanoid robots performing kung fu during German Chancellor Merz's visit, highlighting advancements in AI robotics."
     },
     {
-      "id": "441623e471ff",
-      "text": "New in Cowork: scheduled tasks.\n\nClaude can now complete recurring tasks at specific times automatically: a morning brief, weekly spreadsheet updates, Friday team presentations. https://t.co/7ucKZbAVip",
-      "author": "claudeai",
-      "url": "https://x.com/claudeai/status/2026720870631354429",
-      "engagement": 498,
-      "created_at": "Wed Feb 25 18:08:04 +0000 2026",
-      "source_type": "home_feed",
-      "fetched_at": "2026-02-25T18:44:27.358364+00:00"
-    },
-    {
-      "id": "a6a646a6638b",
-      "text": "So Google has just released its own agent builder?!\n\nYou can now add the agent block in Google Opal and \"program it\" in plain English.\n\nAnd it has natively:\n\n- Tool call (with Nano Banana, Veo, web search...)\n- Memory to save infos between sessions\n- Conditional logic\n\nProbably the easiest way to build AI agents I've seen so far.",
-      "author": "itsPaulAi",
-      "url": "https://x.com/itsPaulAi/status/2026403523701641514",
-      "engagement": 496,
-      "created_at": "Tue Feb 24 21:07:03 +0000 2026",
-      "source_type": "home_feed",
-      "fetched_at": "2026-02-25T18:44:27.358397+00:00"
-    },
-    {
-      "id": "d9134099553e",
-      "text": "Hey @elonmusk, if you hate Anthropic so much, make a Grok CLI and I\u2019ll cancel my Anthropic subscription today",
-      "author": "UziObi",
-      "url": "https://x.com/UziObi/status/2026399091450671113",
-      "engagement": 454,
-      "created_at": "Tue Feb 24 20:49:26 +0000 2026",
-      "source_type": "home_feed",
-      "fetched_at": "2026-02-25T18:44:27.358436+00:00"
-    },
-    {
-      "id": "dec6221ccd74",
-      "text": "BREAKING: Amazon, Google, Meta, Microsoft, xAI, Oracle and OpenAI are set to sign an agreement with the Trump Administration to generate their own electricity supply for AI data centers, per Fox News.\n\nThis includes:\n\n1. Meeting with President Trump in March to sign the pledge\n\n2. Companies will build, bring, or buy their own power supply for new AI data centers\n\n3. Companies will agree to protect Americans from price hikes\n\nTrump is shifting attention to surging electricity costs.",
-      "author": "KobeissiLetter",
-      "url": "https://x.com/KobeissiLetter/status/2026719177168281985",
-      "engagement": 452,
-      "created_at": "Wed Feb 25 18:01:21 +0000 2026",
-      "source_type": "following_feed",
-      "fetched_at": "2026-02-25T18:44:27.357734+00:00"
-    },
-    {
-      "id": "299c4a4b5ee7",
-      "text": "OpenClaw AI Agent Hits 228,000 GitHub Stars in Rapid Rise",
-      "author": "X_Trending",
-      "url": "",
-      "engagement": 446,
-      "created_at": "",
-      "source_type": "trending",
-      "fetched_at": "2026-02-25T18:44:27.358622+00:00"
-    },
-    {
-      "id": "cc9bd61dfffa",
-      "text": "Elad Gil, swyx, and Dreamer CEO Build AI Agents Live with User Ideas",
-      "author": "X_Trending",
-      "url": "",
-      "engagement": 409,
-      "created_at": "23 hours ago",
-      "source_type": "trending",
-      "fetched_at": "2026-02-25T18:44:27.358631+00:00"
-    },
-    {
-      "id": "4b2040bf31c7",
-      "text": "Introducing Gemini 3.1 Pro \ud83d\ude80\n\n3.1 Pro represents a major step forward in core reasoning. It scored 77.1% (more than doubling 3 Pro\u2019s score) on ARC-AGI-2, the benchmark that evaluates a model's ability to solve new logic patterns and work through challenges it hasn\u2019t encountered before.\n\nThis demo illustrates how the model can go beyond the prompt. Instead of rendering a video or static graphic, 3.1 Pro codes a full environment, integrating generative audio and providing UI controls.",
+      "id": "bfba1aea6862",
+      "text": "More than a billion images generated later, we love seeing what you create with Nano Banana. Today, we\u2019re inviting more people to join in on the fun with the launch of \ud83c\udf4cNano Banana 2\ud83c\udf4c\n\nThis state-of-the-art model is exceptionally good at things like: \n\u2014 Creating images that tap into the Gemini model\u2019s real-world knowledge base + are powered by information and images from web search to more accurately render specific landmarks, locations, objects, and beyond\n\n\u2014 Adapting creative assets for global",
       "author": "GoogleAI",
-      "url": "https://x.com/GoogleAI/status/2024573281680887823",
-      "engagement": 376,
-      "created_at": "Thu Feb 19 19:54:19 +0000 2026",
+      "url": "https://x.com/GoogleAI/status/2027051670350287166",
+      "raw_engagement": 110,
+      "engagement": 6912,
+      "created_at": "Thu Feb 26 16:02:33 +0000 2026",
       "source_type": "account",
-      "fetched_at": "2026-02-25T18:44:27.358855+00:00"
+      "fetched_at": "2026-02-26T17:23:14.189191+00:00",
+      "cluster_size": 14,
+      "cluster_topic": "nano banana",
+      "cluster_urls": [
+        "https://x.com/GoogleAI/status/2027051670350287166",
+        "https://x.com/joshwoodward/status/1993308508876403087",
+        "https://x.com/emollick/status/2027051701258109306",
+        "https://x.com/googleaidevs/status/2027059557311131680",
+        "https://x.com/op7418/status/2027021180667043976"
+      ],
+      "recency": "breaking",
+      "ai_headline": "Google AI Launches Nano Banana 2 with Gemini Integration",
+      "ai_summary": "Google AI releases Nano Banana 2, a state-of-the-art image generation model integrated with Gemini, inviting more users to create images."
     },
     {
-      "id": "ee309317b2b8",
-      "text": "Introducing Devin 2.2 \u2013 the autonomous agent that can test with computer use, self-verify, and auto-fix its work. Try it for free!\n\nWe\u2019ve also overhauled Devin from the ground up:\n\n- 3x faster startup\n- fully redesigned interface\n- computer use + virtual desktop\n\n...and hundreds more UX and functionality improvements.",
-      "author": "cognition",
-      "url": "https://x.com/cognition/status/2026343816521994339",
-      "engagement": 326,
-      "created_at": "Tue Feb 24 17:09:48 +0000 2026",
-      "source_type": "account",
-      "fetched_at": "2026-02-25T18:44:27.358965+00:00"
+      "id": "af9cb67f0f1d",
+      "text": "Anthropic CEO Warns of AI Job Tsunami on Horizon",
+      "author": "X_Trending",
+      "url": "",
+      "raw_engagement": 3200,
+      "engagement": 4800,
+      "created_at": "14 hours ago",
+      "source_type": "trending",
+      "fetched_at": "2026-02-26T17:23:14.188733+00:00",
+      "cluster_size": 1,
+      "cluster_topic": "",
+      "cluster_urls": [
+        ""
+      ],
+      "recency": "recent",
+      "ai_headline": "Anthropic CEO Warns of AI-Driven Job Displacement",
+      "ai_summary": "The CEO of Anthropic has issued a warning about a potential 'AI job tsunami,' suggesting significant job displacement due to AI advancements."
     },
     {
-      "id": "50dc191d9a33",
-      "text": "What has Perplexity been up to last two months? We've silently been working on the next big thing: Perplexity Computer. Computer unifies every current capability of AI into a single system. Files, tools, memory, and models, orchestrated together, working for you.",
-      "author": "AravSrinivas",
-      "url": "https://x.com/AravSrinivas/status/2026695864039911684",
-      "engagement": 320,
-      "created_at": "Wed Feb 25 16:28:42 +0000 2026",
-      "source_type": "account",
-      "fetched_at": "2026-02-25T18:44:27.358797+00:00"
+      "id": "fd7f93a8256b",
+      "text": "Moonlake AI Unveils Interactive Cyberpunk World Demo",
+      "author": "X_Trending",
+      "url": "",
+      "raw_engagement": 1300,
+      "engagement": 2250,
+      "created_at": "21 hours ago",
+      "source_type": "trending",
+      "fetched_at": "2026-02-26T17:23:14.188780+00:00",
+      "cluster_size": 1,
+      "cluster_topic": "moonlake",
+      "cluster_urls": [],
+      "recency": "recent",
+      "ai_headline": "Moonlake AI Unveils Interactive Cyberpunk World Demo",
+      "ai_summary": "Moonlake AI has revealed a demo showcasing an interactive cyberpunk world, demonstrating advancements in AI-driven virtual environments."
     },
     {
-      "id": "2296c5ec44f8",
-      "text": "JUST IN: Top AI companies to sign deal to build their own electricity supply for data centers:\n\n\u2022 xAI\n\u2022 Meta\n\u2022 Oracle\n\u2022 Google\n\u2022 OpenAI\n\u2022 Amazon\n\u2022 Microsoft",
-      "author": "WatcherGuru",
-      "url": "https://x.com/WatcherGuru/status/2026719297058308372",
-      "engagement": 302,
-      "created_at": "Wed Feb 25 18:01:49 +0000 2026",
-      "source_type": "following_feed",
-      "fetched_at": "2026-02-25T18:44:27.357724+00:00"
+      "id": "8d300d9b3db6",
+      "text": "My IQ dropped by 3 and was permanently lost by the time I finished watching the video \ud83e\udd23\n\nSora 2 on @Hailuo_AI https://t.co/3jgdExlrpO",
+      "author": "lexx_aura",
+      "url": "https://x.com/lexx_aura/status/2026972696232263802",
+      "raw_engagement": 276,
+      "engagement": 1784,
+      "created_at": "Thu Feb 26 10:48:44 +0000 2026",
+      "source_type": "home_feed",
+      "fetched_at": "2026-02-26T17:23:14.187536+00:00",
+      "cluster_size": 2,
+      "cluster_topic": "sora",
+      "cluster_urls": [
+        "https://x.com/lexx_aura/status/2026972696232263802",
+        "https://x.com/JunieLauX/status/1829950412340019261"
+      ],
+      "recency": "today",
+      "ai_headline": "Hailuo AI's Sora 2 Video Stuns Users [2 Sources]",
+      "ai_summary": "Hailuo AI's Sora 2 video is generating buzz, with users expressing amazement at the AI's capabilities, though one user jokingly claims a loss of IQ points."
     },
     {
-      "id": "91abf33405a5",
-      "text": "Anthropic has acquired @Vercept_ai to advance Claude\u2019s computer use capabilities. \n\nRead more: https://t.co/YVz1zh7Pqq",
+      "id": "9801b5fb540a",
+      "text": "In November, we outlined our approach to deprecating and preserving older Claude models.\n\nWe noted we were exploring keeping certain models available to the public post-retirement, and giving past models a way to pursue their interests.\n\nWith Claude Opus 3, we\u2019re doing both.",
       "author": "AnthropicAI",
-      "url": "https://x.com/AnthropicAI/status/2026705792033026465",
-      "engagement": 222,
-      "created_at": "Wed Feb 25 17:08:09 +0000 2026",
+      "url": "https://x.com/AnthropicAI/status/2026765820098130111",
+      "raw_engagement": 620,
+      "engagement": 1230,
+      "created_at": "Wed Feb 25 21:06:41 +0000 2026",
       "source_type": "account",
-      "fetched_at": "2026-02-25T18:44:27.358728+00:00"
+      "fetched_at": "2026-02-26T17:23:14.188902+00:00",
+      "cluster_size": 1,
+      "cluster_topic": "claude opus",
+      "cluster_urls": [
+        "https://x.com/AnthropicAI/status/2026765820098130111"
+      ],
+      "recency": "recent",
+      "ai_headline": "Anthropic Preserves Older Claude Models with Claude Opus 3",
+      "ai_summary": "Anthropic is preserving older Claude models by keeping some publicly available and allowing them to pursue their interests with the release of Claude Opus 3."
     },
     {
-      "id": "ef4164fe02af",
-      "text": "Happy for my brother.\n\nAn absolute triumph for Benchmark.",
-      "author": "sama",
-      "url": "https://x.com/sama/status/2023839310764802349",
-      "engagement": 204,
-      "created_at": "Tue Feb 17 19:17:47 +0000 2026",
-      "source_type": "account",
-      "fetched_at": "2026-02-25T18:44:27.359231+00:00"
-    },
-    {
-      "id": "c365ee9f0cf5",
-      "text": "AI is changing how work gets done, and we want to lead that transition responsibly.\n\nExcited to welcome Arvind KC as Chief People Officer to help OpenAI grow and be a model for how AI-enabled work can expand what people can do. https://t.co/uZe9zUthnS",
-      "author": "OpenAI",
-      "url": "https://x.com/OpenAI/status/2026412700583317815",
-      "engagement": 182,
-      "created_at": "Tue Feb 24 21:43:31 +0000 2026",
-      "source_type": "account",
-      "fetched_at": "2026-02-25T18:44:27.358889+00:00"
-    },
-    {
-      "id": "6068fa72be6d",
-      "text": "how to build an ai native vertical saas in the claude cowork era:\n\n1. pick a sub-niche inside a large, profitable market\n2. map one recurring workflow that drives revenue or saves time\n3. write the workflow step-by-step like you\u2019re training an intern\n4. separate mechanical steps from judgment calls\n5. connect claude to the actual stack: crm, sheets, inbox, slides, contracts\n6. remove exports and copy-paste from the process\n7. collapse raw data \u2192 reasoning \u2192 finished output into one session\n8. st",
-      "author": "gregisenberg",
-      "url": "https://x.com/gregisenberg/status/2026665189765005433",
-      "engagement": 180,
-      "created_at": "Wed Feb 25 14:26:49 +0000 2026",
+      "id": "278d0e7ed5bf",
+      "text": "Hey @grok \"How many % Now India's Chance Of reaching the Semi-finals\"?\ud83d\ude2d https://t.co/ftvUpExUDc",
+      "author": "Sareem48",
+      "url": "https://x.com/Sareem48/status/2027010509325652205",
+      "raw_engagement": 74,
+      "engagement": 435,
+      "created_at": "Thu Feb 26 13:19:00 +0000 2026",
       "source_type": "home_feed",
-      "fetched_at": "2026-02-25T18:44:27.358422+00:00"
+      "fetched_at": "2026-02-26T17:23:14.187143+00:00",
+      "cluster_size": 1,
+      "cluster_topic": "",
+      "cluster_urls": [
+        "https://x.com/Sareem48/status/2027010509325652205"
+      ],
+      "recency": "fresh",
+      "ai_headline": "Grok AI Responds to Query About India's Semi-Final Chances",
+      "ai_summary": "A user asked Grok AI about India's chances of reaching the semi-finals, showcasing the AI's ability to respond to real-time queries."
     },
     {
-      "id": "05bc78e3953d",
-      "text": "Made with @Grok Imagine",
-      "author": "elonmusk",
-      "url": "https://x.com/elonmusk/status/2026719624994369541",
-      "engagement": 168,
-      "created_at": "Wed Feb 25 18:03:07 +0000 2026",
-      "source_type": "following_feed",
-      "fetched_at": "2026-02-25T18:44:27.357719+00:00"
-    },
-    {
-      "id": "a4560f13c755",
-      "text": "This is not a hollywood movie, it's an youtube series \ud83d\udd25\n\n@ashchanchlani bhai kya banaya h mja aa gya. Stunning visuals \ud83d\udca5 jo kaam bollywood wale 400cr lga ke nahi kar paate vo aapne kar diya\ud83d\udc4c\n\nConcept, story, screenplay, vfx and specially comedy \ud83e\udd23 everything top-notch \ud83d\udc4d\n\nSach me james Cameron ki swades bna di \ud83d\ude02 thala for a reason \ud83d\ude01\n\nWaiting for the 2nd season \ud83e\udd1e or copyright mat maar dena \ud83d\ude14\n#ekaki",
-      "author": "Lonely_prabh",
-      "url": "https://x.com/Lonely_prabh/status/2026633861199732871",
-      "engagement": 160,
-      "created_at": "Wed Feb 25 12:22:20 +0000 2026",
-      "source_type": "home_feed",
-      "fetched_at": "2026-02-25T18:44:27.358444+00:00"
-    },
-    {
-      "id": "d597ee627b2f",
-      "text": "Aravind and team absolutely cooked with this one. \n\nThis looks insane!!\n\nA single system that unifies files, tools, memory, and models, all working together for you. \n\nAlso, love the name - Perplexity Computer.\n\nCongrats! Team :) https://t.co/qIfgyhTd3k",
-      "author": "VaibhavSisinty",
-      "url": "https://x.com/VaibhavSisinty/status/2026700842884370730",
-      "engagement": 120,
-      "created_at": "Wed Feb 25 16:48:29 +0000 2026",
-      "source_type": "home_feed",
-      "fetched_at": "2026-02-25T18:44:27.358458+00:00"
-    },
-    {
-      "id": "824affa4cf7d",
-      "text": "The AI is the Computer",
-      "author": "AravSrinivas",
-      "url": "https://x.com/AravSrinivas/status/2026710957272207490",
-      "engagement": 120,
-      "created_at": "Wed Feb 25 17:28:41 +0000 2026",
-      "source_type": "account",
-      "fetched_at": "2026-02-25T18:44:27.358790+00:00"
-    },
-    {
-      "id": "b1cf99568396",
-      "text": "Gemini 3.1 Pro is now available to all Perplexity Pro and Max subscribers. https://t.co/Nk0N0FXWgM",
-      "author": "perplexity_ai",
-      "url": "https://x.com/perplexity_ai/status/2024590462057922864",
-      "engagement": 118,
-      "created_at": "Thu Feb 19 21:02:35 +0000 2026",
-      "source_type": "account",
-      "fetched_at": "2026-02-25T18:44:27.359179+00:00"
-    },
-    {
-      "id": "6e97dc2f8922",
-      "text": "how to sell AI services when nobody knows who you are (7 easy methods)",
-      "author": "coreyganim",
-      "url": "https://x.com/coreyganim/status/2026666463675765106",
-      "engagement": 110,
-      "created_at": "Wed Feb 25 14:31:53 +0000 2026",
-      "source_type": "home_feed",
-      "fetched_at": "2026-02-25T18:44:27.358405+00:00"
-    },
-    {
-      "id": "169f61d84792",
-      "text": "Channeling the Fire Horse energy this week \ud83d\udd25\ud83d\udc0e here\u2019s what we launched: \n\n\u2014 Gemini 3.1 Pro, a step forward in core intelligence that helps you tackle complex workflows and projects\n\n\u2014 Photoshoot, a new feature for Pomelli by @GoogleLabs that transforms a single product image into studio-quality visuals for your business \n\n\u2014 Lyria 3, our most advanced generative music model yet, turns photos and text into dynamic tracks complete with vocals and lyrics\n\n\u2014 A new featured notebook in @NotebookLM that",
-      "author": "GoogleAI",
-      "url": "https://x.com/GoogleAI/status/2024931776167047587",
-      "engagement": 108,
-      "created_at": "Fri Feb 20 19:38:51 +0000 2026",
-      "source_type": "account",
-      "fetched_at": "2026-02-25T18:44:27.358851+00:00"
-    },
-    {
-      "id": "6d8c5d03a4cc",
-      "text": "New voice mode upgrades are rolling out today across Perplexity and Comet for all users.",
-      "author": "perplexity_ai",
-      "url": "https://x.com/perplexity_ai/status/2026389166049865751",
-      "engagement": 102,
-      "created_at": "Tue Feb 24 20:10:00 +0000 2026",
-      "source_type": "account",
-      "fetched_at": "2026-02-25T18:44:27.359176+00:00"
-    },
-    {
-      "id": "721117c61397",
-      "text": "wtf is going on with claude code?!\n\neven to just open it and say 'hi'\nit'll use up ~30k tokens (system prompts, random bs, etc.)\ni hope to god they're cached!\n\n$0.27 per startup or at least per new update i bet https://t.co/WXZpOJVSRZ",
-      "author": "zsakib_",
-      "url": "https://x.com/zsakib_/status/2026667176610959723",
-      "engagement": 100,
-      "created_at": "Wed Feb 25 14:34:43 +0000 2026",
-      "source_type": "home_feed",
-      "fetched_at": "2026-02-25T18:44:27.358428+00:00"
-    },
-    {
-      "id": "cd23d9490289",
-      "text": "Building your next AI project? The AMD AI Developer Club gives you free cloud credits to experiment, access to optimized AI SDKs, and a community of engineers ready to share real-world solutions. Join the community now.",
-      "author": "AIatAMD",
-      "url": "https://x.com/AIatAMD/status/2017374897065103777",
-      "engagement": 84,
-      "created_at": "Fri Jan 30 23:10:31 +0000 2026",
-      "source_type": "following_feed",
-      "fetched_at": "2026-02-25T18:44:27.357630+00:00"
-    },
-    {
-      "id": "916fb58fb13e",
-      "text": "One of the reasons I love AI is because I can ask the same thing multiple times and it never judges me. Instead, it keeps trying to explain things in a better way until I finally get it.\nHumans don't have such patience.",
-      "author": "ai_for_success",
-      "url": "https://x.com/ai_for_success/status/2026721485428240719",
-      "engagement": 54,
-      "created_at": "Wed Feb 25 18:10:31 +0000 2026",
-      "source_type": "following_feed",
-      "fetched_at": "2026-02-25T18:44:27.357707+00:00"
-    },
-    {
-      "id": "fa459258f6ed",
-      "text": "Energy is becoming a huge domestic political problem: \n\nDonald Trump is bringing Amazon, Google, Meta, Microsoft, xAI, Oracle, and OpenAI to the White House to sign a \u201cRate Payer Protection Pledge,\u201d committing them to generate or purchase their own electricity for new AI data centers. The move aims to shield American households from rising power bills as AI demand surges and strains the aging U.S. grid.",
-      "author": "kimmonismus",
-      "url": "https://x.com/kimmonismus/status/2026720759163298282",
-      "engagement": 54,
-      "created_at": "Wed Feb 25 18:07:38 +0000 2026",
-      "source_type": "following_feed",
-      "fetched_at": "2026-02-25T18:44:27.357711+00:00"
-    },
-    {
-      "id": "efbfcf994419",
-      "text": "The Anthropic Agents SDK loophole for OpenClaw was missing from my prompts file (my mistake). Just updated it:\n\nhttps://t.co/uTxtwLI6NA",
-      "author": "MatthewBerman",
-      "url": "https://x.com/MatthewBerman/status/2026717655475073232",
-      "engagement": 54,
-      "created_at": "Wed Feb 25 17:55:18 +0000 2026",
-      "source_type": "following_feed",
-      "fetched_at": "2026-02-25T18:44:27.357742+00:00"
-    },
-    {
-      "id": "202a05ec85e1",
-      "text": "Hot take:\n\nThe AI age will make Vegas BOOM.\n\nAs people with disposable income gain more time + the internet becomes an AI-generated wasteland, more people will seek real-life experiences.\n\nVegas' positioning as a provider of human experiences is ELITE.",
-      "author": "farzyness",
-      "url": "https://x.com/farzyness/status/2026726488418943090",
-      "engagement": 50,
-      "created_at": "Wed Feb 25 18:30:24 +0000 2026",
-      "source_type": "following_feed",
-      "fetched_at": "2026-02-25T18:44:27.357670+00:00"
-    },
-    {
-      "id": "a56eac9f2baf",
-      "text": "Anthropic is rolling out scheduled tasks on Claude Cowork for macOS and Windows! https://t.co/5N2VHvjoxe",
+      "id": "c10fc0a24524",
+      "text": "OpenAI is rolling out a new Library feature for ChatGPT to help users reuse files uploaded earlier. \n\n\u201cLibrary automatically saves files you upload to ChatGPT so you can find and reuse them later.\u201d https://t.co/NKmkel4zpM",
       "author": "testingcatalog",
-      "url": "https://x.com/testingcatalog/status/2026725217087689086",
-      "engagement": 50,
-      "created_at": "Wed Feb 25 18:25:21 +0000 2026",
+      "url": "https://x.com/testingcatalog/status/2027065439730159747",
+      "raw_engagement": 6,
+      "engagement": 318,
+      "created_at": "Thu Feb 26 16:57:16 +0000 2026",
+      "source_type": "home_feed",
+      "fetched_at": "2026-02-26T17:23:14.186979+00:00",
+      "cluster_size": 1,
+      "cluster_topic": "",
+      "cluster_urls": [
+        "https://x.com/testingcatalog/status/2027065439730159747"
+      ],
+      "recency": "breaking",
+      "ai_headline": "OpenAI's ChatGPT Adds Library Feature for File Reuse",
+      "ai_summary": "OpenAI is rolling out a 'Library' feature for ChatGPT, allowing users to automatically save and reuse files uploaded to the platform."
+    },
+    {
+      "id": "9b8332b7c206",
+      "text": "I thought the OpenClaw hype was fading, but this guy created ClawMart, an app store for AI Assistants, and it made $18K in 7 days!\n\nHe has also created an AI entrepreneur named @FelixCraftAI that ships startups for him.\n\nProxyPreneur? https://t.co/kjvoXuwUBi",
+      "author": "marclou",
+      "url": "https://x.com/marclou/status/2027063639380045872",
+      "raw_engagement": 6,
+      "engagement": 318,
+      "created_at": "Thu Feb 26 16:50:07 +0000 2026",
+      "source_type": "home_feed",
+      "fetched_at": "2026-02-26T17:23:14.187566+00:00",
+      "cluster_size": 1,
+      "cluster_topic": "",
+      "cluster_urls": [
+        "https://x.com/marclou/status/2027063639380045872"
+      ],
+      "recency": "breaking",
+      "ai_headline": "OpenClaw App Store for AI Assistants Generates $18K in 7 Days",
+      "ai_summary": "An app store for AI Assistants built on OpenClaw, called ClawMart, has generated $18,000 in 7 days, highlighting the potential of AI entrepreneurship."
+    },
+    {
+      "id": "531f9493aeb7",
+      "text": "It\u2019s true like it or not. \n\nAI will force out the bottom 90% of the market across all digital industries. \n\nAll mediocre performing workers, companies, freelancers and entrepreneurs will get caught.",
+      "author": "noahmorris",
+      "url": "https://x.com/noahmorris/status/2027047791617601960",
+      "raw_engagement": 4,
+      "engagement": 312,
+      "created_at": "Thu Feb 26 15:47:08 +0000 2026",
+      "source_type": "home_feed",
+      "fetched_at": "2026-02-26T17:23:14.187210+00:00",
+      "cluster_size": 1,
+      "cluster_topic": "",
+      "cluster_urls": [
+        "https://x.com/noahmorris/status/2027047791617601960"
+      ],
+      "recency": "breaking",
+      "ai_headline": "AI Will Force Out Bottom 90% of Digital Market, Expert Claims",
+      "ai_summary": "An expert claims AI will displace the bottom 90% of the market across digital industries, impacting mediocre workers, companies, and entrepreneurs."
+    },
+    {
+      "id": "57c14cd2ba43",
+      "text": "I've been messing with connecting Claude and @framer over the last week and yeah... this is absolutely crazy.\n\nYou can get Claude to optimise your site, create/edit styles, write content and a lot more.\n\nHere's how you can set it up in literally 2 minutes: https://t.co/oO3ev6Cqqy",
+      "author": "hxmzaehsan",
+      "url": "https://x.com/hxmzaehsan/status/2026973414179930458",
+      "raw_engagement": 34,
+      "engagement": 268,
+      "created_at": "Thu Feb 26 10:51:35 +0000 2026",
+      "source_type": "home_feed",
+      "fetched_at": "2026-02-26T17:23:14.187225+00:00",
+      "cluster_size": 1,
+      "cluster_topic": "",
+      "cluster_urls": [
+        "https://x.com/hxmzaehsan/status/2026973414179930458"
+      ],
+      "recency": "today",
+      "ai_headline": "Claude AI Integrates with Framer for Website Optimization",
+      "ai_summary": "Users are connecting Claude AI with Framer to optimize websites, enabling AI to create/edit styles, write content, and more in minutes."
+    },
+    {
+      "id": "6ce2f727d81e",
+      "text": "How Perplexity feels after people were saying they were dead but they are shipping features no other platform comes close to having yet\u2026 https://t.co/T9vHGkoX19",
+      "author": "DudeWhoInvests",
+      "url": "https://x.com/DudeWhoInvests/status/2026719064941375974",
+      "raw_engagement": 76,
+      "engagement": 264,
+      "created_at": "Wed Feb 25 18:00:54 +0000 2026",
+      "source_type": "home_feed",
+      "fetched_at": "2026-02-26T17:23:14.187505+00:00",
+      "cluster_size": 1,
+      "cluster_topic": "",
+      "cluster_urls": [
+        "https://x.com/DudeWhoInvests/status/2026719064941375974"
+      ],
+      "recency": "recent",
+      "ai_headline": "Perplexity AI Ships New Features Despite Doubts",
+      "ai_summary": "Perplexity AI is shipping new features, defying claims of its demise and highlighting its continued innovation in the AI search space."
+    },
+    {
+      "id": "ac82a6748aca",
+      "text": "We\u2019ve partnered with Samsung to bring Perplexity directly into the upcoming Galaxy S26.\n\nEvery new S26 will ship with Perplexity built in as a system\u2011level AI, with its own wake word: \u201cHey Plex.\u201d https://t.co/iDeSzs781n",
+      "author": "perplexity_ai",
+      "url": "https://x.com/perplexity_ai/status/2027067776217841792",
+      "raw_engagement": 64,
+      "engagement": 192,
+      "created_at": "Thu Feb 26 17:06:33 +0000 2026",
+      "source_type": "account",
+      "fetched_at": "2026-02-26T17:23:14.189879+00:00",
+      "cluster_size": 1,
+      "cluster_topic": "",
+      "cluster_urls": [
+        "https://x.com/perplexity_ai/status/2027067776217841792"
+      ],
+      "recency": "breaking",
+      "ai_headline": "Perplexity AI Integrated into Samsung Galaxy S26 [2 Sources]",
+      "ai_summary": "Perplexity AI will be integrated into the upcoming Samsung Galaxy S26, shipping as a system-level AI with the wake word 'Hey Plex.'"
+    },
+    {
+      "id": "ac16749c43ba",
+      "text": "Just a year ago, Anthropic was valued at $18 billion. Today, it\u2019s valued at around $360 billion. An average L4 engineer with four years of experience, a $320k base, and $200k in stock could see that equity grow to roughly $4 million over two years. #Anthropic https://t.co/sU19Yn28GB",
+      "author": "siddarthpaim",
+      "url": "https://x.com/siddarthpaim/status/2026769770582880287",
+      "raw_engagement": 20,
+      "engagement": 180,
+      "created_at": "Wed Feb 25 21:22:23 +0000 2026",
+      "source_type": "home_feed",
+      "fetched_at": "2026-02-26T17:23:14.187551+00:00",
+      "cluster_size": 1,
+      "cluster_topic": "",
+      "cluster_urls": [
+        "https://x.com/siddarthpaim/status/2026769770582880287"
+      ],
+      "recency": "recent",
+      "ai_headline": "Anthropic's Valuation Soars, Benefiting Employees",
+      "ai_summary": "Anthropic's valuation has surged from $18B to $360B, potentially leading to significant equity gains for employees, including engineers."
+    },
+    {
+      "id": "5ffdc229db49",
+      "text": "Nanobanana 2 \ud83c\udf4cis WILD\n\nGave it 3 ref images and a simple prompt, \nhere is 35mm, 50mm and 85mm at f1.2 and f2.0 \n\nIt\u2019s me, like my family thinks this is a photo of me. \n\nGo try it out on Gemini https://t.co/okIm9Z55UL",
+      "author": "LinusEkenstam",
+      "url": "https://x.com/LinusEkenstam/status/2027052563418472656",
+      "raw_engagement": 4,
+      "engagement": 162,
+      "created_at": "Thu Feb 26 16:06:06 +0000 2026",
       "source_type": "following_feed",
-      "fetched_at": "2026-02-25T18:44:27.357686+00:00"
+      "fetched_at": "2026-02-26T17:23:14.188451+00:00",
+      "cluster_size": 1,
+      "cluster_topic": "",
+      "cluster_urls": [
+        "https://x.com/LinusEkenstam/status/2027052563418472656"
+      ],
+      "recency": "breaking",
+      "ai_headline": "Nano Banana 2 Generates Realistic Images on Gemini",
+      "ai_summary": "Users are impressed with Nano Banana 2's ability to generate realistic images based on reference images and prompts on Gemini."
     },
     {
-      "id": "633373d4bbf4",
-      "text": "everything is computer \n\n(made with Perplexity Computer) https://t.co/ms25gF3lid",
+      "id": "949286c0f139",
+      "text": "Perplexity is now integrated into all Samsung Galaxy S26 phones. Every S26 device will have Perplexity pre-loaded with the wake word \"Hey Plex\". The devices come with three assistants: Perplexity, Bixby, Gemini. Bixby will also be powered by Perplexity's search-grounded LLMs. https://t.co/LM9OwkGxry",
       "author": "AravSrinivas",
-      "url": "https://x.com/AravSrinivas/status/2026703703248613736",
-      "engagement": 28,
-      "created_at": "Wed Feb 25 16:59:51 +0000 2026",
+      "url": "https://x.com/AravSrinivas/status/2027068958541799749",
+      "raw_engagement": 30,
+      "engagement": 90,
+      "created_at": "Thu Feb 26 17:11:15 +0000 2026",
       "source_type": "account",
-      "fetched_at": "2026-02-25T18:44:27.358794+00:00"
+      "fetched_at": "2026-02-26T17:23:14.189041+00:00",
+      "cluster_size": 1,
+      "cluster_topic": "",
+      "cluster_urls": [
+        "https://x.com/AravSrinivas/status/2027068958541799749"
+      ],
+      "recency": "breaking",
+      "ai_headline": "Perplexity Powers Samsung's Bixby AI Assistant [2 Sources]",
+      "ai_summary": "Samsung's Bixby AI assistant will use Perplexity's search-grounded LLMs for complex queries on 800M devices, integrated with the Galaxy S26."
     },
     {
-      "id": "3148affa5f08",
-      "text": "Perplexity Computer uses usage\u2011based pricing with optional sub\u2011agent model selection and spending caps.\n\nChoose different models for different sub\u2011agent tasks and control token spend.\n\nMax users get 10,000 credits per month included with their subscription.\n\nWe\u2019re also giving a one\u2011time bonus of 20,000 extra credits, granted at launch for existing users and at signup for new users, that expires 30 days after it\u2019s granted.",
+      "id": "eaa93e310658",
+      "text": "Their new AI assistant, Bixby, uses Perplexity API's for complex, web\u2011based, or generative queries on 800M devices in 2026.\n\nBixby handles all on-device actions while routing any research, questions, and tasks to Perplexity in the background.",
       "author": "perplexity_ai",
-      "url": "https://x.com/perplexity_ai/status/2026695793537855526",
-      "engagement": 22,
-      "created_at": "Wed Feb 25 16:28:26 +0000 2026",
+      "url": "https://x.com/perplexity_ai/status/2027067800825872454",
+      "raw_engagement": 6,
+      "engagement": 18,
+      "created_at": "Thu Feb 26 17:06:39 +0000 2026",
       "source_type": "account",
-      "fetched_at": "2026-02-25T18:44:27.359168+00:00"
+      "fetched_at": "2026-02-26T17:23:14.189898+00:00",
+      "cluster_size": 1,
+      "cluster_topic": "",
+      "cluster_urls": [
+        "https://x.com/perplexity_ai/status/2027067800825872454"
+      ],
+      "recency": "breaking",
+      "ai_headline": "Perplexity API Powers Samsung's Bixby for Complex Queries",
+      "ai_summary": "Samsung's new AI assistant, Bixby, leverages Perplexity APIs for web-based and generative queries, routing research and tasks to Perplexity."
     },
     {
-      "id": "143e8d9c1ab3",
-      "text": "You can now fix PRs without leaving Devin Review!\n\nJust ask Devin to fix any issues it found. Devin will propose inline code changes that you can apply with a single click.\n\nSwap github -&gt; devinreview in any PR link to try Devin Review, no account needed. https://t.co/2LHKDS0MQC",
-      "author": "cognition",
-      "url": "https://x.com/cognition/status/2026011590336938059",
-      "engagement": 20,
-      "created_at": "Mon Feb 23 19:09:39 +0000 2026",
-      "source_type": "account",
-      "fetched_at": "2026-02-25T18:44:27.358975+00:00"
-    },
-    {
-      "id": "36830ead1b0d",
-      "text": "Available on web for Max subscribers today, and coming soon to Perplexity Pro and Enterprise.\n\nhttps://t.co/wOm1wjIC9E",
-      "author": "perplexity_ai",
-      "url": "https://x.com/perplexity_ai/status/2026695805252547008",
-      "engagement": 8,
-      "created_at": "Wed Feb 25 16:28:28 +0000 2026",
-      "source_type": "account",
-      "fetched_at": "2026-02-25T18:44:27.359171+00:00"
-    },
-    {
-      "id": "bd2c60a70fd5",
-      "text": "We're opening it initially to all Max users, and introducing usage-based pricing, which we believe is the right business model for AI instead of ads. Once we are satisfied with load tests, Pro users will be able to run jobs on Computer too.",
+      "id": "6a8e7c8e4c37",
+      "text": "Perplexity\u2019s mission is to power the world\u2019s curiosity, and with Samsung and Perplexity, more curious people with smart questions have access to the world\u2019s knowledge than ever before.",
       "author": "AravSrinivas",
-      "url": "https://x.com/AravSrinivas/status/2026697136507859067",
-      "engagement": 6,
-      "created_at": "Wed Feb 25 16:33:46 +0000 2026",
-      "source_type": "account",
-      "fetched_at": "2026-02-25T18:44:27.358800+00:00"
-    },
-    {
-      "id": "3abb90297ecc",
-      "text": "We also integrated Devin Review into Devin\u2019s core session page.\n\nDevin doesn't just write code and hand it off: it reviews its own output, catches issues, and fixes them before you look at your PRs.",
-      "author": "cognition",
-      "url": "https://x.com/cognition/status/2026343821626483162",
-      "engagement": 4,
-      "created_at": "Tue Feb 24 17:09:49 +0000 2026",
-      "source_type": "account",
-      "fetched_at": "2026-02-25T18:44:27.358968+00:00"
-    },
-    {
-      "id": "18ebb666bf36",
-      "text": "More information about Devin Review: https://t.co/Pa8oYu8raF\n\nGet started: https://t.co/Zzu1a3gNAd",
-      "author": "cognition",
-      "url": "https://x.com/cognition/status/2026011737372471697",
+      "url": "https://x.com/AravSrinivas/status/2027070090374742431",
+      "raw_engagement": 0,
       "engagement": 0,
-      "created_at": "Mon Feb 23 19:10:14 +0000 2026",
+      "created_at": "Thu Feb 26 17:15:45 +0000 2026",
       "source_type": "account",
-      "fetched_at": "2026-02-25T18:44:27.358978+00:00"
+      "fetched_at": "2026-02-26T17:23:14.189080+00:00",
+      "cluster_size": 1,
+      "cluster_topic": "",
+      "cluster_urls": [
+        "https://x.com/AravSrinivas/status/2027070090374742431"
+      ],
+      "recency": "breaking",
+      "ai_headline": "Perplexity & Samsung Partner to Expand Access to Knowledge",
+      "ai_summary": "Perplexity and Samsung partner to make knowledge more accessible to curious individuals through smart questions and AI integration."
+    },
+    {
+      "id": "8485a7e47237",
+      "text": "This launch is part of a broader partnership with Samsung, with Samsung Internet up next.\n\nSamsung will use our APIs for browser control and offer Perplexity as an optional default search engine, similar to how Mozilla lets you choose search providers.\n\nhttps://t.co/NLmITkc2j9",
+      "author": "perplexity_ai",
+      "url": "https://x.com/perplexity_ai/status/2027067812494364902",
+      "raw_engagement": 0,
+      "engagement": 0,
+      "created_at": "Thu Feb 26 17:06:42 +0000 2026",
+      "source_type": "account",
+      "fetched_at": "2026-02-26T17:23:14.189914+00:00",
+      "cluster_size": 1,
+      "cluster_topic": "",
+      "cluster_urls": [
+        "https://x.com/perplexity_ai/status/2027067812494364902"
+      ],
+      "recency": "breaking",
+      "ai_headline": "Perplexity to Integrate with Samsung Internet Browser",
+      "ai_summary": "Perplexity is expanding its partnership with Samsung to integrate with Samsung Internet, offering Perplexity as an optional default search engine."
     }
   ]
 }
