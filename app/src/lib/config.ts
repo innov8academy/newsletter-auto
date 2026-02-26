@@ -84,7 +84,12 @@ export const defaultConfig: NewsletterConfig = {
             category: "newsletter",
             tier: 1
         },
-        // Techspresso — DEAD (301 redirect, broken)
+        {
+            name: "Techspresso",
+            url: "https://rss.app/feeds/b9p7lV1V0GgnylLS.xml",
+            category: "newsletter",
+            tier: 1
+        },
         // TLDR AI — DEAD (404)
 
         // =====================
@@ -207,9 +212,9 @@ export const SCORING_CONFIG = {
     recencyBoostHours: 12, // Stories newer than this get +1
     tierWeight: {
         0: 1.2,  // X/Twitter (real-time, high-engagement)
-        1: 1.0,  // Newsletters
-        2: 0.9,  // News sites
-        3: 1.1,  // Official blogs (important)
+        1: 1.3,  // Newsletters (highest value — curated, multi-story)
+        2: 0.7,  // News sites (lower value — single stories, often rehashed)
+        3: 1.1,  // Official blogs (important — primary sources)
         4: 0.8   // Social
     }
 };
