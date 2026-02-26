@@ -577,10 +577,13 @@ export default function Home() {
           </div>
 
           <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2 text-xs text-white/40 px-3 py-1.5 rounded-full bg-white/5 border border-white/5">
-              <span className="w-2 h-2 rounded-full bg-teal-400 animate-pulse"></span>
-              API Connected
-            </div>
+            <button
+              onClick={() => setShowApiInput(true)}
+              className="flex items-center gap-2 text-xs text-white/40 px-3 py-1.5 rounded-full bg-white/5 border border-white/5 hover:border-amber-500/30 hover:text-amber-400 transition-all cursor-pointer"
+            >
+              <span className={`w-2 h-2 rounded-full ${(apiKey || serverHasKey) ? 'bg-teal-400 animate-pulse' : 'bg-coral-400'}`}></span>
+              {(apiKey || serverHasKey) ? 'API Connected' : 'Connect API'}
+            </button>
 
             <Dialog open={showSourcesDialog} onOpenChange={setShowSourcesDialog}>
               <DialogTrigger asChild>
@@ -1172,6 +1175,43 @@ export default function Home() {
               </div>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* API Key Dialog (accessible from dashboard) */}
+      <Dialog open={showApiInput} onOpenChange={setShowApiInput}>
+        <DialogContent className="bg-[#0B0B0F] border border-white/10 text-white max-w-sm">
+          <DialogHeader>
+            <DialogTitle>API Configuration</DialogTitle>
+            <DialogDescription>
+              {apiKey || serverHasKey 
+                ? 'Update or replace your OpenRouter API key.'
+                : 'Enter your OpenRouter API key to enable AI features.'}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            <div className="space-y-2">
+              <label className="text-xs uppercase tracking-wider text-white/50 font-medium block">OpenRouter API Key</label>
+              <Input
+                type="password"
+                value={apiKey}
+                onChange={(e) => setApiKey(e.target.value)}
+                placeholder="sk-or-..."
+                className="bg-black/40 border-white/10"
+              />
+              <p className="text-xs text-white/30">Get a key at <a href="https://openrouter.ai/keys" target="_blank" rel="noopener noreferrer" className="text-amber-400 hover:underline">openrouter.ai/keys</a></p>
+            </div>
+            {serverHasKey && (
+              <div className="flex items-center gap-2 text-xs text-teal-400/80 bg-teal-400/5 px-3 py-2 rounded-lg border border-teal-400/10">
+                <span className="w-1.5 h-1.5 rounded-full bg-teal-400"></span>
+                Server has a key configured (your input overrides it)
+              </div>
+            )}
+            <div className="flex gap-2 justify-end">
+              <Button variant="ghost" size="sm" onClick={() => setShowApiInput(false)}>Cancel</Button>
+              <Button size="sm" className="bg-amber-500 text-black hover:bg-amber-600" onClick={handleSaveApiKey}>Save Key</Button>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
 

@@ -353,9 +353,11 @@ with open(output_file, 'w') as f:
 print(f"[Done] {len(unique)} unique items saved (from {len(all_items)} total)")
 PYTHON
 
-# ---- AI HEADLINE REWRITING ----
-# Use OpenRouter to turn raw tweets into clean, professional news headlines
-echo "[AI Rewrite] Generating clean headlines..."
+# ---- AI CLASSIFICATION + HEADLINE REWRITING ----
+# Use OpenRouter to:
+# 1. CLASSIFY each item as NEWS vs OPINION/JOKE/PROMO (drop non-news)
+# 2. Rewrite news items into clean headlines
+echo "[AI Filter+Rewrite] Classifying and rewriting..."
 python3 << 'PYEOF'
 import json, urllib.request, os
 
@@ -365,37 +367,49 @@ openrouter_key = os.environ.get('OPENROUTER_API_KEY', '')
 with open(output_file) as f:
     data = json.load(f)
 
-top_items = data['items'][:20]
+# Process more items since many will be filtered out
+top_items = data['items'][:40]
 if not top_items or not openrouter_key:
-    print("[AI Rewrite] Skipped (no key or no items)")
+    print("[AI Filter] Skipped (no key or no items)")
     exit(0)
 
 # Build the prompt with all items
 items_text = ""
 for i, item in enumerate(top_items):
     cluster_info = f" [{item.get('cluster_size', 1)} sources]" if item.get('cluster_size', 1) > 1 else ""
-    items_text += f"{i+1}. @{item['author']}: {item['text'][:300]}{cluster_info}\n\n"
+    items_text += f"{i+1}. @{item['author']}: {item['text'][:250]}{cluster_info}\n\n"
 
-prompt = f"""You are an AI news editor for a tech newsletter. Rewrite these raw X/Twitter posts into clean, professional news headlines + one-line summaries.
+prompt = f"""You are a strict AI news editor. Your job is to separate REAL NEWS from opinions, jokes, and commentary.
 
-Rules:
-- Each headline should be clear, informative, and newsworthy
-- Include the key product/company name
-- If multiple sources mention the same thing, that's BIG news — make the headline reflect its importance
-- Keep each headline under 80 chars
-- Keep each summary under 150 chars
-- Output JSON array: [{{"idx": 1, "headline": "...", "summary": "..."}}]
-- Only output the JSON, nothing else
+STEP 1: Classify each item:
+- "news" = Actual news: product launches, releases, updates, acquisitions, partnerships, research papers, funding rounds, policy changes, benchmarks, tools shipping
+- "skip" = NOT news: personal opinions about AI tools, jokes, memes, self-promotion, investment pitches, job hunting, vague commentary, "I tested X and it's great", reactions to news (unless they ADD new information), non-AI topics
 
-Raw posts:
+STEP 2: For "news" items only, rewrite into clean headlines.
+
+IMPORTANT RULES:
+- Be STRICT. If someone is just sharing their opinion about Claude/GPT/etc — that's "skip"
+- "I love using X" = skip. "X just launched v2 with Y features" = news
+- Jokes and memes about AI = skip
+- "Testing X and it works great" = skip (unless it's a launch announcement)
+- Investment/VC pitches = skip
+- Iran/politics/non-AI = skip
+- If it's borderline, skip it. We only want REAL news.
+
+Output JSON array: [{{"idx": 1, "type": "news", "headline": "...", "summary": "..."}}, {{"idx": 2, "type": "skip"}}]
+Headlines: max 80 chars, include product/company name
+Summaries: max 150 chars
+Only output JSON.
+
+Items:
 {items_text}"""
 
 try:
     req_data = json.dumps({
         "model": "google/gemini-2.0-flash-001",
         "messages": [{"role": "user", "content": prompt}],
-        "max_tokens": 2000,
-        "temperature": 0.3
+        "max_tokens": 3000,
+        "temperature": 0.1
     }).encode()
 
     req = urllib.request.Request(
@@ -406,36 +420,50 @@ try:
             'Content-Type': 'application/json'
         }
     )
-    resp = urllib.request.urlopen(req, timeout=30)
+    resp = urllib.request.urlopen(req, timeout=45)
     result = json.loads(resp.read())
     content = result['choices'][0]['message']['content']
     
-    # Parse JSON from response (handle markdown code blocks)
+    # Parse JSON from response
     content = content.strip()
     if content.startswith('```'):
         content = content.split('\n', 1)[1]
         content = content.rsplit('```', 1)[0]
     
-    rewrites = json.loads(content)
+    classifications = json.loads(content)
     
-    # Apply rewrites to items
-    for rw in rewrites:
-        idx = rw.get('idx', 0) - 1
+    # Apply classifications — keep only news, drop opinions
+    news_items = []
+    skipped = 0
+    for cl in classifications:
+        idx = cl.get('idx', 0) - 1
         if 0 <= idx < len(top_items):
-            top_items[idx]['ai_headline'] = rw.get('headline', '')
-            top_items[idx]['ai_summary'] = rw.get('summary', '')
+            if cl.get('type') == 'news':
+                item = top_items[idx]
+                item['ai_headline'] = cl.get('headline', '')
+                item['ai_summary'] = cl.get('summary', '')
+                news_items.append(item)
+            else:
+                skipped += 1
     
-    # Save back
-    data['items'][:20] = top_items
+    print(f"[AI Filter] {len(news_items)} news items kept, {skipped} opinions/jokes dropped")
+    
+    # Replace items with only the news items
+    # Keep any remaining unclassified items at the end (in case AI didn't classify all)
+    classified_idxs = {cl.get('idx', 0) - 1 for cl in classifications}
+    unclassified = [item for i, item in enumerate(top_items) if i not in classified_idxs]
+    
+    data['items'] = news_items + unclassified[:10]  # News first, then overflow
+    data['count'] = len(data['items'])
+    
     with open(output_file, 'w') as f:
         json.dump(data, f, indent=2)
     
-    rewritten = sum(1 for i in top_items if i.get('ai_headline'))
-    print(f"[AI Rewrite] {rewritten}/{len(top_items)} items rewritten")
+    print(f"[AI Filter] Final: {len(data['items'])} items in feed")
 
 except Exception as e:
-    print(f"[AI Rewrite] Error: {e}")
-    # Continue without rewrites — raw data still works
+    print(f"[AI Filter] Error: {e}")
+    # Continue without filtering — raw data still works
 PYEOF
 
 # Push to Supabase

@@ -1,159 +1,210 @@
 {
-  "fetched_at": "2026-02-26T17:32:39.484234+00:00",
-  "count": 9,
+  "fetched_at": "2026-02-26T18:00:55.394227+00:00",
+  "count": 12,
   "items": [
     {
-      "id": "de710048636d",
-      "text": "\ud83d\udea8 WARNING:\n\nANTHROPIC CEO JUST SAID THAT AI WILL WIPE OUT EVERY JOB,\n\nAND SPIKE UNEMPLOYMENT TO 20% IN THE NEXT 12 MONTHS\n\nTHIS IS ABSOLUTELY CRAZY\n\n\u201cNO LIMIT\u201d HAS BEEN WARNING US FOREVER. HIS ACCOUNT IS BLOWING UP RIGHT NOW.\n\nHE SAID ROBOTS WILL SOON BE ABLE TO FUC\u2026 Show more https://t.co/cpfcQDse5l",
-      "author": "theUMreal",
-      "url": "https://x.com/theUMreal/status/2026960161319829614",
-      "raw_engagement": 820,
-      "engagement": 1840,
-      "created_at": "Thu Feb 26 09:58:56 +0000 2026",
+      "id": "fc85c097639a",
+      "text": "BREAKING: The US Pentagon has made a \"final offer\" to Anthropic seeking unrestricted military use of its AI capabilities ahead of a Friday deadline.\n\nDetails include:\n\n1. Pete Hegseth threatening to label Anthropic as a \"supply chain risk\"\n\n2. Anthropic is resisting use of its AI capabilities to surveil Americans\n\n3. Anthropic is resisting use of its AI capabilities for lethal military missions\n\n4. Anthropic was recently awarded a $200 million government contract\n\n5. Anthropic now has just over ",
+      "author": "KobeissiLetter",
+      "url": "https://x.com/KobeissiLetter/status/2027031529042411581",
+      "raw_engagement": 836,
+      "engagement": 2340,
+      "created_at": "Thu Feb 26 14:42:31 +0000 2026",
       "source_type": "home_feed",
-      "fetched_at": "2026-02-26T17:32:39.479147+00:00",
+      "fetched_at": "2026-02-26T18:00:55.389456+00:00",
       "cluster_size": 1,
       "cluster_topic": "",
       "cluster_urls": [
-        "https://x.com/theUMreal/status/2026960161319829614"
-      ],
-      "recency": "today"
-    },
-    {
-      "id": "0049a5bc5996",
-      "text": "It's 2036 and 80% of jobs have been replaced by AI and robotics. https://t.co/IoziutBePJ",
-      "author": "JesseCohenInv",
-      "url": "https://x.com/JesseCohenInv/status/2026975867738419490",
-      "raw_engagement": 818,
-      "engagement": 1836,
-      "created_at": "Thu Feb 26 11:01:20 +0000 2026",
-      "source_type": "home_feed",
-      "fetched_at": "2026-02-26T17:32:39.479290+00:00",
-      "cluster_size": 1,
-      "cluster_topic": "",
-      "cluster_urls": [
-        "https://x.com/JesseCohenInv/status/2026975867738419490"
-      ],
-      "recency": "today"
-    },
-    {
-      "id": "e79f22c2d733",
-      "text": "Chris Camillo says AI is accelerating so fast that going to school might not be worth it anymore\n\n\"One of my kids is 16 years old and he drives himself to school, and one day he slept in and I was so astonished. I was like, how is that even possible? If I would have done that as a kid, the thought of what my parents would have done to me\"\n\n\"But there was a part of me in the back of my head, does it even matter anymore? I'm looking at my kid going to school and I am like, why are you even in scho",
-      "author": "CryptoMikli",
-      "url": "https://x.com/CryptoMikli/status/2027009426012418502",
-      "raw_engagement": 266,
-      "engagement": 915,
-      "created_at": "Thu Feb 26 13:14:41 +0000 2026",
-      "source_type": "home_feed",
-      "fetched_at": "2026-02-26T17:32:39.479304+00:00",
-      "cluster_size": 1,
-      "cluster_topic": "",
-      "cluster_urls": [
-        "https://x.com/CryptoMikli/status/2027009426012418502"
+        "https://x.com/KobeissiLetter/status/2027031529042411581"
       ],
       "recency": "fresh"
     },
     {
-      "id": "889bbedfce2e",
-      "text": "JUST IN: Jensen Huang says market \"got it wrong\" on AI threat to software companies",
-      "author": "Kalshi",
-      "url": "https://x.com/Kalshi/status/2027006936915353765",
-      "raw_engagement": 150,
-      "engagement": 625,
-      "created_at": "Thu Feb 26 13:04:48 +0000 2026",
-      "source_type": "home_feed",
-      "fetched_at": "2026-02-26T17:32:39.479318+00:00",
+      "id": "7178d150aa5a",
+      "text": "OpenClaw AI Agent Boasts 232,000 Stars Amid Bug Frustrations and Fixes",
+      "author": "X_Trending",
+      "url": "",
+      "raw_engagement": 362,
+      "engagement": 1086,
+      "created_at": "2 hours ago",
+      "source_type": "trending",
+      "fetched_at": "2026-02-26T18:00:55.390190+00:00",
       "cluster_size": 1,
       "cluster_topic": "",
       "cluster_urls": [
-        "https://x.com/Kalshi/status/2027006936915353765"
-      ],
-      "recency": "fresh"
-    },
-    {
-      "id": "7f76533727cd",
-      "text": "AI agents can now use a browser like humans\n\nVercel just dropped agent-browser a CLI that lets AI:\n\n\u2022 Navigate any website\n\u2022 Click, type & interact with elements\n\u2022 Take screenshots & extract data\n\u2022 Persist sessions, cookies & auth\n\u2022 Run complete workflows autonomously\n\nBasically, you can turn any AI into a real web user\nThis changes everything for automation, scraping & autonomous agents\n\nlink - https://t.co/hAIsWjfjLb",
-      "author": "_vmlops",
-      "url": "https://x.com/_vmlops/status/2026906044568584694",
-      "raw_engagement": 126,
-      "engagement": 452,
-      "created_at": "Thu Feb 26 06:23:53 +0000 2026",
-      "source_type": "home_feed",
-      "fetched_at": "2026-02-26T17:32:39.479161+00:00",
-      "cluster_size": 1,
-      "cluster_topic": "",
-      "cluster_urls": [
-        "https://x.com/_vmlops/status/2026906044568584694"
-      ],
-      "recency": "today"
-    },
-    {
-      "id": "94667dfd640c",
-      "text": "Started with @framer widgets\n\nEnded up designing a full 3D AI motion app\n\nHow does this even happen \ud83d\ude05 https://t.co/hoirOx2PWK",
-      "author": "tranmautritam",
-      "url": "https://x.com/tranmautritam/status/2027022203708207363",
-      "raw_engagement": 70,
-      "engagement": 425,
-      "created_at": "Thu Feb 26 14:05:28 +0000 2026",
-      "source_type": "home_feed",
-      "fetched_at": "2026-02-26T17:32:39.479245+00:00",
-      "cluster_size": 1,
-      "cluster_topic": "",
-      "cluster_urls": [
-        "https://x.com/tranmautritam/status/2027022203708207363"
-      ],
-      "recency": "fresh"
-    },
-    {
-      "id": "2e4f8e3a0178",
-      "text": "the truth is no matter how hard you try you\u2019ll never be able to keep up with 100% of what\u2019s going on in AI right now \n\nthere\u2019s just too much action right now",
-      "author": "gregisenberg",
-      "url": "https://x.com/gregisenberg/status/2027043651684061466",
-      "raw_engagement": 40,
-      "engagement": 420,
-      "created_at": "Thu Feb 26 15:30:41 +0000 2026",
-      "source_type": "home_feed",
-      "fetched_at": "2026-02-26T17:32:39.479276+00:00",
-      "cluster_size": 1,
-      "cluster_topic": "",
-      "cluster_urls": [
-        "https://x.com/gregisenberg/status/2027043651684061466"
+        ""
       ],
       "recency": "breaking"
     },
     {
-      "id": "9ebda0904238",
-      "text": "Holy moly, the Gemini app can take actions now.\n\nIt will launch soon as a beta feature in the Gemini app for Pixel 10, Pixel 10 Pro, and the Samsung Galaxy S26 series.\n\nI am not sure if it will roll out globally or be limited to the US during beta.\nhttps://t.co/X2LQ8IX05M",
-      "author": "ai_for_success",
-      "url": "https://x.com/ai_for_success/status/2026979666368831997",
-      "raw_engagement": 20,
-      "engagement": 240,
-      "created_at": "Thu Feb 26 11:16:26 +0000 2026",
+      "id": "e6941513c826",
+      "text": "Claude for legal works seems to work just well as Harvey btw",
+      "author": "typesfast",
+      "url": "https://x.com/typesfast/status/2026998028222013679",
+      "raw_engagement": 76,
+      "engagement": 440,
+      "created_at": "Thu Feb 26 12:29:24 +0000 2026",
       "source_type": "home_feed",
-      "fetched_at": "2026-02-26T17:32:39.478943+00:00",
+      "fetched_at": "2026-02-26T18:00:55.389470+00:00",
       "cluster_size": 1,
       "cluster_topic": "",
       "cluster_urls": [
-        "https://x.com/ai_for_success/status/2026979666368831997"
+        "https://x.com/typesfast/status/2026998028222013679"
+      ],
+      "recency": "fresh"
+    },
+    {
+      "id": "88261cbd16b2",
+      "text": "when you realise you\u2019re only 1 Claude tweet away from unemployment https://t.co/iXfP6LGfQr",
+      "author": "lochan_twt",
+      "url": "https://x.com/lochan_twt/status/2026987695495581774",
+      "raw_engagement": 102,
+      "engagement": 404,
+      "created_at": "Thu Feb 26 11:48:20 +0000 2026",
+      "source_type": "home_feed",
+      "fetched_at": "2026-02-26T18:00:55.389500+00:00",
+      "cluster_size": 1,
+      "cluster_topic": "",
+      "cluster_urls": [
+        "https://x.com/lochan_twt/status/2026987695495581774"
       ],
       "recency": "today"
     },
     {
-      "id": "504df878cbe3",
-      "text": "Most people who try to self host OpenClaw give up before it is running.\n\nSSH, Node.js, API keys scattered across config files, no monitoring, and every update means starting the whole process over. It is a 30 to 60 minute job for experienced devs. For everyone else it is just a wall.\n\nKilo Claw fixes that. Fully managed hosted OpenClaw running in under 60 seconds. \n500 plus AI models via Kilo Gateway, scheduled automations, zero markup on tokens. If you are already on Kilo Code, your existing ac",
-      "author": "ai_for_success",
-      "url": "https://x.com/ai_for_success/status/2026839362428875086",
-      "raw_engagement": 4,
-      "engagement": 156,
-      "created_at": "Thu Feb 26 01:58:55 +0000 2026",
+      "id": "5edd8f0c0d56",
+      "text": "Claude Cowork is f*cking ridiculous \ud83e\udd2f\n\nOne prompt \u2192 competitive research, creative briefs, 15 hook variations, and a full performance dashboard.\n\nAll saved as real files on your computer.\n\nAll inside Claude Desktop.\n\nIf you're spending hours every week copy-pasting between tools, pulling competitor ads manually, writing briefs from scratch, and building reports in spreadsheets ...\n\nClaude Cowork eliminates the entire loop:\n\n\u2192 Point it at your project folder with brand voice + context files\n\u2192 It ",
+      "author": "mikefutia",
+      "url": "https://x.com/mikefutia/status/2027076867069759761",
+      "raw_engagement": 8,
+      "engagement": 324,
+      "created_at": "Thu Feb 26 17:42:41 +0000 2026",
       "source_type": "home_feed",
-      "fetched_at": "2026-02-26T17:32:39.478736+00:00",
+      "fetched_at": "2026-02-26T18:00:55.388698+00:00",
       "cluster_size": 1,
       "cluster_topic": "",
       "cluster_urls": [
-        "https://x.com/ai_for_success/status/2026839362428875086"
+        "https://x.com/mikefutia/status/2027076867069759761"
       ],
-      "recency": "recent"
+      "recency": "breaking"
+    },
+    {
+      "id": "19becf8bc729",
+      "text": "Someone built an interactive GPT visualizer that shows every single step of how a model generates output.\n\nNot just the final answer.\nThe actual pipeline. https://t.co/rH45vP7nIo",
+      "author": "Amank1412",
+      "url": "https://x.com/Amank1412/status/2026943753844670643",
+      "raw_engagement": 52,
+      "engagement": 304,
+      "created_at": "Thu Feb 26 08:53:44 +0000 2026",
+      "source_type": "home_feed",
+      "fetched_at": "2026-02-26T18:00:55.389557+00:00",
+      "cluster_size": 1,
+      "cluster_topic": "",
+      "cluster_urls": [
+        "https://x.com/Amank1412/status/2026943753844670643"
+      ],
+      "recency": "today"
+    },
+    {
+      "id": "6f6f0ce718c7",
+      "text": "New AI sdk pattern \ud83e\udd0c\n- Render product video's like this for ~$0.008\n- English in -&gt; video out\n\nstack\n@shadcn \n@aisdk \n@ctatedev json-render remotion https://t.co/alRCb1DBjS",
+      "author": "nolansym",
+      "url": "https://x.com/nolansym/status/2027056881840058576",
+      "raw_engagement": 0,
+      "engagement": 300,
+      "created_at": "Thu Feb 26 16:23:16 +0000 2026",
+      "source_type": "home_feed",
+      "fetched_at": "2026-02-26T18:00:55.389358+00:00",
+      "cluster_size": 1,
+      "cluster_topic": "",
+      "cluster_urls": [
+        "https://x.com/nolansym/status/2027056881840058576"
+      ],
+      "recency": "breaking"
+    },
+    {
+      "id": "17576632de6c",
+      "text": "we occasionally invest in ai companies when we meet incredible founders like akshay and ajit! thrilled to announce companion labs' seed where we were the first yes and glad to bring along our friends at @peakxvpartners @_surgeahead to lead their round! \n\nhttps://t.co/RUPHFrzhFN",
+      "author": "anmolm_",
+      "url": "https://x.com/anmolm_/status/2026993545513718084",
+      "raw_engagement": 0,
+      "engagement": 250,
+      "created_at": "Thu Feb 26 12:11:35 +0000 2026",
+      "source_type": "home_feed",
+      "fetched_at": "2026-02-26T18:00:55.389111+00:00",
+      "cluster_size": 1,
+      "cluster_topic": "",
+      "cluster_urls": [
+        "https://x.com/anmolm_/status/2026993545513718084"
+      ],
+      "recency": "fresh"
+    },
+    {
+      "id": "e746fbd39ebb",
+      "text": "Luckily, yesterday, before CapCut shut down Seedance 2.0, I was able to create this 15-second continuous single-shot action sequence with a hard noir aesthetic. And what can I say\u2026\n\nThis is the most mind-blowing action sequence I\u2019ve ever seen generated with AI \ud83e\udd2f\n\nIt doesn\u2019t fall short of Sin City at all. I\u2019m sure Frank Miller would love it.\n\nBig words.",
+      "author": "Artedeingenio",
+      "url": "https://x.com/Artedeingenio/status/2026946086963679566",
+      "raw_engagement": 24,
+      "engagement": 248,
+      "created_at": "Thu Feb 26 09:03:00 +0000 2026",
+      "source_type": "home_feed",
+      "fetched_at": "2026-02-26T18:00:55.389223+00:00",
+      "cluster_size": 1,
+      "cluster_topic": "",
+      "cluster_urls": [
+        "https://x.com/Artedeingenio/status/2026946086963679566"
+      ],
+      "recency": "today"
+    },
+    {
+      "id": "a0932da1e574",
+      "text": "Iran is rushing to export oil amid surging tensions with the US:\n\nIranian crude exports jumped +200% MoM, to 20 million barrels between February 15-20.\n\nThis is equivalent to over 3 million barrels per day, far above Iran's usual daily exports.\n\nSatellite imagery confirms the spike, with tankers near Iranian ports more than doubling from 8 to 18 over the same period.\n\nThe same pattern was seen last year, when Iran rushed to ship crude shortly before American air strikes, and again in 2024 during",
+      "author": "KobeissiLetter",
+      "url": "https://x.com/KobeissiLetter/status/2027079805682749621",
+      "raw_engagement": 18,
+      "engagement": 204,
+      "created_at": "Thu Feb 26 17:54:21 +0000 2026",
+      "source_type": "following_feed",
+      "fetched_at": "2026-02-26T18:00:55.389892+00:00",
+      "cluster_size": 1,
+      "cluster_topic": "",
+      "cluster_urls": [
+        "https://x.com/KobeissiLetter/status/2027079805682749621"
+      ],
+      "recency": "breaking"
+    },
+    {
+      "id": "eb6f0523b0e8",
+      "text": "Been testing the new @orchidsapp 1.0.\n\nIt's unlike anything I've seen.\n\n\u2192 Build *ANY* app\n\u2192 Across *ANY* stack\n\u2192 Web, Mobile, Agents, Python, Chrome extensions, robotics..\n\n... you can even plug in your ChatGPT/Claude Code subs \ud83d\udd25\n\n8 wild use cases \ud83e\uddf5\u2193 https://t.co/VFNQWkHqiv",
+      "author": "DataChaz",
+      "url": "https://x.com/DataChaz/status/2027074343881388063",
+      "raw_engagement": 12,
+      "engagement": 186,
+      "created_at": "Thu Feb 26 17:32:39 +0000 2026",
+      "source_type": "following_feed",
+      "fetched_at": "2026-02-26T18:00:55.390047+00:00",
+      "cluster_size": 1,
+      "cluster_topic": "",
+      "cluster_urls": [
+        "https://x.com/DataChaz/status/2027074343881388063"
+      ],
+      "recency": "breaking"
+    },
+    {
+      "id": "aef448d3b95b",
+      "text": "Loved collaborating with @orchidsapp on this \ud83e\udd1d\n\n\u267b\ufe0f Show some love with a repost if you enjoyed the content. Supporting small teams is how we build the future!\n\nStay ahead with daily drops on LLMs, agents, and workflows by following @datachaz",
+      "author": "DataChaz",
+      "url": "https://x.com/DataChaz/status/2027075155437175133",
+      "raw_engagement": 0,
+      "engagement": 150,
+      "created_at": "Thu Feb 26 17:35:52 +0000 2026",
+      "source_type": "following_feed",
+      "fetched_at": "2026-02-26T18:00:55.390090+00:00",
+      "cluster_size": 1,
+      "cluster_topic": "",
+      "cluster_urls": [
+        "https://x.com/DataChaz/status/2027075155437175133"
+      ],
+      "recency": "breaking"
     }
   ]
 }
