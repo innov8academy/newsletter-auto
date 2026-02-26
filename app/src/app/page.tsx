@@ -121,27 +121,14 @@ export default function Home() {
         // Always deduplicate by normalized title
         const normalize = (t: string) => t?.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 60) || '';
         
-        if (refresh) {
-          setXNews(prev => {
-            const combined = [...newItems, ...prev];
-            const seen = new Set<string>();
-            return combined.filter((i: any) => {
-              const key = normalize(i.title);
-              if (seen.has(key)) return false;
-              seen.add(key);
-              return true;
-            });
-          });
-        } else {
-          // Initial load — deduplicate within the batch
-          const seen = new Set<string>();
-          setXNews(newItems.filter((i: any) => {
-            const key = normalize(i.title);
-            if (seen.has(key)) return false;
-            seen.add(key);
-            return true;
-          }));
-        }
+        // ALWAYS replace with fresh data — never accumulate old items
+        const seen = new Set<string>();
+        setXNews(newItems.filter((i: any) => {
+          const key = normalize(i.title);
+          if (seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        }));
       }
     } catch (e) {
       console.error('Failed to fetch X news', e);

@@ -51,9 +51,12 @@ export async function GET() {
         const items = await response.json();
 
         const formatted = items.map((item: any) => {
+            // AI-rewritten headlines won't have @handle prefix
             const handleMatch = item.title?.match(/^@(\w+):\s*/);
-            const author = handleMatch ? handleMatch[1] : 'unknown';
-            const cleanTitle = item.title?.replace(/^@\w+:\s*/, '') || '';
+            const author = handleMatch ? handleMatch[1] : 'AI';
+            const cleanTitle = handleMatch 
+                ? item.title?.replace(/^@\w+:\s*/, '') || ''
+                : item.title || '';
 
             return {
                 id: item.id,

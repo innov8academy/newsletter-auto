@@ -263,8 +263,9 @@ async function fetchXNews(): Promise<NewsItem[]> {
 export async function fetchAllNews(feeds: RSSFeed[]): Promise<NewsItem[]> {
     const allPromises = feeds.map(feed => parseRSSFeed(feed));
     
-    // Also fetch X/Twitter news in parallel
-    allPromises.push(fetchXNews());
+    // X/Twitter news is shown in its own panel — don't mix into Top Stories
+    // This prevents duplicates and keeps the sections distinct
+    // allPromises.push(fetchXNews());  // DISABLED: X news handled separately
     
     const results = await Promise.all(allPromises);
 
