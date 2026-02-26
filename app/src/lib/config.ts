@@ -65,12 +65,13 @@ export const defaultConfig: NewsletterConfig = {
             category: "newsletter",
             tier: 1
         },
-        {
-            name: "Ben's Bites",
-            url: "https://rss.app/feeds/O60XfEFYoxJhYVkS.xml",
-            category: "newsletter",
-            tier: 1
-        },
+        // Ben's Bites — DEAD (last post Oct 2025)
+        // {
+        //     name: "Ben's Bites",
+        //     url: "https://rss.app/feeds/O60XfEFYoxJhYVkS.xml",
+        //     category: "newsletter",
+        //     tier: 1
+        // },
         {
             name: "The Neuron",
             url: "https://rss.app/feeds/e2QjBpEDLPfVUeoI.xml",
@@ -83,18 +84,9 @@ export const defaultConfig: NewsletterConfig = {
             category: "newsletter",
             tier: 1
         },
-        {
-            name: "Techspresso",
-            url: "https://www.dupple.com/techpresso-archives/rss.xml",
-            category: "newsletter",
-            tier: 1
-        },
-        {
-            name: "TLDR AI",
-            url: "https://tldr.tech/ai/rss",
-            category: "newsletter",
-            tier: 1
-        },
+        // Techspresso — DEAD (301 redirect, broken)
+        // TLDR AI — DEAD (404)
+
         // =====================
         // TIER 2: TECH NEWS SITES (single stories per item)
         // =====================

@@ -1,7 +1,6 @@
 #!/bin/bash
 # X/Twitter AI News Fetcher for Newsletter
-# Uses bird CLI to pull latest AI news, pushes to Supabase
-# v2: Topic clustering, recency boost, AI-powered headline rewriting
+# SIMPLE: Fetch X's AI-curated trending news → push to Supabase
 set -euo pipefail
 
 BIRD="/home/ubuntu/.local/bin/bird"
@@ -18,57 +17,30 @@ OUTPUT_FILE="$OUTPUT_DIR/latest.json"
 TEMP_DIR=$(mktemp -d)
 trap "rm -rf $TEMP_DIR" EXIT
 
-# Load API key from env file (NEVER hardcode keys)
+# Load OpenRouter key from content-engine if not in secrets
 OPENROUTER_API_KEY="${OPENROUTER_API_KEY:-$(grep OPENROUTER_API_KEY /home/ubuntu/content-engine/app/.env.local 2>/dev/null | cut -d= -f2)}"
-HISTORY_FILE="$OUTPUT_DIR/shown_history.json"
 
 mkdir -p "$OUTPUT_DIR"
 echo "[$(date -u)] Starting X news fetch..."
 
-# REMOVED: Home feed and Following feed — too noisy (opinions, jokes, random stuff)
-# Alex's feed changes too fast and picks up low-quality content
-
-# LAYER 1: X's AI-curated trending news (best signal for actual NEWS)
-echo "[Layer 1] Fetching X trending AI news..."
-$BIRD news --ai-only -n 30 --json > "$TEMP_DIR/trending.json" 2>/dev/null || echo "[]" > "$TEMP_DIR/trending.json"
+# SOURCE 1: X's AI-curated trending news
+echo "[Fetch] Getting X AI curated trending news..."
+$BIRD news --ai-only -n 30 --json > "$TEMP_DIR/trending_ai.json" 2>/dev/null || echo "[]" > "$TEMP_DIR/trending_ai.json"
 sleep 2
 
-# LAYER 2: Targeted searches — specific to catch launches & announcements
-echo "[Layer 2] Running targeted searches..."
-SEARCHES=(
-  "AI launch OR AI release OR AI update min_faves:500 -is:retweet"
-  "Perplexity OR Cursor OR Claude OR Gemini launched OR releasing min_faves:200 -is:retweet"
-  "OpenAI OR Anthropic OR Google AI announcing OR introduces min_faves:300 -is:retweet"
-  "AI tool launched OR shipping OR now available min_faves:200 -is:retweet"
-  "open source AI model released min_faves:100 -is:retweet"
-  "AI pricing OR free tier OR API cost min_faves:100 -is:retweet"
-)
-search_idx=0
-for query in "${SEARCHES[@]}"; do
-  $BIRD $ALEX_AUTH search "$query" -n 10 --json > "$TEMP_DIR/search_${search_idx}.json" 2>/dev/null || echo "[]" > "$TEMP_DIR/search_${search_idx}.json"
-  search_idx=$((search_idx + 1))
-  sleep 2
-done
+# SOURCE 2: X's general trending (we filter to AI ourselves — catches more)
+echo "[Fetch] Getting X general trending news..."
+$BIRD news -n 30 --json > "$TEMP_DIR/trending_general.json" 2>/dev/null || echo "[]" > "$TEMP_DIR/trending_general.json"
 
-# LAYER 3: Key AI accounts (official announcements, not opinions)
-echo "[Layer 3] Fetching from key AI accounts..."
-ACCOUNTS=("_akhaliq" "sama" "AnthropicAI" "GoogleAI" "OpenAI" "perplexity_ai" "cursor_ai" "AravSrinivas" "karpathy" "cognition" "xaborai" "GoogleDeepMind" "MetaAI" "ylaboratory" "demaborishassabis")
-for account in "${ACCOUNTS[@]}"; do
-  $BIRD $ALEX_AUTH user-tweets "$account" -n 5 --json > "$TEMP_DIR/account_${account}.json" 2>/dev/null || echo "[]" > "$TEMP_DIR/account_${account}.json"
-  sleep 1
-done
-
-# Combine, cluster, rank, and rewrite with AI
-echo "[Combine] Merging all sources..."
-export TEMP_DIR OUTPUT_FILE OPENROUTER_API_KEY HISTORY_FILE
+# Process and save
+echo "[Process] Processing trending items..."
+export TEMP_DIR OUTPUT_FILE
 python3 << 'PYTHON'
-import json, os, hashlib, re, urllib.request, time
-from datetime import datetime, timezone, timedelta
+import json, os, hashlib
+from datetime import datetime, timezone
 
 temp_dir = os.environ['TEMP_DIR']
 output_file = os.environ['OUTPUT_FILE']
-openrouter_key = os.environ.get('OPENROUTER_API_KEY', '')
-all_items = []
 
 def safe_load(path):
     try:
@@ -81,380 +53,69 @@ def safe_load(path):
 def make_id(text):
     return hashlib.md5(text.encode()).hexdigest()[:12]
 
-def parse_relative_time(time_str):
-    """Parse relative time strings like '13 hours ago', '2 days ago' into datetime"""
-    if not time_str or not isinstance(time_str, str):
-        return None
-    now = datetime.now(timezone.utc)
-    m = re.match(r'(\d+)\s*(second|minute|hour|day|week|month)s?\s*ago', time_str.lower())
-    if m:
-        val, unit = int(m.group(1)), m.group(2)
-        deltas = {'second': 1, 'minute': 60, 'hour': 3600, 'day': 86400, 'week': 604800, 'month': 2592000}
-        return now - timedelta(seconds=val * deltas.get(unit, 86400))
-    # Try ISO format
-    for fmt in ['%Y-%m-%dT%H:%M:%S%z', '%Y-%m-%dT%H:%M:%S.%f%z', '%a %b %d %H:%M:%S %z %Y']:
-        try:
-            return datetime.strptime(time_str, fmt)
-        except:
-            pass
-    return None
+# AI keyword filter — X trending includes non-AI stuff even with --ai-only
+AI_KEYWORDS = {'ai ', ' ai', 'artificial intelligence', 'gpt', 'claude', 'gemini', 'llm',
+    'openai', 'anthropic', 'deepmind', 'machine learning', 'chatbot', 'midjourney',
+    'stable diffusion', 'dall-e', 'sora', 'copilot', 'cursor', 'perplexity', 'devin',
+    'hugging face', 'nvidia', 'robot', 'generative', 'foundation model',
+    'agi', 'coding agent', 'ai agent', 'ai model', 'benchmark', 'llama', 'mistral',
+    'nano banana', 'imagen', 'flux', 'gemma', 'grok', 'deepseek',
+    'image generation', 'video generation', 'text to', 'ai tool', 'ai startup',
+    'moonlake', 'whisper', 'diffusion', 'transformer', 'neural', 'autonomous',
+    'apple intelligence', 'meta ai', 'google ai', 'amazon ai'}
 
-def hours_ago(dt):
-    """Return how many hours ago a datetime was"""
-    if not dt:
-        return 48  # default: treat as old
-    now = datetime.now(timezone.utc)
-    if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=timezone.utc)
-    return (now - dt).total_seconds() / 3600
+def is_ai(text):
+    t = text.lower()
+    return any(kw in t for kw in AI_KEYWORDS)
 
-def extract_tweet(tweet, source_type, boost=0):
-    """Extract a normalized item from a tweet dict"""
-    if not isinstance(tweet, dict):
-        return None
-    text = tweet.get('text', tweet.get('full_text', ''))
-    if not text or text.startswith('RT @'):
-        return None
-    author = tweet.get('author', tweet.get('username', ''))
-    if isinstance(author, dict):
-        author = author.get('screen_name', author.get('username', ''))
-    tweet_id = str(tweet.get('id', ''))
-    likes = int(tweet.get('favorite_count', tweet.get('likes', tweet.get('favoriteCount', 0))) or 0)
-    rts = int(tweet.get('retweet_count', tweet.get('retweets', tweet.get('retweetCount', 0))) or 0)
-    url = f"https://x.com/{author}/status/{tweet_id}" if author and tweet_id else ''
-    created_at = tweet.get('created_at', tweet.get('createdAt', ''))
-    
-    return {
-        'id': make_id(f"{text[:100]}-{author}"),
-        'text': text[:500],
-        'author': str(author),
-        'url': url,
-        'raw_engagement': likes + rts * 2,
-        'engagement': likes + rts * 2 + boost,
-        'created_at': created_at,
-        'created_dt': parse_relative_time(created_at),
-        'source_type': source_type,
-        'fetched_at': datetime.now(timezone.utc).isoformat()
-    }
-
-# Home feed and following feed REMOVED — too noisy with opinions/jokes
-
-# Process trending items
-for item in safe_load(f"{temp_dir}/trending.json"):
+# Combine both trending feeds and filter to AI-only
+all_trending = safe_load(f"{temp_dir}/trending_ai.json") + safe_load(f"{temp_dir}/trending_general.json")
+items = []
+skipped = 0
+for item in all_trending:
     headline = item.get('headline', '')
     if not headline:
         continue
-    all_items.append({
+    if not is_ai(headline):
+        skipped += 1
+        continue
+    items.append({
         'id': make_id(headline),
         'text': headline,
         'author': 'X_Trending',
         'url': '',
-        'raw_engagement': item.get('postCount', 0) or 0,
         'engagement': item.get('postCount', 0) or 0,
-        'created_at': item.get('timeAgo', ''),
-        'created_dt': parse_relative_time(item.get('timeAgo', '')),
         'source_type': 'trending',
         'fetched_at': datetime.now(timezone.utc).isoformat()
     })
 
-# Process search results and account tweets
-for fname in sorted(os.listdir(temp_dir)):
-    if not (fname.startswith('search_') or fname.startswith('account_')):
-        continue
-    source_type = 'search' if fname.startswith('search_') else 'account'
-    for tweet in safe_load(f"{temp_dir}/{fname}"):
-        if not isinstance(tweet, dict):
-            continue
-        if 'headline' in tweet and 'text' not in tweet:
-            all_items.append({
-                'id': make_id(tweet['headline']),
-                'text': tweet['headline'],
-                'author': 'X_Trending',
-                'url': '',
-                'raw_engagement': tweet.get('postCount', 0) or 0,
-                'engagement': tweet.get('postCount', 0) or 0,
-                'created_at': '',
-                'created_dt': None,
-                'source_type': 'trending',
-                'fetched_at': datetime.now(timezone.utc).isoformat()
-            })
-            continue
-        item = extract_tweet(tweet, source_type)
-        if item:
-            all_items.append(item)
+if skipped:
+    print(f"[Filter] Dropped {skipped} non-AI items")
 
-# Filter: only keep AI-related items
-STRONG_AI_KEYWORDS = {'ai ', ' ai', 'artificial intelligence', 'gpt', 'claude', 'gemini', 'llm', 
-    'openai', 'anthropic', 'deepmind', 'machine learning', 'chatbot', 'midjourney', 
-    'stable diffusion', 'dall-e', 'sora', 'copilot', 'cursor', 'perplexity', 'devin',
-    'hugging face', 'nvidia', 'gpu', 'robot', 'generative ai', 'foundation model',
-    'agi', 'coding agent', 'ai agent', 'ai model', 'benchmark', 'llama', 'mistral',
-    'nano banana', 'imagen', 'flux', 'gemma', 'phi-', 'grok', 'deepseek',
-    'text to image', 'text-to-image', 'image generation', 'video generation',
-    'coding assistant', 'ai tool', 'ai startup', 'ai company', 'ai safety'}
-
-def is_ai_related(text):
-    t = text.lower()
-    return any(kw in t for kw in STRONG_AI_KEYWORDS)
-
-ai_items = [item for item in all_items if is_ai_related(item['text'])]
-print(f"[Filter] {len(ai_items)} AI-related items out of {len(all_items)} total")
-
-# ---- TOPIC CLUSTERING ----
-# Group items talking about the same thing, boost the cluster
-def get_topic_keywords(text):
-    """Extract key noun phrases for clustering"""
-    t = text.lower()
-    # Remove common words and URLs
-    t = re.sub(r'https?://\S+', '', t)
-    t = re.sub(r'@\w+', '', t)
-    # Known product/topic names to cluster on
-    topics = [
-        'nano banana', 'perplexity computer', 'gemini 3', 'gemini 3.1', 'claude opus',
-        'cursor', 'devin', 'evmbench', 'moonlake', 'grok', 'deepseek', 'llama',
-        'sora', 'imagen', 'flux', 'o4', 'o3', 'codex', 'copilot', 'gemma',
-        'vercept', 'anthropic acqui', 'nvidia partner', 'openai o', 'google ai studio',
-    ]
-    found = []
-    for topic in topics:
-        if topic in t:
-            found.append(topic)
-    return found if found else None
-
-# Build clusters
-clusters = {}  # topic -> list of items
-unclustered = []
-
-for item in ai_items:
-    topics = get_topic_keywords(item['text'])
-    if topics:
-        primary_topic = topics[0]
-        if primary_topic not in clusters:
-            clusters[primary_topic] = []
-        clusters[primary_topic].append(item)
-    else:
-        unclustered.append(item)
-
-# For each cluster, pick best item and boost it
-clustered_items = []
-for topic, items in clusters.items():
-    # Sort by raw engagement
-    items.sort(key=lambda x: x['raw_engagement'], reverse=True)
-    best = items[0].copy()
-    # Cluster boost: more mentions = more important news
-    cluster_size = len(items)
-    cluster_boost = min(cluster_size * 200, 2000)  # Up to 2000 boost for 10+ mentions
-    # Sum engagement across cluster
-    total_engagement = sum(i['raw_engagement'] for i in items)
-    best['engagement'] = total_engagement + cluster_boost
-    best['cluster_size'] = cluster_size
-    best['cluster_topic'] = topic
-    # Collect all URLs from cluster for reference
-    best['cluster_urls'] = [i['url'] for i in items if i.get('url')][:5]
-    clustered_items.append(best)
-    if cluster_size > 1:
-        print(f"  [Cluster] '{topic}': {cluster_size} items, boosted to {best['engagement']}")
-
-# Add unclustered items
-for item in unclustered:
-    item['cluster_size'] = 1
-    item['cluster_topic'] = ''
-    item['cluster_urls'] = [item.get('url', '')]
-    clustered_items.append(item)
-
-# ---- HARD 24H CUTOFF ----
-# Only keep items from the last 24 hours. Old viral tweets = noise.
-fresh_items = []
-stale_count = 0
-for item in clustered_items:
-    h = hours_ago(item.get('created_dt'))
-    if h > 24:
-        stale_count += 1
-        continue  # DROP anything older than 24h
-    # Recency boost within 24h window
-    if h < 3:
-        item['engagement'] = int(item['engagement'] * 3.0)
-        item['recency'] = 'breaking'
-    elif h < 6:
-        item['engagement'] = int(item['engagement'] * 2.5)
-        item['recency'] = 'fresh'
-    elif h < 12:
-        item['engagement'] = int(item['engagement'] * 2.0)
-        item['recency'] = 'today'
-    else:
-        item['engagement'] = int(item['engagement'] * 1.5)
-        item['recency'] = 'recent'
-    fresh_items.append(item)
-
-if stale_count:
-    print(f"  [Recency] Dropped {stale_count} items older than 24h")
-
-# ---- HISTORY DEDUP ----
-# Don't show news we've already pushed to Supabase before
-history_file = os.environ.get('HISTORY_FILE', '')
-shown_titles = set()
-if history_file:
-    try:
-        with open(history_file) as f:
-            history = json.load(f)
-        # Keep last 7 days of history
-        cutoff = (datetime.now(timezone.utc) - timedelta(days=7)).isoformat()
-        history = [h for h in history if h.get('shown_at', '') > cutoff]
-        shown_titles = {h['key'] for h in history}
-        print(f"  [History] Loaded {len(shown_titles)} previously shown items")
-    except:
-        history = []
-else:
-    history = []
-
-# Deduplicate by text similarity + history
+# Deduplicate
 seen = set()
 unique = []
-for item in fresh_items:
-    key = item['text'][:80].lower().strip()
-    # Also check cluster topic as history key
-    cluster_key = item.get('cluster_topic', '')
-    if key in seen:
-        continue
-    if key in shown_titles or (cluster_key and cluster_key in shown_titles):
-        continue
-    seen.add(key)
-    unique.append(item)
+for item in items:
+    key = item['text'][:60].lower().strip()
+    if key not in seen:
+        seen.add(key)
+        unique.append(item)
 
+# Sort by engagement
 unique.sort(key=lambda x: x['engagement'], reverse=True)
-print(f"  [History] {len(fresh_items) - len(unique)} items filtered as already shown")
-
-# Clean up items for JSON serialization (remove datetime objects)
-for item in unique:
-    if 'created_dt' in item:
-        del item['created_dt']
 
 output = {
     'fetched_at': datetime.now(timezone.utc).isoformat(),
     'count': len(unique),
-    'items': unique[:50]
+    'items': unique
 }
 with open(output_file, 'w') as f:
     json.dump(output, f, indent=2)
-print(f"[Done] {len(unique)} unique items saved (from {len(all_items)} total)")
+print(f"[Done] {len(unique)} trending AI news items saved")
 PYTHON
-
-# ---- AI CLASSIFICATION + HEADLINE REWRITING ----
-# Use OpenRouter to:
-# 1. CLASSIFY each item as NEWS vs OPINION/JOKE/PROMO (drop non-news)
-# 2. Rewrite news items into clean headlines
-echo "[AI Filter+Rewrite] Classifying and rewriting..."
-python3 << 'PYEOF'
-import json, urllib.request, os
-
-output_file = os.environ['OUTPUT_FILE']
-openrouter_key = os.environ.get('OPENROUTER_API_KEY', '')
-
-with open(output_file) as f:
-    data = json.load(f)
-
-# Process more items since many will be filtered out
-top_items = data['items'][:40]
-if not top_items or not openrouter_key:
-    print("[AI Filter] Skipped (no key or no items)")
-    exit(0)
-
-# Build the prompt with all items
-items_text = ""
-for i, item in enumerate(top_items):
-    cluster_info = f" [{item.get('cluster_size', 1)} sources]" if item.get('cluster_size', 1) > 1 else ""
-    items_text += f"{i+1}. @{item['author']}: {item['text'][:250]}{cluster_info}\n\n"
-
-prompt = f"""You are a strict AI news editor. Your job is to separate REAL NEWS from opinions, jokes, and commentary.
-
-STEP 1: Classify each item:
-- "news" = Actual news: product launches, releases, updates, acquisitions, partnerships, research papers, funding rounds, policy changes, benchmarks, tools shipping
-- "skip" = NOT news: personal opinions about AI tools, jokes, memes, self-promotion, investment pitches, job hunting, vague commentary, "I tested X and it's great", reactions to news (unless they ADD new information), non-AI topics
-
-STEP 2: For "news" items only, rewrite into clean headlines.
-
-IMPORTANT RULES:
-- Be STRICT. If someone is just sharing their opinion about Claude/GPT/etc — that's "skip"
-- "I love using X" = skip. "X just launched v2 with Y features" = news
-- Jokes and memes about AI = skip
-- "Testing X and it works great" = skip (unless it's a launch announcement)
-- Investment/VC pitches = skip
-- Iran/politics/non-AI = skip
-- If it's borderline, skip it. We only want REAL news.
-
-Output JSON array: [{{"idx": 1, "type": "news", "headline": "...", "summary": "..."}}, {{"idx": 2, "type": "skip"}}]
-Headlines: max 80 chars, include product/company name
-Summaries: max 150 chars
-Only output JSON.
-
-Items:
-{items_text}"""
-
-try:
-    req_data = json.dumps({
-        "model": "google/gemini-2.0-flash-001",
-        "messages": [{"role": "user", "content": prompt}],
-        "max_tokens": 3000,
-        "temperature": 0.1
-    }).encode()
-
-    req = urllib.request.Request(
-        "https://openrouter.ai/api/v1/chat/completions",
-        data=req_data,
-        headers={
-            'Authorization': f'Bearer {openrouter_key}',
-            'Content-Type': 'application/json'
-        }
-    )
-    resp = urllib.request.urlopen(req, timeout=45)
-    result = json.loads(resp.read())
-    content = result['choices'][0]['message']['content']
-    
-    # Parse JSON from response
-    content = content.strip()
-    if content.startswith('```'):
-        content = content.split('\n', 1)[1]
-        content = content.rsplit('```', 1)[0]
-    
-    classifications = json.loads(content)
-    
-    # Apply classifications — keep only news, drop opinions
-    news_items = []
-    skipped = 0
-    for cl in classifications:
-        idx = cl.get('idx', 0) - 1
-        if 0 <= idx < len(top_items):
-            if cl.get('type') == 'news':
-                item = top_items[idx]
-                item['ai_headline'] = cl.get('headline', '')
-                item['ai_summary'] = cl.get('summary', '')
-                news_items.append(item)
-            else:
-                skipped += 1
-    
-    print(f"[AI Filter] {len(news_items)} news items kept, {skipped} opinions/jokes dropped")
-    
-    # Replace items with only the news items
-    # Keep any remaining unclassified items at the end (in case AI didn't classify all)
-    classified_idxs = {cl.get('idx', 0) - 1 for cl in classifications}
-    unclassified = [item for i, item in enumerate(top_items) if i not in classified_idxs]
-    
-    data['items'] = news_items + unclassified[:10]  # News first, then overflow
-    data['count'] = len(data['items'])
-    
-    with open(output_file, 'w') as f:
-        json.dump(data, f, indent=2)
-    
-    print(f"[AI Filter] Final: {len(data['items'])} items in feed")
-
-except Exception as e:
-    print(f"[AI Filter] Error: {e}")
-    # Continue without filtering — raw data still works
-PYEOF
 
 # Push to Supabase
 echo "[$(date -u)] Pushing to Supabase..."
-# Secrets loaded from .env.secrets at top of script
 SUPABASE_URL="${SUPABASE_URL}"
 SUPABASE_KEY="${SUPABASE_KEY}"
 X_SOURCE_ID="${X_SOURCE_ID:-d5ec53f3-063c-4efa-a6b7-f6dd0781aff8}"
@@ -484,32 +145,17 @@ try:
 except Exception as e:
     print(f"[Supabase] Delete error: {e}")
 
-# Insert top 20 (up from 15)
+# Insert items — headlines are already clean from X trending
 rows = []
 for idx, item in enumerate(data['items'][:20]):
-    # Use AI headline if available, otherwise clean the raw text
-    headline = item.get('ai_headline', '')
-    summary = item.get('ai_summary', '')
-    
-    if not headline:
-        text = item['text'].replace('\n', ' ').strip()
-        headline = text.split('. ')[0][:150]
-        author = item.get('author', 'unknown')
-        headline = f"@{author}: {headline}"
-    
-    if not summary:
-        summary = item['text'].replace('\n', ' ').strip()[:500]
-    
-    # Ensure unique URL (Supabase has unique constraint)
-    item_url = item.get('url') or (item.get('cluster_urls', [''])[0] if item.get('cluster_urls') else '')
-    if not item_url:
-        item_url = f"https://x.com/search?q={item.get('id', idx)}"
+    headline = item['text'].replace('\n', ' ').strip()[:200]
+    item_url = f"https://x.com/search?q={item.get('id', idx)}"
     
     rows.append({
         'source_id': source_id,
         'url': item_url,
         'title': headline,
-        'raw_summary': summary,
+        'raw_summary': headline,
         'is_processed': False
     })
 
@@ -533,44 +179,5 @@ if rows:
 else:
     print("[Supabase] No items to insert")
 PYEOF
-
-# Update shown history
-echo "[History] Updating shown history..."
-python3 << 'HISTEOF'
-import json, os
-from datetime import datetime, timezone, timedelta
-
-history_file = os.environ.get('HISTORY_FILE', '')
-output_file = os.environ['OUTPUT_FILE']
-if not history_file:
-    exit(0)
-
-# Load existing history
-try:
-    with open(history_file) as f:
-        history = json.load(f)
-except:
-    history = []
-
-# Keep last 7 days only
-cutoff = (datetime.now(timezone.utc) - timedelta(days=7)).isoformat()
-history = [h for h in history if h.get('shown_at', '') > cutoff]
-
-# Add newly shown items
-with open(output_file) as f:
-    data = json.load(f)
-
-now = datetime.now(timezone.utc).isoformat()
-for item in data['items'][:20]:
-    key = item['text'][:80].lower().strip()
-    history.append({'key': key, 'shown_at': now})
-    # Also track cluster topic
-    if item.get('cluster_topic'):
-        history.append({'key': item['cluster_topic'], 'shown_at': now})
-
-with open(history_file, 'w') as f:
-    json.dump(history, f)
-print(f"[History] Saved {len(history)} entries")
-HISTEOF
 
 echo "[$(date -u)] X news fetch complete."

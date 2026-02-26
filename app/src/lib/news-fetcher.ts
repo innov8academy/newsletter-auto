@@ -287,7 +287,21 @@ export async function fetchAllNews(feeds: RSSFeed[]): Promise<NewsItem[]> {
         return true;
     });
 
-    return deduplicated;
+    // STRICT: Only keep items from the last 24 hours
+    const oneDayAgo = new Date();
+    oneDayAgo.setHours(oneDayAgo.getHours() - 24);
+    
+    const fresh = deduplicated.filter(item => {
+        const pubDate = new Date(item.publishedAt);
+        // If date is invalid or in the future, keep it (likely fresh)
+        if (isNaN(pubDate.getTime())) return true;
+        if (pubDate > new Date()) return true;
+        return pubDate >= oneDayAgo;
+    });
+
+    console.log(`[News] ${deduplicated.length} total → ${fresh.length} from last 24h (dropped ${deduplicated.length - fresh.length} stale)`);
+
+    return fresh;
 }
 
 // Filter news by date (last N days)
