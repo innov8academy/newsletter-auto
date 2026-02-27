@@ -25,7 +25,7 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        const selectedModel = model || 'google/gemini-3-pro-image-preview';
+        const selectedModel = model || 'google/gemini-3.1-flash-image-preview';
         const hasReferenceImages = referenceImages && referenceImages.length > 0;
 
         console.log('API: Starting styled image generation', {

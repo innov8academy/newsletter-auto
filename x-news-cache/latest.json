@@ -1,51 +1,69 @@
 {
-  "fetched_at": "2026-02-26T18:40:08.396513+00:00",
-  "count": 5,
+  "fetched_at": "2026-02-27T20:00:08.509385+00:00",
+  "count": 7,
   "items": [
     {
-      "id": "0b87ef0e0525",
-      "text": "Google DeepMind Unveils Nano Banana 2 AI Image Generator",
+      "id": "8f6fc6852e69",
+      "text": "Anthropic Adds Auto-Memory to Claude Code for Seamless Sessions",
       "author": "X_Trending",
       "url": "",
-      "engagement": 11000,
+      "engagement": 5400,
       "source_type": "trending",
-      "fetched_at": "2026-02-26T18:40:08.396338+00:00"
+      "fetched_at": "2026-02-27T20:00:08.509220+00:00"
     },
     {
-      "id": "fd7f93a8256b",
-      "text": "Moonlake AI Unveils Interactive Cyberpunk World Demo",
+      "id": "cba10a87e7a9",
+      "text": "Perplexity Launches Computer: AI That Handles Full Projects",
       "author": "X_Trending",
       "url": "",
-      "engagement": 1300,
+      "engagement": 679,
       "source_type": "trending",
-      "fetched_at": "2026-02-26T18:40:08.396410+00:00"
+      "fetched_at": "2026-02-27T20:00:08.509173+00:00"
     },
     {
-      "id": "b3ec0044b79c",
-      "text": "Why No AI Agent Books Flights Seamlessly Yet?",
+      "id": "da0b46e1a15b",
+      "text": "Block Lays Off Half Its Workforce as Dorsey Bets on AI",
       "author": "X_Trending",
       "url": "",
-      "engagement": 179,
+      "engagement": 487,
       "source_type": "trending",
-      "fetched_at": "2026-02-26T18:40:08.396414+00:00"
+      "fetched_at": "2026-02-27T20:00:08.509251+00:00"
     },
     {
-      "id": "723ce8d64992",
-      "text": "Uber CEO Predicts AI Agents Will Replace New Engineer Hires",
+      "id": "e3abcf9352a1",
+      "text": "Browser Use Scales AI Agents with Unikraft Micro-VMs for Secure Isolation",
       "author": "X_Trending",
       "url": "",
-      "engagement": 92,
+      "engagement": 436,
       "source_type": "trending",
-      "fetched_at": "2026-02-26T18:40:08.396373+00:00"
+      "fetched_at": "2026-02-27T20:00:08.509225+00:00"
     },
     {
-      "id": "771b40bee6eb",
-      "text": "Nano Banana Pro",
+      "id": "8ee016969ab3",
+      "text": "Running 122B AI Model on Dual Mac Studios at 52 Tokens per Second",
+      "author": "X_Trending",
+      "url": "",
+      "engagement": 211,
+      "source_type": "trending",
+      "fetched_at": "2026-02-27T20:00:08.509211+00:00"
+    },
+    {
+      "id": "bcfcbcddaa1e",
+      "text": "Figma CEO: AI Commoditizes Execution, Taste Wins Out",
+      "author": "X_Trending",
+      "url": "",
+      "engagement": 210,
+      "source_type": "trending",
+      "fetched_at": "2026-02-27T20:00:08.509217+00:00"
+    },
+    {
+      "id": "236c7f2a52e6",
+      "text": "Nano Banana",
       "author": "X_Trending",
       "url": "",
       "engagement": 0,
       "source_type": "trending",
-      "fetched_at": "2026-02-26T18:40:08.396454+00:00"
+      "fetched_at": "2026-02-27T20:00:08.509301+00:00"
     }
   ]
 }

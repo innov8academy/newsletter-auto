@@ -15,7 +15,7 @@ export async function POST(request: NextRequest) {
         }
 
         // Default to FLUX.1.1 Pro if invalid model passed
-        const selectedModel = model || 'black-forest-labs/flux-1.1-pro';
+        const selectedModel = model || 'google/gemini-3.1-flash-image-preview';
 
         let imageUrl = '';
 
