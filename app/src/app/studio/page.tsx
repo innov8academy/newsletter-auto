@@ -36,7 +36,7 @@ import {
 
 const IMAGE_MODELS = [
     { id: 'google/gemini-3.1-flash-image-preview', name: 'Nano Banana 2', description: 'Best & Cheapest Image Gen (Gemini 3.1 Flash)' },
-    { id: 'google/gemini-3-pro-image-preview', name: 'Gemini 3 Pro', description: 'Google Flagship (High Fidelity)' },
+    { id: 'google/gemini-3-pro-image-preview', name: 'Gemini 3.1 Pro', description: 'Google Flagship (High Fidelity)' },
     { id: 'google/gemini-2.0-flash-001', name: 'Gemini 2.0 Flash', description: 'Fastest Multimodal' },
     { id: 'bytedance-seed/seedream-4.5', name: 'SeedDream 4.5', description: 'Artistic consistency' },
     { id: 'black-forest-labs/flux-pro-1.1', name: 'Flux Pro 1.1', description: 'Reliable Fallback' },

@@ -61,18 +61,18 @@ export default function DraftPage() {
     const [draft, setDraft] = useState<NewsletterDraft | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [copied, setCopied] = useState(false);
-    const [selectedModel, setSelectedModel] = useState<DraftModelId>('google/gemini-3-pro-preview');
+    const [selectedModel, setSelectedModel] = useState<DraftModelId>('google/gemini-3.1-pro-preview');
 
     // Story regeneration state
     const [regeneratingStoryIndex, setRegeneratingStoryIndex] = useState<number | null>(null);
     const [storyRegenPrompt, setStoryRegenPrompt] = useState('');
-    const [storyRegenModel, setStoryRegenModel] = useState<DraftModelId>('google/gemini-3-pro-preview');
+    const [storyRegenModel, setStoryRegenModel] = useState<DraftModelId>('google/gemini-3.1-pro-preview');
     const [storyPopoverOpen, setStoryPopoverOpen] = useState<number | null>(null);
     
     // Bulk regeneration state
     const [bulkRegenPopoverOpen, setBulkRegenPopoverOpen] = useState(false);
     const [bulkRegenPrompt, setBulkRegenPrompt] = useState('');
-    const [bulkRegenModel, setBulkRegenModel] = useState<DraftModelId>('google/gemini-3-pro-preview');
+    const [bulkRegenModel, setBulkRegenModel] = useState<DraftModelId>('google/gemini-3.1-pro-preview');
     const [bulkRegenProgress, setBulkRegenProgress] = useState<{ current: number; total: number } | null>(null);
 
     // Section generation state

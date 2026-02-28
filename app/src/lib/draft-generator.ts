@@ -11,14 +11,14 @@ const OPENROUTER_API_URL = 'https://openrouter.ai/api/v1/chat/completions';
 // Available models for draft generation
 export const DRAFT_MODELS = [
     { id: 'anthropic/claude-sonnet-4.5', name: 'Claude Sonnet 4.5', description: 'Best writing quality' },
-    { id: 'google/gemini-3-pro-preview', name: 'Gemini 3 Pro', description: 'Google flagship' },
+    { id: 'google/gemini-3.1-pro-preview', name: 'Gemini 3.1 Pro', description: 'Google flagship' },
     { id: 'openai/gpt-4o', name: 'GPT-4o', description: 'OpenAI flagship' },
     { id: 'deepseek/deepseek-r1', name: 'DeepSeek R1', description: 'Powerful reasoning' },
     { id: 'google/gemini-2.0-flash-001', name: 'Gemini Flash', description: 'Fast & reliable' },
 ] as const;
 
 export type DraftModelId = typeof DRAFT_MODELS[number]['id'];
-export const DEFAULT_DRAFT_MODEL: DraftModelId = 'google/gemini-3-pro-preview';
+export const DEFAULT_DRAFT_MODEL: DraftModelId = 'google/gemini-3.1-pro-preview';
 export const DEFAULT_INTRO_MODEL: DraftModelId = 'anthropic/claude-sonnet-4.5';
 
 // Newsletter draft structure
@@ -83,7 +83,7 @@ export async function generateNewsletterDraft(
         return { success: false, error: 'No research reports provided' };
     }
 
-    // Use different models: Claude Sonnet for intro/title, Gemini 3 Pro for stories
+    // Use different models: Claude Sonnet for intro/title, Gemini 3.1 Pro for stories
     const storyModel = modelId || DEFAULT_DRAFT_MODEL;
     const introModel = introModelId || DEFAULT_INTRO_MODEL;
     const dateContext = currentDate || new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
@@ -398,7 +398,7 @@ STOP HERE. Do NOT write the story sections.`;
 
         console.log(`[Draft] Phase 1 complete. Intro generated.`);
 
-        // PHASE 2: Generate story sections with Gemini 3 Pro
+        // PHASE 2: Generate story sections with Gemini 3.1 Pro
         const storiesPrompt = `Continue the newsletter. Write ONLY the story sections and summary:
 
 ${researchSummaries}

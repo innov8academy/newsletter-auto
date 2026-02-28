@@ -16,7 +16,7 @@ export const RESEARCH_MODELS = [
     { id: 'moonshotai/kimi-k2.5', name: 'Kimi K2.5 (Agent)', description: '🤖 262K + web search + tool-calling', category: 'research', agentic: true },
     { id: 'perplexity/sonar', name: 'Perplexity Sonar', description: '💰 Web search - $1/1M tokens', category: 'research' },
     { id: 'perplexity/sonar-pro', name: 'Perplexity Sonar Pro', description: '🔥 Advanced web research', category: 'research' },
-    { id: 'google/gemini-3-pro-preview', name: 'Gemini 3 Pro', description: 'Google flagship - 1M context', category: 'research' },
+    { id: 'google/gemini-3.1-pro-preview', name: 'Gemini 3.1 Pro', description: 'Google flagship - 1M context', category: 'research' },
 
     // Strong General Purpose (great writing quality)
     { id: 'anthropic/claude-sonnet-4.5', name: 'Claude Sonnet 4.5', description: 'Best writing quality', category: 'general' },

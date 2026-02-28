@@ -41,7 +41,7 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        // Generate full newsletter draft (two-phase: intro with Claude Sonnet, stories with Gemini 3 Pro)
+        // Generate full newsletter draft (two-phase: intro with Claude Sonnet, stories with Gemini 3.1 Pro)
         console.log(`[Draft] Generating newsletter from ${reports.length} reports`);
         console.log(`[Draft] Intro model: ${introModel}, Story model: ${storyModel}`);
         console.log(`[Draft] Current date context: ${currentDate}`);

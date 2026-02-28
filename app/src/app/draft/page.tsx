@@ -469,7 +469,7 @@ function StoryStep() {
         setError,
     } = useWizard();
     const [localStory, setLocalStory] = useState<StoryBlock | null>(null);
-    const [selectedModel, setSelectedModel] = useState<DraftModelId>('google/gemini-3-pro-preview');
+    const [selectedModel, setSelectedModel] = useState<DraftModelId>('google/gemini-3.1-pro-preview');
     const [copied, setCopied] = useState(false);
     const [customInput, setCustomInput] = useState('');
     const [showRegenOptions, setShowRegenOptions] = useState(false);
