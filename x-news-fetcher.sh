@@ -1,183 +1,164 @@
 #!/bin/bash
-# X/Twitter AI News Fetcher for Newsletter
-# SIMPLE: Fetch X's AI-curated trending news → push to Supabase
+# X/Twitter AI News Fetcher for Newsletter Auto
+# Fetches tweets from AI accounts → filters → pushes to Supabase
 set -euo pipefail
 
-BIRD="/home/ubuntu/.local/bin/bird"
+BIRD="/usr/local/bin/bird"
 
-# Load secrets from env file (NEVER hardcode keys in scripts)
-SECRETS_FILE="/home/ubuntu/clawd/projects/newsletter-auto/.env.secrets"
+# Load secrets
+SECRETS_FILE="/home/ubuntu/newsletter-auto/.env.secrets"
 if [ -f "$SECRETS_FILE" ]; then
   set -a; source "$SECRETS_FILE"; set +a
 fi
 
-ALEX_AUTH="--auth-token ${ALEX_AUTH_TOKEN} --ct0 ${ALEX_CT0}"
-OUTPUT_DIR="/home/ubuntu/clawd/projects/newsletter-auto/x-news-cache"
+OUTPUT_DIR="/home/ubuntu/newsletter-auto/x-news-cache"
 OUTPUT_FILE="$OUTPUT_DIR/latest.json"
-TEMP_DIR=$(mktemp -d)
-trap "rm -rf $TEMP_DIR" EXIT
-
-# Load OpenRouter key from content-engine if not in secrets
-OPENROUTER_API_KEY="${OPENROUTER_API_KEY:-$(grep OPENROUTER_API_KEY /home/ubuntu/content-engine/app/.env.local 2>/dev/null | cut -d= -f2)}"
 
 mkdir -p "$OUTPUT_DIR"
-echo "[$(date -u)] Starting X news fetch..."
+echo "[$(date -u)] Starting X AI news fetch..."
 
-# SOURCE 1: X's AI-curated trending news
-echo "[Fetch] Getting X AI curated trending news..."
-$BIRD news --ai-only -n 30 --json > "$TEMP_DIR/trending_ai.json" 2>/dev/null || echo "[]" > "$TEMP_DIR/trending_ai.json"
-sleep 2
-
-# SOURCE 2: X's general trending (we filter to AI ourselves — catches more)
-echo "[Fetch] Getting X general trending news..."
-$BIRD news -n 30 --json > "$TEMP_DIR/trending_general.json" 2>/dev/null || echo "[]" > "$TEMP_DIR/trending_general.json"
-
-# Process and save
-echo "[Process] Processing trending items..."
-export TEMP_DIR OUTPUT_FILE
 python3 << 'PYTHON'
-import json, os, hashlib
+import subprocess, json, re, hashlib, os, time
 from datetime import datetime, timezone
 
-temp_dir = os.environ['TEMP_DIR']
-output_file = os.environ['OUTPUT_FILE']
+OUTPUT_FILE = os.environ.get('OUTPUT_FILE', '/home/ubuntu/newsletter-auto/x-news-cache/latest.json')
 
-def safe_load(path):
-    try:
-        with open(path) as f:
-            data = json.load(f)
-            return data if isinstance(data, list) else data.get('items', data.get('tweets', data.get('results', [])))
-    except:
-        return []
+AI_ACCOUNTS = [
+    'OpenAI', 'AnthropicAI', 'GoogleAI', 'GoogleDeepMind', 'xaborai',
+    'sama', 'demaborai', 'kaborai', 'ylecun', 'hardmaru',
+    'emaborai', 'aaborai', '_jasonwei', 'DrJimFan',
+    'AravSrinivas', 'CursorAI', 'peraborai', 'huggingface',
+    'ClaudeAI', 'MistralAI', 'StabilityAI', 'midjourney'
+]
+
+AI_KEYWORDS = re.compile(
+    r'\bai\b|artificial intelligence|gpt|claude|gemini|llm|openai|anthropic|'
+    r'deepmind|machine learning|chatbot|midjourney|stable diffusion|dall-?e|'
+    r'sora|copilot|cursor|perplexity|devin|hugging.?face|nvidia|generative|'
+    r'foundation model|agi|coding agent|ai agent|ai model|benchmark|'
+    r'llama|mistral|deepseek|grok|whisper|diffusion|transformer|neural|'
+    r'text.to|image.gen|video.gen|ai tool|ai startup|reasoning|'
+    r'fine.?tun|embeddings|rag |vector|multimodal|vision model|'
+    r'apple intelligence|meta ai|google ai|amazon ai',
+    re.IGNORECASE
+)
 
 def make_id(text):
     return hashlib.md5(text.encode()).hexdigest()[:12]
 
-# AI keyword filter — X trending includes non-AI stuff even with --ai-only
-AI_KEYWORDS = {'ai ', ' ai', 'artificial intelligence', 'gpt', 'claude', 'gemini', 'llm',
-    'openai', 'anthropic', 'deepmind', 'machine learning', 'chatbot', 'midjourney',
-    'stable diffusion', 'dall-e', 'sora', 'copilot', 'cursor', 'perplexity', 'devin',
-    'hugging face', 'nvidia', 'robot', 'generative', 'foundation model',
-    'agi', 'coding agent', 'ai agent', 'ai model', 'benchmark', 'llama', 'mistral',
-    'nano banana', 'imagen', 'flux', 'gemma', 'grok', 'deepseek',
-    'image generation', 'video generation', 'text to', 'ai tool', 'ai startup',
-    'moonlake', 'whisper', 'diffusion', 'transformer', 'neural', 'autonomous',
-    'apple intelligence', 'meta ai', 'google ai', 'amazon ai'}
+all_tweets = []
+for account in AI_ACCOUNTS:
+    print(f"[Fetch] @{account}...")
+    try:
+        r = subprocess.run(['bird', 'user', account, '-n', '5'],
+            capture_output=True, text=True, timeout=30)
+        
+        current = {}
+        for line in r.stdout.split('\n'):
+            line = line.rstrip()
+            if line.startswith('@') and '(' in line:
+                if current.get('text'):
+                    all_tweets.append(current)
+                match = re.match(r'@(\w+) \((.+)\)', line)
+                current = {
+                    'author': match.group(1) if match else account,
+                    'date': match.group(2) if match else '',
+                    'text': '', 'likes': 0, 'retweets': 0, 'url': ''
+                }
+            elif line.startswith('  https://x.com/'):
+                current['url'] = line.strip()
+            elif line.startswith('  ❤️'):
+                m = re.findall(r'(\d+)', line)
+                if len(m) >= 2:
+                    current['likes'] = int(m[0])
+                    current['retweets'] = int(m[1])
+            elif line.startswith('  ') and not line.startswith('  📊') and current:
+                current['text'] = (current.get('text', '') + ' ' + line.strip()).strip()
+        
+        if current.get('text'):
+            all_tweets.append(current)
+            
+    except Exception as e:
+        print(f"  ⚠️ Failed: {e}")
+    time.sleep(1)
 
-def is_ai(text):
-    t = text.lower()
-    return any(kw in t for kw in AI_KEYWORDS)
+print(f"\n[Process] Got {len(all_tweets)} total tweets")
 
-# Combine both trending feeds and filter to AI-only
-all_trending = safe_load(f"{temp_dir}/trending_ai.json") + safe_load(f"{temp_dir}/trending_general.json")
+# Filter to AI-relevant
 items = []
-skipped = 0
-for item in all_trending:
-    headline = item.get('headline', '')
-    if not headline:
+seen = set()
+for t in all_tweets:
+    text = t.get('text', '')
+    if not AI_KEYWORDS.search(text):
         continue
-    if not is_ai(headline):
-        skipped += 1
+    key = text[:60].lower()
+    if key in seen:
         continue
+    seen.add(key)
     items.append({
-        'id': make_id(headline),
-        'text': headline,
-        'author': 'X_Trending',
-        'url': '',
-        'engagement': item.get('postCount', 0) or 0,
-        'source_type': 'trending',
+        'id': make_id(text),
+        'text': text[:500],
+        'author': t.get('author', 'unknown'),
+        'url': t.get('url', ''),
+        'engagement': t.get('likes', 0) + t.get('retweets', 0) * 2,
+        'source_type': 'x_account',
         'fetched_at': datetime.now(timezone.utc).isoformat()
     })
 
-if skipped:
-    print(f"[Filter] Dropped {skipped} non-AI items")
-
-# Deduplicate
-seen = set()
-unique = []
-for item in items:
-    key = item['text'][:60].lower().strip()
-    if key not in seen:
-        seen.add(key)
-        unique.append(item)
-
-# Sort by engagement
-unique.sort(key=lambda x: x['engagement'], reverse=True)
+items.sort(key=lambda x: x['engagement'], reverse=True)
 
 output = {
     'fetched_at': datetime.now(timezone.utc).isoformat(),
-    'count': len(unique),
-    'items': unique
+    'count': len(items),
+    'items': items
 }
-with open(output_file, 'w') as f:
+with open(OUTPUT_FILE, 'w') as f:
     json.dump(output, f, indent=2)
-print(f"[Done] {len(unique)} trending AI news items saved")
+print(f"[Done] {len(items)} AI news items saved")
 PYTHON
 
 # Push to Supabase
-echo "[$(date -u)] Pushing to Supabase..."
-SUPABASE_URL="${SUPABASE_URL}"
-SUPABASE_KEY="${SUPABASE_KEY}"
 X_SOURCE_ID="${X_SOURCE_ID:-d5ec53f3-063c-4efa-a6b7-f6dd0781aff8}"
 
-export SUPABASE_URL SUPABASE_KEY X_SOURCE_ID OUTPUT_FILE
+if [ -z "${SUPABASE_URL:-}" ] || [ -z "${SUPABASE_KEY:-}" ]; then
+  echo "[Supabase] ⚠️ SUPABASE_URL or SUPABASE_KEY not set, skipping push"
+  exit 0
+fi
 
-python3 << 'PYEOF'
-import json, urllib.request, os
+echo "[$(date -u)] Pushing to Supabase..."
 
-output_file = os.environ['OUTPUT_FILE']
-url = os.environ['SUPABASE_URL']
-key = os.environ['SUPABASE_KEY']
-source_id = os.environ['X_SOURCE_ID']
+# Delete old X news
+curl -s -o /dev/null \
+  "${SUPABASE_URL}/rest/v1/news_items?source_id=eq.${X_SOURCE_ID}" \
+  -X DELETE \
+  -H "apikey: ${SUPABASE_KEY}" \
+  -H "Authorization: Bearer ${SUPABASE_KEY}"
 
-with open(output_file) as f:
+# Insert new items
+python3 -c "
+import json, os
+with open('${OUTPUT_FILE}') as f:
     data = json.load(f)
-
-# Delete old X news first
-try:
-    req = urllib.request.Request(
-        f"{url}/rest/v1/news_items?source_id=eq.{source_id}",
-        method='DELETE',
-        headers={'apikey': key, 'Authorization': f'Bearer {key}'}
-    )
-    urllib.request.urlopen(req)
-    print("[Supabase] Cleared old X news")
-except Exception as e:
-    print(f"[Supabase] Delete error: {e}")
-
-# Insert items — headlines are already clean from X trending
+source_id = '${X_SOURCE_ID}'
 rows = []
-for idx, item in enumerate(data['items'][:20]):
-    headline = item['text'].replace('\n', ' ').strip()[:200]
-    item_url = f"https://x.com/search?q={item.get('id', idx)}"
-    
+for item in data['items'][:20]:
     rows.append({
         'source_id': source_id,
-        'url': item_url,
-        'title': headline,
-        'raw_summary': headline,
+        'url': item.get('url', ''),
+        'title': item['text'][:200],
+        'raw_summary': item['text'][:500],
         'is_processed': False
     })
+print(json.dumps(rows))
+" > /tmp/x_ai_news_rows.json
 
-if rows:
-    req = urllib.request.Request(
-        f"{url}/rest/v1/news_items",
-        data=json.dumps(rows).encode(),
-        headers={
-            'apikey': key,
-            'Authorization': f'Bearer {key}',
-            'Content-Type': 'application/json',
-            'Prefer': 'return=representation,resolution=ignore-duplicates'
-        }
-    )
-    try:
-        resp = urllib.request.urlopen(req)
-        result = json.loads(resp.read())
-        print(f"[Supabase] Inserted {len(result)} X news items")
-    except Exception as e:
-        print(f"[Supabase] Insert error: {e}")
-else:
-    print("[Supabase] No items to insert")
-PYEOF
+curl -s -o /dev/null -w "Insert: %{http_code}\n" \
+  "${SUPABASE_URL}/rest/v1/news_items" \
+  -H "apikey: ${SUPABASE_KEY}" \
+  -H "Authorization: Bearer ${SUPABASE_KEY}" \
+  -H "Content-Type: application/json" \
+  -H "Prefer: return=representation,resolution=ignore-duplicates" \
+  -d @/tmp/x_ai_news_rows.json
 
-echo "[$(date -u)] X news fetch complete."
+rm -f /tmp/x_ai_news_rows.json
+echo "[$(date -u)] X AI news fetch complete."

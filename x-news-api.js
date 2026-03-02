@@ -8,8 +8,8 @@ const fs = require('fs');
 const path = require('path');
 
 const PORT = 3456;
-const BIRD = '/home/ubuntu/.local/bin/bird';
-const CACHE_FILE = '/home/ubuntu/clawd/projects/newsletter-auto/x-news-cache/latest.json';
+const BIRD = '/usr/local/bin/bird';
+const CACHE_FILE = '/home/ubuntu/newsletter-auto/x-news-cache/latest.json';
 const GIST_ID = '58bd9d2317950e97c41d561081546c05';
 
 // Simple API key to prevent abuse
@@ -74,7 +74,7 @@ function normalizeItems(data) {
     return [];
 }
 
-const FETCHER_SCRIPT = '/home/ubuntu/clawd/projects/newsletter-auto/x-news-fetcher.sh';
+const FETCHER_SCRIPT = '/home/ubuntu/newsletter-auto/x-news-fetcher.sh';
 
 async function fetchFreshXNews() {
     if (isFetching) {
