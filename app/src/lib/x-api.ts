@@ -46,10 +46,12 @@ const EXPANSIONS = ['author_id'] as const;
 // ─── Client ────────────────────────────────────────────────────────────────────
 
 function getClient(): TwitterApi {
-    const token = process.env.X_BEARER_TOKEN;
+    let token = process.env.X_BEARER_TOKEN;
     if (!token || token === 'your_bearer_token_here') {
         throw new Error('[X API] X_BEARER_TOKEN not configured. Get one from developer.x.com');
     }
+    // Decode URL-encoded characters (e.g. %3D → =) in case token was pasted with encoding
+    token = decodeURIComponent(token);
     return new TwitterApi(token);
 }
 
@@ -153,7 +155,7 @@ async function fetchAINewsStories(client: TwitterApi): Promise<XTweet[]> {
     console.log('[X API] Strategy 3: News Search API...');
     try {
         // /2/news/search may not be in the SDK yet — use raw fetch
-        const token = process.env.X_BEARER_TOKEN;
+        const token = decodeURIComponent(process.env.X_BEARER_TOKEN || '');
         const response = await fetch(
             'https://api.x.com/2/news/search?query=artificial+intelligence+OR+AI+OR+GPT&max_results=10',
             {
