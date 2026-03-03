@@ -1,4 +1,4 @@
-import { NewsItem, RSSFeed } from './types';
+import { NewsItem, RSSFeed, FeedHealth } from './types';
 import { XMLParser } from 'fast-xml-parser';
 
 const parser = new XMLParser({
@@ -202,55 +202,32 @@ function cleanText(text: string): string {
         .trim();
 }
 
-// Fetch AI news from X/Twitter (from newsletter's own Supabase — pushed by bird CLI on EC2)
-const X_SOURCE_ID = 'd5ec53f3-063c-4efa-a6b7-f6dd0781aff8';
+// Fetch AI news from X/Twitter (from Supabase cache — populated by X API v2)
+import { getCachedXNews } from './x-api';
 
 async function fetchXNews(): Promise<NewsItem[]> {
     try {
-        const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-        const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-        
-        if (!supabaseUrl || !supabaseKey) {
-            console.log('[X News] Supabase not configured, skipping');
-            return [];
-        }
+        console.log('[X News] Fetching cached X API v2 data...');
+        const tweets = await getCachedXNews();
+        console.log(`[X News] Got ${tweets.length} items from cache`);
 
-        console.log('[X News] Fetching from Supabase...');
-        const response = await fetch(
-            `${supabaseUrl}/rest/v1/news_items?source_id=eq.${X_SOURCE_ID}&order=created_at.desc&limit=10`,
-            {
-                headers: {
-                    'apikey': supabaseKey,
-                    'Authorization': `Bearer ${supabaseKey}`,
-                },
-                cache: 'no-store',
-            }
-        );
+        return tweets.map(t => {
+            // Parse engagement data for content enrichment
+            const engagementInfo = t.engagement_score > 0
+                ? ` [${t.likes} likes, ${t.retweets} RTs]`
+                : '';
 
-        if (!response.ok) {
-            console.error('[X News] Supabase fetch failed:', response.status);
-            return [];
-        }
-
-        const items = await response.json();
-        console.log(`[X News] Got ${items.length} items from Supabase`);
-        
-        return items.map((item: any) => {
-            // Extract @handle from title (format: "@handle: tweet text")
-            const handleMatch = item.title?.match(/^@(\w+):/);
-            const author = handleMatch ? handleMatch[1] : 'unknown';
-            
             return {
-                id: `x_${item.id}`,
-                title: item.title || '',
-                url: item.url || '',
+                id: `x_${t.id}`,
+                title: `@${t.author_username}: ${t.text.split('\n')[0].substring(0, 180)}`,
+                url: t.url,
                 source: 'x_twitter',
-                sourceName: `X: @${author}`,
-                publishedAt: item.published_at || item.created_at || new Date().toISOString(),
-                summary: item.raw_summary || item.title || '',
+                sourceName: `X: @${t.author_username}`,
+                publishedAt: t.created_at,
+                summary: t.text + engagementInfo,
                 imageUrl: '',
-                author: author,
-                content: item.raw_summary || item.title || '',
+                author: t.author_username,
+                content: t.text,
             };
         });
     } catch (error) {
@@ -259,17 +236,43 @@ async function fetchXNews(): Promise<NewsItem[]> {
     }
 }
 
-// Fetch news from all configured feeds
-export async function fetchAllNews(feeds: RSSFeed[]): Promise<NewsItem[]> {
-    const allPromises = feeds.map(feed => parseRSSFeed(feed));
-    
-    // X/Twitter news is shown in its own panel — don't mix into Top Stories
-    // This prevents duplicates and keeps the sections distinct
-    // allPromises.push(fetchXNews());  // DISABLED: X news handled separately
-    
-    const results = await Promise.all(allPromises);
+// Fetch news from all configured feeds (with feed health tracking)
+export async function fetchAllNews(feeds: RSSFeed[]): Promise<{ items: NewsItem[], feedHealth: FeedHealth[] }> {
+    const feedHealth: FeedHealth[] = [];
 
+    const allPromises = feeds.map(async (feed) => {
+        const start = Date.now();
+        try {
+            const items = await parseRSSFeed(feed);
+            const latencyMs = Date.now() - start;
+            feedHealth.push({
+                name: feed.name,
+                status: items.length > 0 ? 'ok' : 'empty',
+                itemCount: items.length,
+                latencyMs,
+            });
+            return items;
+        } catch (error) {
+            const latencyMs = Date.now() - start;
+            feedHealth.push({
+                name: feed.name,
+                status: 'failed',
+                itemCount: 0,
+                latencyMs,
+                error: error instanceof Error ? error.message : String(error),
+            });
+            return [];
+        }
+    });
+
+    const results = await Promise.all(allPromises);
     const allNews = results.flat();
+
+    // Log feed health summary
+    const ok = feedHealth.filter(f => f.status === 'ok').length;
+    const empty = feedHealth.filter(f => f.status === 'empty').length;
+    const failed = feedHealth.filter(f => f.status === 'failed');
+    console.log(`[Feed Health] ${ok} OK, ${empty} empty, ${failed.length} FAILED${failed.length > 0 ? ': ' + failed.map(f => f.name).join(', ') : ''}`);
 
     // Sort by date (newest first)
     allNews.sort((a, b) =>
@@ -287,21 +290,21 @@ export async function fetchAllNews(feeds: RSSFeed[]): Promise<NewsItem[]> {
         return true;
     });
 
-    // STRICT: Only keep items from the last 24 hours
-    const oneDayAgo = new Date();
-    oneDayAgo.setHours(oneDayAgo.getHours() - 24);
-    
+    // Keep items from the last 48 hours (newsletters publish every 2-3 days)
+    const cutoff = new Date();
+    cutoff.setHours(cutoff.getHours() - 48);
+
     const fresh = deduplicated.filter(item => {
         const pubDate = new Date(item.publishedAt);
         // If date is invalid or in the future, keep it (likely fresh)
         if (isNaN(pubDate.getTime())) return true;
         if (pubDate > new Date()) return true;
-        return pubDate >= oneDayAgo;
+        return pubDate >= cutoff;
     });
 
-    console.log(`[News] ${deduplicated.length} total → ${fresh.length} from last 24h (dropped ${deduplicated.length - fresh.length} stale)`);
+    console.log(`[News] ${deduplicated.length} total → ${fresh.length} from last 48h (dropped ${deduplicated.length - fresh.length} stale)`);
 
-    return fresh;
+    return { items: fresh, feedHealth };
 }
 
 // Filter news by date (last N days)

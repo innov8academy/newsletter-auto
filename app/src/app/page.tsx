@@ -35,7 +35,22 @@ import {
   saveCustomFeeds,
 } from '@/lib/storage';
 import { addCost } from '@/lib/cost-tracker';
-import { MoveRight, Sparkles, Check, Play, Search, Clock, ExternalLink, BarChart3, Layers, FileText, ListChecks, ArrowRight, RefreshCw, Trash2, Plus, Settings2, X } from 'lucide-react';
+import { MoveRight, Sparkles, Check, Play, Search, Clock, ExternalLink, BarChart3, Layers, FileText, ListChecks, ArrowRight, RefreshCw, Trash2, Plus, Settings2, X, Heart, Repeat2 } from 'lucide-react';
+
+function formatCount(n: number): string {
+  if (n >= 1000000) return (n / 1000000).toFixed(1).replace(/\.0$/, '') + 'M';
+  if (n >= 1000) return (n / 1000).toFixed(1).replace(/\.0$/, '') + 'K';
+  return n.toString();
+}
+
+function getSourceBadge(method: string): { label: string; color: string } {
+  switch (method) {
+    case 'news_api': return { label: 'News', color: 'bg-blue-500/20 text-blue-300 border-blue-500/30' };
+    case 'community': return { label: 'Community', color: 'bg-purple-500/20 text-purple-300 border-purple-500/30' };
+    case 'context_search': return { label: 'Tech', color: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30' };
+    default: return { label: 'Trending', color: 'bg-amber-500/20 text-amber-300 border-amber-500/30' };
+  }
+}
 
 interface RSSFeed {
   name: string;
@@ -703,6 +718,50 @@ export default function Home() {
                       ))}
                     </tbody>
                   </table>
+
+                  {/* Feed Health Section */}
+                  <div className="mt-6">
+                    <h3 className="text-sm font-semibold text-white/60 uppercase mb-3">Feed Health</h3>
+                    {curationStats?.feedHealth ? (
+                      (() => {
+                        const failed = curationStats.feedHealth.filter((f: any) => f.status === 'failed');
+                        const empty = curationStats.feedHealth.filter((f: any) => f.status === 'empty');
+                        const hasIssues = failed.length > 0 || empty.length > 0;
+                        return hasIssues ? (
+                          <div className="space-y-2">
+                            {failed.map((f: any, i: number) => (
+                              <div key={`f-${i}`} className="flex items-center gap-2 text-sm">
+                                <span className="w-2 h-2 rounded-full bg-red-500 shrink-0" />
+                                <span className="text-red-400">{f.name}</span>
+                                <span className="text-white/30 text-xs ml-auto">{f.error || 'Failed'}</span>
+                              </div>
+                            ))}
+                            {empty.map((f: any, i: number) => (
+                              <div key={`e-${i}`} className="flex items-center gap-2 text-sm">
+                                <span className="w-2 h-2 rounded-full bg-yellow-500 shrink-0" />
+                                <span className="text-yellow-400">{f.name}</span>
+                                <span className="text-white/30 text-xs ml-auto">Empty (0 items)</span>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-2 text-sm text-green-400">
+                            <span className="w-2 h-2 rounded-full bg-green-500" />
+                            All feeds healthy
+                          </div>
+                        );
+                      })()
+                    ) : (
+                      <span className="text-white/30 text-sm">No feed health data</span>
+                    )}
+                  </div>
+
+                  {/* Curation Mode */}
+                  {curationStats?.curationMode && (
+                    <div className="mt-4 text-xs text-white/40">
+                      Curation mode: <span className={curationStats.curationMode === 'relaxed' ? 'text-yellow-400' : 'text-green-400'}>{curationStats.curationMode}</span>
+                    </div>
+                  )}
                 </div>
               </DialogContent>
             </Dialog>
@@ -810,9 +869,31 @@ export default function Home() {
                                 }`}>
                                   {item.title}
                                 </p>
-                                <p className="text-xs text-white/30 mt-1">
-                                  @{item.author}
-                                </p>
+                                <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                                  <span className="text-xs text-white/30">@{item.author}</span>
+                                  {(item.likes > 0 || item.retweets > 0) && (
+                                    <div className="flex items-center gap-2 text-xs text-white/25">
+                                      {item.likes > 0 && (
+                                        <span className="flex items-center gap-0.5">
+                                          <Heart className="w-3 h-3" />{formatCount(item.likes)}
+                                        </span>
+                                      )}
+                                      {item.retweets > 0 && (
+                                        <span className="flex items-center gap-0.5">
+                                          <Repeat2 className="w-3 h-3" />{formatCount(item.retweets)}
+                                        </span>
+                                      )}
+                                    </div>
+                                  )}
+                                  {item.source_method && (() => {
+                                    const badge = getSourceBadge(item.source_method);
+                                    return (
+                                      <span className={`text-[10px] px-1.5 py-0.5 rounded-full border ${badge.color}`}>
+                                        {badge.label}
+                                      </span>
+                                    );
+                                  })()}
+                                </div>
                                 {isSelected && (
                                   <input
                                     type="text"

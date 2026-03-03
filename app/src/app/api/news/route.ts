@@ -11,7 +11,7 @@ export async function GET(request: Request) {
         const apiKey = searchParams.get('apiKey') || process.env.OPENROUTER_API_KEY || '';
 
         // Fetch newsletters from all configured feeds
-        const allNews = await fetchAllNews(defaultConfig.rssFeeds);
+        const { items: allNews } = await fetchAllNews(defaultConfig.rssFeeds);
 
         // Filter by date
         const filteredByDate = filterByDate(allNews, days);

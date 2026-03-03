@@ -1,76 +1,84 @@
 import { NextResponse } from 'next/server';
+import { fetchAllXContent, getCachedXNews, isCacheFresh } from '@/lib/x-api';
 
-const X_SOURCE_ID = 'd5ec53f3-063c-4efa-a6b7-f6dd0781aff8';
-
-// POST = trigger fresh fetch from EC2 bird API, then return updated items
-export async function POST() {
-    try {
-        // Trigger fresh bird fetch via the EC2 API
-        const apiUrl = process.env.X_NEWS_API_URL || 'https://ip-172-31-46-67.tail060601.ts.net';
-        const apiKey = process.env.X_NEWS_API_KEY || 'innov8-x-news-2026';
-        
-        try {
-            await fetch(`${apiUrl}/x-news?key=${apiKey}&fresh=true`, {
-                signal: AbortSignal.timeout(60000),
-            });
-        } catch (e) {
-            console.log('[X News] Fresh fetch from EC2 failed, using cached data');
-        }
-
-        // Now return the updated Supabase data (bird pushes to Supabase)
-        return GET();
-    } catch (error) {
-        return GET(); // Fallback to cached
-    }
-}
-
+// GET = return cached X news from Supabase (fast, no API calls)
 export async function GET() {
     try {
-        const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-        const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+        const tweets = await getCachedXNews();
 
-        if (!supabaseUrl || !supabaseKey) {
-            return NextResponse.json({ items: [], error: 'Supabase not configured' });
-        }
-
-        const response = await fetch(
-            `${supabaseUrl}/rest/v1/news_items?source_id=eq.${X_SOURCE_ID}&order=created_at.desc&limit=20`,
-            {
-                headers: {
-                    'apikey': supabaseKey,
-                    'Authorization': `Bearer ${supabaseKey}`,
-                },
-                cache: 'no-store',
-            }
-        );
-
-        if (!response.ok) {
-            return NextResponse.json({ items: [], error: 'Failed to fetch' });
-        }
-
-        const items = await response.json();
-
-        const formatted = items.map((item: any) => {
-            // AI-rewritten headlines won't have @handle prefix
-            const handleMatch = item.title?.match(/^@(\w+):\s*/);
-            const author = handleMatch ? handleMatch[1] : 'AI';
-            const cleanTitle = handleMatch 
-                ? item.title?.replace(/^@\w+:\s*/, '') || ''
-                : item.title || '';
+        const formatted = tweets.map(t => {
+            // Clean @handle prefix from text for display title
+            const cleanTitle = t.text.split('\n')[0].substring(0, 200);
 
             return {
-                id: item.id,
-                author,
+                id: t.id,
+                author: t.author_username,
+                author_name: t.author_name,
                 title: cleanTitle,
-                summary: item.raw_summary || cleanTitle,
-                url: item.url || '',
-                publishedAt: item.published_at || item.created_at,
+                summary: t.text,
+                url: t.url,
+                publishedAt: t.created_at,
+                likes: t.likes,
+                retweets: t.retweets,
+                impressions: t.impressions,
+                engagement_score: t.engagement_score,
+                source_method: t.source_method,
             };
         });
 
-        return NextResponse.json({ items: formatted, count: formatted.length });
+        return NextResponse.json({
+            items: formatted,
+            count: formatted.length,
+            cached: true,
+        });
     } catch (error) {
-        console.error('X news API error:', error);
+        console.error('[X News API] GET error:', error);
         return NextResponse.json({ items: [], error: 'Internal error' });
+    }
+}
+
+// POST = trigger fresh X API v2 fetch, then return updated items
+export async function POST() {
+    try {
+        // Check if cache is still fresh (avoid unnecessary API calls)
+        const fresh = await isCacheFresh(30);
+        if (fresh) {
+            console.log('[X News API] Cache is fresh (<30min), returning cached data');
+            return GET();
+        }
+
+        console.log('[X News API] Fetching fresh data from X API v2...');
+        const result = await fetchAllXContent();
+
+        const formatted = result.tweets.map(t => {
+            const cleanTitle = t.text.split('\n')[0].substring(0, 200);
+
+            return {
+                id: t.id,
+                author: t.author_username,
+                author_name: t.author_name,
+                title: cleanTitle,
+                summary: t.text,
+                url: t.url,
+                publishedAt: t.created_at,
+                likes: t.likes,
+                retweets: t.retweets,
+                impressions: t.impressions,
+                engagement_score: t.engagement_score,
+                source_method: t.source_method,
+            };
+        });
+
+        return NextResponse.json({
+            items: formatted,
+            count: formatted.length,
+            cached: result.cached,
+            api_calls: result.api_calls_made,
+            errors: result.errors.length > 0 ? result.errors : undefined,
+        });
+    } catch (error) {
+        console.error('[X News API] POST error:', error);
+        // Fallback to cached data
+        return GET();
     }
 }

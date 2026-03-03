@@ -83,6 +83,15 @@ export interface NewsletterSection {
   sourceUrl: string;
 }
 
+// Feed health tracking
+export interface FeedHealth {
+  name: string;
+  status: 'ok' | 'empty' | 'failed';
+  itemCount: number;
+  latencyMs: number;
+  error?: string;
+}
+
 // Curation progress for UI
 export interface CurationProgress {
   stage: 'fetching' | 'extracting' | 'scoring' | 'done';

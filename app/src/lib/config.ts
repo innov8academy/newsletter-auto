@@ -199,24 +199,27 @@ export const defaultConfig: NewsletterConfig = {
 
 // Scoring configuration
 export const SCORING_CONFIG = {
-    minScoreToShow: 6,
+    minScoreToShow: 4,
+    targetMinStories: 20,
+    hardFloorScore: 3, // Absolute minimum for adaptive fallback
     crossSourceBoost: {
-        twoSources: 1,
-        threePlusSources: 2
+        twoSources: 1.5,
+        threePlusSources: 2.5
     },
     categoryBoost: {
         model_release: 1,
         acquisition: 1,
-        major_update: 1
+        major_update: 1,
+        tool_launch: 1
     },
     recencyBoostHours: 12, // Stories newer than this get +1
     tierWeight: {
         0: 1.2,  // X/Twitter (real-time, high-engagement)
         1: 1.3,  // Newsletters (highest value — curated, multi-story)
-        2: 0.7,  // News sites (lower value — single stories, often rehashed)
+        2: 1.0,  // News sites (fair weight — single stories but important)
         3: 1.1,  // Official blogs (important — primary sources)
-        4: 0.8   // Social
-    }
+        4: 0.85  // Social (Reddit, HN — community signal)
+    } as Record<number, number>
 };
 
 // Prompt for extracting and scoring news stories

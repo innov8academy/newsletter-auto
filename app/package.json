@@ -29,6 +29,7 @@
     "react-konva": "^19.2.2",
     "tailwind-merge": "^3.4.0",
     "tailwindcss-animate": "^1.0.7",
+    "twitter-api-v2": "^1.29.0",
     "use-image": "^1.1.4"
   },
   "devDependencies": {

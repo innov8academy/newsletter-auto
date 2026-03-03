@@ -1,5 +1,10 @@
 #!/bin/bash
-# X/Twitter AI News Fetcher for Newsletter Auto
+# ⚠️ DEPRECATED — March 2026
+# This script used the bird CLI on EC2 to fetch X/Twitter posts.
+# Replaced by X API v2 integration in app/src/lib/x-api.ts (direct, no EC2 dependency).
+# Kept as reference only. Do not run.
+#
+# X/Twitter AI News Fetcher for Newsletter Auto (LEGACY)
 # Fetches tweets from AI accounts → filters → pushes to Supabase
 set -euo pipefail
 
@@ -28,7 +33,9 @@ AI_ACCOUNTS = [
     'sama', 'demaborai', 'kaborai', 'ylecun', 'hardmaru',
     'emaborai', 'aaborai', '_jasonwei', 'DrJimFan',
     'AravSrinivas', 'CursorAI', 'peraborai', 'huggingface',
-    'ClaudeAI', 'MistralAI', 'StabilityAI', 'midjourney'
+    'ClaudeAI', 'MistralAI', 'StabilityAI', 'midjourney',
+    'nvidia', 'MetaAI', 'deepaborai', 'AIatMeta', 'Scale_AI',
+    'MoonshotAI', 'coaborai'
 ]
 
 AI_KEYWORDS = re.compile(

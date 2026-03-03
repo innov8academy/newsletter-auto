@@ -1,4 +1,4 @@
-import { NewsItem, CuratedStory, CurationProgress } from './types';
+import { NewsItem, CuratedStory, CurationProgress, FeedHealth } from './types';
 import { defaultConfig, SCORING_CONFIG, SMART_CURATION_PROMPT } from './config';
 import { fetchAllNews, filterByDate } from './news-fetcher';
 import { supabaseAdmin, isSupabaseConfigured } from './supabase';
@@ -54,13 +54,13 @@ async function fetchUsedStoryHeadlines(): Promise<string[]> {
     }
 
     try {
-        const thirtyDaysAgo = new Date();
-        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+        const sevenDaysAgo = new Date();
+        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
         const { data, error } = await supabaseAdmin
             .from('used_stories')
             .select('headline')
-            .gte('used_at', thirtyDaysAgo.toISOString())
+            .gte('used_at', sevenDaysAgo.toISOString())
             .order('used_at', { ascending: false });
 
         if (error) {
@@ -77,7 +77,7 @@ async function fetchUsedStoryHeadlines(): Promise<string[]> {
 }
 
 // Check if a story headline is too similar to previously used ones
-function isStoryUsed(headline: string, usedHeadlines: string[], threshold: number = 0.6): boolean {
+function isStoryUsed(headline: string, usedHeadlines: string[], threshold: number = 0.7): boolean {
     for (const usedHeadline of usedHeadlines) {
         const similarity = calculateSimilarity(headline, usedHeadline);
         if (similarity >= threshold) {
@@ -99,16 +99,42 @@ async function extractStories(
 ): Promise<RawExtractedStory[]> {
     let content = item.content || item.summary || '';
 
-    // X/Twitter items — extract as single story with engagement context
+    // X/Twitter items — extract with dynamic engagement-based scoring
     if (item.source === 'x_twitter') {
         const tweetText = item.content || item.summary || item.title || '';
         // Clean the @handle prefix from title
         const cleanTitle = (item.title || '').replace(/^@\w+:\s*/, '').substring(0, 120);
+
+        // Parse engagement data from enriched summary (format: "text [123 likes, 45 RTs]")
+        let engagement = 0;
+        let sourceMethod = 'search';
+        const engMatch = (item.summary || '').match(/\[(\d+) likes?, (\d+) RTs?\]/);
+        if (engMatch) {
+            engagement = parseInt(engMatch[1]) + parseInt(engMatch[2]) * 2;
+        }
+
+        // Try parsing JSON engagement from raw data
+        try {
+            const meta = JSON.parse(item.content || '{}');
+            if (meta.engagement_score) engagement = meta.engagement_score;
+            if (meta.source_method) sourceMethod = meta.source_method;
+        } catch { /* not JSON, that's fine */ }
+
+        // Dynamic scoring based on engagement
+        let baseScore: number;
+        if (engagement > 10000) baseScore = 9;
+        else if (engagement > 5000) baseScore = 8;
+        else if (engagement > 1000) baseScore = 7;
+        else baseScore = 6;
+
+        // News API stories get +1 boost (already Grok-curated)
+        if (sourceMethod === 'news_api') baseScore = Math.min(baseScore + 1, 10);
+
         return [{
             headline: cleanTitle || tweetText.split('\n')[0].substring(0, 120),
             summary: tweetText.substring(0, 500),
             category: 'news',
-            baseScore: 6, // Moderate base — let cross-source matching boost it
+            baseScore,
             entities: [],
             originalUrl: item.url,
         }];
@@ -213,7 +239,7 @@ export async function curateNews(
 
     onProgress?.({ stage: 'fetching', current: 0, total: 1, message: `Fetching news from ${allFeeds.length} sources...` });
 
-    const allNews = await fetchAllNews(allFeeds);
+    const { items: allNews, feedHealth } = await fetchAllNews(allFeeds);
 
     // Track found counts
     allNews.forEach(item => {
@@ -222,50 +248,36 @@ export async function curateNews(
         }
     });
 
-    // INTELLIGENT BALANCING: Ensure representation from all tiers
-    // Instead of just taking the newest 20, we take:
-    // - Up to 2 newest items from EACH source (to ensure breadth)
-    // - Then fill the rest with the absolute newest remaining
+    // TIERED BUDGET: Give newsletters more slots (they contain multiple stories)
+    // Tier 1 (newsletters): 4 items each — they yield 3-6 stories per item
+    // Tier 2-4: 2 items each — single stories
+    const TIER_BUDGET: Record<number, number> = { 1: 4, 2: 2, 3: 2, 4: 2 };
+    const SOFT_CAP = 40;
+
     const candidateItems: NewsItem[] = [];
     const seenUrls = new Set<string>();
 
-    // 1. Quota Round: Take up to 2 items per source
+    // Group items by source
     const itemsBySource = new Map<string, NewsItem[]>();
     allNews.forEach(item => {
         if (!itemsBySource.has(item.sourceName)) itemsBySource.set(item.sourceName, []);
         itemsBySource.get(item.sourceName)?.push(item);
     });
 
-    const QUOTA_PER_SOURCE = 2;
-    const X_GUARANTEED_SLOTS = 5; // Guarantee X/Twitter gets at least 5 slots
-    
-    // Separate X items from RSS items
-    const xItems: NewsItem[] = [];
-    const rssItemsBySource = new Map<string, NewsItem[]>();
-    
-    for (const [source, items] of itemsBySource) {
-        if (source.startsWith('X: @') || source === 'X/Twitter AI') {
-            xItems.push(...items);
-        } else {
-            rssItemsBySource.set(source, items);
-        }
-    }
-    
-    // Add guaranteed X items first (sorted by date, newest first)
-    xItems.sort((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime());
-    xItems.slice(0, X_GUARANTEED_SLOTS).forEach(item => {
-        if (!seenUrls.has(item.url)) {
-            candidateItems.push(item);
-            seenUrls.add(item.url);
-        }
-    });
-    
-    // Then quota round for RSS sources
-    for (const [source, items] of rssItemsBySource) {
-        items.sort((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime());
+    // Build a tier lookup from feeds config
+    const feedTierMap = new Map<string, number>();
+    allFeeds.forEach(f => feedTierMap.set(f.name, f.tier ?? 2));
 
-        const quotaItems = items.slice(0, QUOTA_PER_SOURCE);
-        quotaItems.forEach(item => {
+    // Quota round: take tiered budget per source
+    for (const [source, items] of itemsBySource) {
+        // Skip X items (handled separately in their own panel)
+        if (source.startsWith('X: @') || source === 'X/Twitter AI') continue;
+
+        items.sort((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime());
+        const tier = feedTierMap.get(source) ?? 2;
+        const budget = TIER_BUDGET[tier] ?? 2;
+
+        items.slice(0, budget).forEach(item => {
             if (!seenUrls.has(item.url)) {
                 candidateItems.push(item);
                 seenUrls.add(item.url);
@@ -273,23 +285,24 @@ export async function curateNews(
         });
     }
 
-    // 2. Fill Round: If we have space left for the hard limit, fill with newest ignoring source
-    const TOTAL_LIMIT = 25; // Increased from 20 to accommodate X items
-    if (candidateItems.length < TOTAL_LIMIT) {
-        const remainingNeeded = TOTAL_LIMIT - candidateItems.length;
+    // Fill round: if under soft cap, add more items by recency
+    if (candidateItems.length < SOFT_CAP) {
+        const remainingNeeded = SOFT_CAP - candidateItems.length;
         const remainingItems = allNews
-            .filter(item => !seenUrls.has(item.url))
+            .filter(item => !seenUrls.has(item.url) && !item.sourceName.startsWith('X: @'))
             .sort((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime())
             .slice(0, remainingNeeded);
 
         candidateItems.push(...remainingItems);
     }
 
-    // Sort candidates by date again so we process in order
+    // Sort candidates by date so we process newest first
     candidateItems.sort((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime());
 
-    // Stage 2: Extract stories from each item
-    const totalToProcess = Math.min(candidateItems.length, TOTAL_LIMIT);
+    console.log(`[News] ${allNews.length} fresh items → ${candidateItems.length} candidates for extraction`);
+
+    // Stage 2: Extract stories from each item — process ALL candidates (no hard cap)
+    const totalToProcess = candidateItems.length;
 
     for (let i = 0; i < totalToProcess; i++) {
         const item = candidateItems[i];
@@ -371,6 +384,14 @@ export async function curateNews(
         let finalScore = story.baseScore;
         const boosts: string[] = [];
 
+        // Tier weight — apply multiplier based on the highest-tier source
+        const bestTier = Math.min(...story.sources.map(s => feedTierMap.get(s) ?? 2));
+        const tierWeight = SCORING_CONFIG.tierWeight[bestTier] ?? 1.0;
+        if (tierWeight !== 1.0) {
+            finalScore = finalScore * tierWeight;
+            boosts.push(`×${tierWeight} (tier ${bestTier})`);
+        }
+
         // Cross-source boost
         if (story.crossSourceCount >= 3) {
             finalScore += SCORING_CONFIG.crossSourceBoost.threePlusSources;
@@ -399,14 +420,24 @@ export async function curateNews(
         story.boosts = boosts;
     }
 
-    // Filter and sort
-    let result = Array.from(stories.values())
-        .filter(s => s.finalScore >= SCORING_CONFIG.minScoreToShow)
-        .sort((a, b) => b.finalScore - a.finalScore);
+    // Filter and sort — primary pass with normal threshold
+    const allScored = Array.from(stories.values()).sort((a, b) => b.finalScore - a.finalScore);
+    let result = allScored.filter(s => s.finalScore >= SCORING_CONFIG.minScoreToShow);
+    let curationMode = 'normal';
+
+    // Adaptive minimum guarantee: if below target, progressively relax threshold
+    if (result.length < SCORING_CONFIG.targetMinStories) {
+        const relaxed = allScored.filter(s => s.finalScore >= SCORING_CONFIG.hardFloorScore);
+        if (relaxed.length > result.length) {
+            result = relaxed.slice(0, Math.max(SCORING_CONFIG.targetMinStories, relaxed.length));
+            curationMode = 'relaxed';
+            console.log(`[Adaptive] Relaxed threshold to ${SCORING_CONFIG.hardFloorScore} — ${result.length} stories (target: ${SCORING_CONFIG.targetMinStories})`);
+        }
+    }
 
     // Stage 4: Filter out previously used stories
     onProgress?.({ stage: 'scoring', current: 1, total: 1, message: 'Checking for duplicates...' });
-    
+
     const usedHeadlines = await fetchUsedStoryHeadlines();
     if (usedHeadlines.length > 0) {
         const beforeCount = result.length;
@@ -417,12 +448,15 @@ export async function curateNews(
         }
     }
 
+    console.log(`[News] Final: ${result.length} stories (mode: ${curationMode})`);
     onProgress?.({ stage: 'done', current: 1, total: 1, message: `Found ${result.length} curated stories` });
 
     const stats = {
         sourcesAnalyzed: allFeeds.length,
         totalArticlesFound: allNews.length,
         articlesProcessed: totalToProcess,
+        curationMode,
+        feedHealth,
         breakdown: Object.entries(statsBreakdown).map(([name, counts]) => ({
             sourceName: name,
             found: counts.found,
