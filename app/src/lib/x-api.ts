@@ -58,20 +58,28 @@ function getClient(): TwitterApi {
 // ─── Helper: parse tweets from API response ────────────────────────────────────
 
 function parseTweets(
-    data: any,
+    result: any,
     sourceMethod: XTweet['source_method']
 ): XTweet[] {
-    if (!data?.data) return [];
+    // The SDK returns a paginator. The raw response is in .data
+    // .data has { data: Tweet[], includes: { users: [] }, meta: {} }
+    const response = result?.data || result;
+    const tweets = response?.data || response;
+
+    // Handle case where tweets is not an array
+    if (!Array.isArray(tweets)) {
+        console.log(`[X API] parseTweets: no tweets array found (got ${typeof tweets})`);
+        return [];
+    }
 
     // Build author lookup from includes
     const authors = new Map<string, { username: string; name: string }>();
-    if (data.includes?.users) {
-        for (const user of data.includes.users) {
-            authors.set(user.id, { username: user.username, name: user.name });
-        }
+    const users = response?.includes?.users || result?.includes?.users || [];
+    for (const user of users) {
+        authors.set(user.id, { username: user.username, name: user.name });
     }
 
-    return data.data.map((tweet: any) => {
+    return tweets.map((tweet: any) => {
         const author = authors.get(tweet.author_id) || { username: 'unknown', name: 'Unknown' };
         const metrics = tweet.public_metrics || {};
         const likes = metrics.like_count || 0;
@@ -368,28 +376,37 @@ async function cacheToSupabase(tweets: XTweet[]): Promise<void> {
             .delete()
             .eq('source_id', X_SOURCE_ID);
 
-        // Insert new items
-        const rows = tweets.map(t => ({
-            source_id: X_SOURCE_ID,
-            url: t.url,
-            title: `@${t.author_username}: ${t.text.split('\n')[0].substring(0, 180)}`,
-            raw_summary: JSON.stringify({
-                text: t.text,
-                author_username: t.author_username,
-                author_name: t.author_name,
-                likes: t.likes,
-                retweets: t.retweets,
-                impressions: t.impressions,
-                engagement_score: t.engagement_score,
-                source_method: t.source_method,
-            }),
-            published_at: t.created_at,
-            is_processed: false,
-        }));
+        // Insert new items — ensure every row has a unique URL
+        const seenUrls = new Set<string>();
+        const rows = tweets
+            .map(t => {
+                // Guarantee unique URL: use tweet URL, or generate one from ID
+                let url = t.url || `https://x.com/i/status/${t.id}`;
+                if (seenUrls.has(url)) url = `${url}?d=${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+                seenUrls.add(url);
+
+                return {
+                    source_id: X_SOURCE_ID,
+                    url,
+                    title: `@${t.author_username}: ${t.text.split('\n')[0].substring(0, 180)}`,
+                    raw_summary: JSON.stringify({
+                        text: t.text,
+                        author_username: t.author_username,
+                        author_name: t.author_name,
+                        likes: t.likes,
+                        retweets: t.retweets,
+                        impressions: t.impressions,
+                        engagement_score: t.engagement_score,
+                        source_method: t.source_method,
+                    }),
+                    published_at: t.created_at,
+                    is_processed: false,
+                };
+            });
 
         const { error } = await supabaseAdmin
             .from('news_items')
-            .insert(rows);
+            .upsert(rows, { onConflict: 'url', ignoreDuplicates: true });
 
         if (error) {
             console.error('[X API] Supabase insert error:', error);
