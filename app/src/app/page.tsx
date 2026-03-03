@@ -820,9 +820,8 @@ export default function Home() {
             <div className="grid grid-cols-12 gap-8 h-[calc(100vh-140px)]">
               {/* Main Feed */}
               <div className="col-span-8 flex flex-col h-full">
-                {/* X/Twitter AI News Section */}
-                {xNews.length > 0 && (
-                  <div className="mb-6">
+                {/* X/Twitter AI News Section — always show so Refresh is accessible */}
+                <div className="mb-6">
                     <div className="flex items-center gap-3 mb-4">
                       <div className="flex items-center gap-2">
                         <span className="bg-white text-black px-2 py-1 rounded-md font-bold text-sm leading-none">𝕏</span>
@@ -842,6 +841,13 @@ export default function Home() {
                         Refresh
                       </Button>
                     </div>
+                    {xNews.length === 0 ? (
+                      <div className="rounded-lg border border-white/5 bg-surface p-6 text-center">
+                        <p className="text-sm text-white/30">
+                          {xLoading ? 'Fetching trending AI posts...' : 'No X posts cached. Click Refresh to fetch trending AI content.'}
+                        </p>
+                      </div>
+                    ) : (
                     <div className="grid grid-cols-2 gap-3">
                       {xNews.map((item: any) => {
                         const isSelected = selectedIds.has(`x_${item.id}`);
@@ -919,9 +925,9 @@ export default function Home() {
                         );
                       })}
                     </div>
+                    )}
                     {/* All X items shown */}
-                  </div>
-                )}
+                </div>
 
                 <div className="flex items-center justify-between mb-6">
                   <div>
