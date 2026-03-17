@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-// Web search using Serper API
+// Web search using Serper API — supports web, news, and reddit search
 export async function POST(request: NextRequest) {
   try {
-    const { query, num = 5 } = await request.json();
-    
+    const { query, num = 5, type = 'web' } = await request.json();
+
     const apiKey = process.env.SERPER_API_KEY;
     if (!apiKey) {
       return NextResponse.json(
@@ -13,7 +13,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const response = await fetch('https://google.serper.dev/search', {
+    // Choose Serper endpoint based on type
+    const endpoint = type === 'news'
+      ? 'https://google.serper.dev/news'
+      : 'https://google.serper.dev/search';
+
+    const response = await fetch(endpoint, {
       method: 'POST',
       headers: {
         'X-API-KEY': apiKey,

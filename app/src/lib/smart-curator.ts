@@ -2,6 +2,7 @@ import { NewsItem, CuratedStory, CurationProgress, FeedHealth } from './types';
 import { defaultConfig, SCORING_CONFIG, SMART_CURATION_PROMPT } from './config';
 import { fetchAllNews, filterByDate } from './news-fetcher';
 import { supabaseAdmin, isSupabaseConfigured } from './supabase';
+import { callGemini } from './gemini-client';
 
 interface RawExtractedStory {
     headline: string;
@@ -174,37 +175,14 @@ ${content.substring(0, 15000)}
 Return JSON array only.`;
 
     try {
-        const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${apiKey}`,
-                'HTTP-Referer': 'http://localhost:3000',
-                'X-Title': 'Innov8 AI',
-            },
-            body: JSON.stringify({
-                model: 'google/gemini-2.0-flash-001',
-                messages: [{ role: 'user', content: prompt }],
-                temperature: 0.2,
-                max_tokens: 3000,
-            }),
+        // Use Gemini API directly (free tier) instead of OpenRouter
+        const response = await callGemini(prompt, {
+            model: 'gemini-3.1-flash-lite-preview',
+            temperature: 0.2,
+            maxOutputTokens: 3000,
         });
 
-        if (!response.ok) {
-            return [{
-                headline: item.title,
-                summary: item.summary || '',
-                category: 'other',
-                baseScore: 5,
-                entities: [],
-                originalUrl: item.url,
-            }];
-        }
-
-        const data = await response.json();
-        const content_response = data.choices?.[0]?.message?.content || '[]';
-
-        const cleanContent = content_response
+        const cleanContent = response.text
             .replace(/```json\n?/g, '')
             .replace(/```\n?/g, '')
             .trim();

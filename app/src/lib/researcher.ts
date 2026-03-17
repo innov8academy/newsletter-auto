@@ -1,18 +1,22 @@
-// Deep Research Agent using OpenRouter
+// Deep Research Agent using OpenRouter + Direct Gemini API
 // Generates newsletter-ready content for news stories
 
 import { CuratedStory, ResearchReport } from './types';
 import { ALEX_VOICE } from './config';
+import { callGemini } from './gemini-client';
 
 const OPENROUTER_API_URL = 'https://openrouter.ai/api/v1/chat/completions';
 
 // Available models for research - user can select from these
-// Updated 2025: Organized by specialty
+// Updated March 2026: Budget options first, organized by cost
 export const RESEARCH_MODELS = [
+    // Budget Research (FREE or near-free)
+    { id: 'budget/gemini-grounded', name: 'Budget: Gemini + Google Search', description: '💸 FREE! Gemini 3.1 Flash Lite + Google Search grounding', category: 'budget' },
+    { id: 'budget/serper-gemini', name: 'Budget: Serper + Gemini', description: '💸 ~$0.003/story. Serper search + Gemini synthesis', category: 'budget' },
+
     // Deep Research Specialists (have web access or agentic research capability)
-    // NOTE: o4-mini-deep-research removed - takes 5-10min, exceeds Vercel timeout
-    { id: 'perplexity/sonar-deep-research', name: 'Perplexity Deep Research', description: '🔬 Best deep research - fast & reliable', category: 'research' },
-    { id: 'x-ai/grok-4.1-fast', name: 'Grok 4.1 Fast (Reasoning)', description: '🚀 10x cheaper! Deep reasoning + 2M context', category: 'research', reasoning: true },
+    { id: 'perplexity/sonar-deep-research', name: 'Perplexity Deep Research', description: '🔬 Best deep research - $0.50-1.00/story', category: 'research' },
+    { id: 'x-ai/grok-4.1-fast', name: 'Grok 4.1 Fast (Reasoning)', description: '🚀 Deep reasoning + 2M context', category: 'research', reasoning: true },
     { id: 'moonshotai/kimi-k2.5', name: 'Kimi K2.5 (Agent)', description: '🤖 262K + web search + tool-calling', category: 'research', agentic: true },
     { id: 'perplexity/sonar', name: 'Perplexity Sonar', description: '💰 Web search - $1/1M tokens', category: 'research' },
     { id: 'perplexity/sonar-pro', name: 'Perplexity Sonar Pro', description: '🔥 Advanced web research', category: 'research' },
@@ -24,13 +28,13 @@ export const RESEARCH_MODELS = [
     { id: 'deepseek/deepseek-r1', name: 'DeepSeek R1', description: 'Powerful reasoning', category: 'general' },
 
     // Fast & Cheap
-    { id: 'google/gemini-2.0-flash-001', name: 'Gemini 2.0 Flash', description: 'Fast & reliable', category: 'fast' },
+    { id: 'google/gemini-3.1-flash-lite-preview', name: 'Gemini 3.1 Flash Lite', description: 'Fast & free tier available', category: 'fast' },
     { id: 'anthropic/claude-3.5-haiku', name: 'Claude 3.5 Haiku', description: 'Fast & cheap', category: 'fast' },
 ] as const;
 
 export type ResearchModelId = typeof RESEARCH_MODELS[number]['id'];
 
-const DEFAULT_MODEL: ResearchModelId = 'x-ai/grok-4.1-fast';
+const DEFAULT_MODEL: ResearchModelId = 'budget/gemini-grounded';
 
 interface ResearchResult {
     success: boolean;
@@ -60,14 +64,20 @@ export async function generateResearchReport(
     const selectedModel = modelId || DEFAULT_MODEL;
     console.log('[generateResearchReport] Selected model:', selectedModel);
 
+    // Budget research modes — use direct Gemini API (free tier)
+    if (selectedModel.startsWith('budget/')) {
+        console.log('[generateResearchReport] Using budget mode:', selectedModel);
+        return await generateBudgetResearch(story, selectedModel, direction);
+    }
+
     // Check model type for specialized handling
     const isPerplexity = selectedModel.toLowerCase().includes('perplexity');
     const isKimi = selectedModel.toLowerCase().includes('kimi');
-    
+
     // Check if model supports agentic mode (tool-calling)
     const modelConfig = RESEARCH_MODELS.find(m => m.id === selectedModel);
     const isAgentic = modelConfig && 'agentic' in modelConfig && modelConfig.agentic;
-    
+
     // Use agentic research for Kimi with tool-calling
     if (isKimi && isAgentic) {
         console.log('[generateResearchReport] Using agentic mode for Kimi');
@@ -511,6 +521,160 @@ Start by searching for the most relevant and recent information.`;
     
     const report = parseResearchContent(story, finalContent);
     return { success: true, report };
+}
+
+/**
+ * Budget research using direct Gemini API — FREE tier
+ * Option A (gemini-grounded): Gemini 3.1 Flash Lite with Google Search grounding — single API call
+ * Option B (serper-gemini): Serper search + Gemini synthesis — more control over queries
+ */
+async function generateBudgetResearch(
+    story: CuratedStory,
+    mode: string,
+    direction?: string
+): Promise<ResearchResult> {
+    const systemPrompt = getVerbosePrompt();
+
+    const userPrompt = `Research and write about this story for the newsletter:
+
+**Headline:** ${story.headline}
+
+**Summary:** ${story.summary}
+
+**Category:** ${story.category}
+
+**Original Sources:** ${story.sources.join(', ')}
+
+${story.originalUrl ? `**Source URL:** ${story.originalUrl}` : ''}
+
+${direction ? `**RESEARCH DIRECTION:** ${direction}\n\nIMPORTANT: Focus your research specifically on the angle/direction above.` : ''}
+
+Search for the latest information about this topic. Find specific facts, numbers, quotes, and recent developments. Then write this up for the newsletter. Make it engaging and newsletter-ready.`;
+
+    try {
+        if (mode === 'budget/gemini-grounded') {
+            // Option A: Single Gemini call with Google Search grounding
+            console.log('[BudgetResearch] Using Gemini + Google Search grounding');
+
+            const response = await callGemini(userPrompt, {
+                model: 'gemini-3.1-flash-lite-preview',
+                systemInstruction: systemPrompt,
+                useGoogleSearch: true,
+                temperature: 0.3,
+                maxOutputTokens: 4000,
+            });
+
+            if (!response.text) {
+                return { success: false, error: 'Gemini returned empty response' };
+            }
+
+            // Log grounding info
+            const searchQueries = response.groundingMetadata?.webSearchQueries || [];
+            const sources = response.groundingMetadata?.groundingChunks
+                ?.map(c => c.web?.title || c.web?.uri)
+                .filter(Boolean) || [];
+            console.log(`[BudgetResearch] Grounding used ${searchQueries.length} searches, ${sources.length} sources`);
+
+            const report = parseResearchContent(story, response.text);
+            return { success: true, report };
+
+        } else if (mode === 'budget/serper-gemini') {
+            // Option B: Serper search + Gemini synthesis
+            console.log('[BudgetResearch] Using Serper + Gemini synthesis');
+
+            // Generate search queries from the story
+            const queries = generateSearchQueries(story, direction);
+            console.log('[BudgetResearch] Search queries:', queries);
+
+            // Run all searches in parallel
+            const searchResults = await Promise.all(
+                queries.map(async (query) => {
+                    try {
+                        const searchUrl = `${process.env.NEXT_PUBLIC_BASE_URL || 'https://newsletter-auto.vercel.app'}/api/web-search`;
+                        const res = await fetch(searchUrl, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ query: query.query, num: 5, type: query.type || 'web' }),
+                        });
+                        const data = await res.json();
+                        return data.success ? data.results : [];
+                    } catch (e) {
+                        console.error(`[BudgetResearch] Search failed for "${query.query}":`, e);
+                        return [];
+                    }
+                })
+            );
+
+            // Flatten and format all results
+            const allResults = searchResults.flat();
+            const formattedResults = formatSearchResults(allResults);
+
+            // Feed to Gemini for synthesis (no grounding needed — we have the data)
+            const synthesisPrompt = `${userPrompt}
+
+## RAW SEARCH RESULTS (use these as your source material):
+
+${formattedResults}
+
+Based on the search results above, write a comprehensive newsletter-ready report. Cite specific facts and sources.`;
+
+            const response = await callGemini(synthesisPrompt, {
+                model: 'gemini-3.1-flash-lite-preview',
+                systemInstruction: systemPrompt,
+                useGoogleSearch: false,
+                temperature: 0.3,
+                maxOutputTokens: 4000,
+            });
+
+            if (!response.text) {
+                return { success: false, error: 'Gemini synthesis returned empty response' };
+            }
+
+            const report = parseResearchContent(story, response.text);
+            return { success: true, report };
+
+        } else {
+            return { success: false, error: `Unknown budget mode: ${mode}` };
+        }
+    } catch (error) {
+        console.error('[BudgetResearch] Error:', error);
+        return {
+            success: false,
+            error: error instanceof Error ? error.message : 'Budget research failed',
+        };
+    }
+}
+
+/**
+ * Generate smart search queries from a story for Serper
+ */
+function generateSearchQueries(
+    story: CuratedStory,
+    direction?: string
+): Array<{ query: string; type?: string }> {
+    const queries: Array<{ query: string; type?: string }> = [];
+    const headline = story.headline;
+
+    // Query 1: Direct headline search (news)
+    queries.push({ query: headline, type: 'news' });
+
+    // Query 2: Extract key entity + topic for broader context
+    // Remove common filler words for a tighter query
+    const cleanHeadline = headline
+        .replace(/\b(the|a|an|is|are|was|were|has|have|had|will|would|could|should|may|might|can|do|does|did|new|just|now|says|said|announces|announced|launches|launched|releases|released|introduces|introduced|unveils|unveiled)\b/gi, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+    queries.push({ query: `${cleanHeadline} 2026`, type: 'web' });
+
+    // Query 3: Reddit/community discussion
+    queries.push({ query: `${cleanHeadline} site:reddit.com`, type: 'web' });
+
+    // Query 4: If direction provided, search for that specific angle
+    if (direction) {
+        queries.push({ query: `${direction} ${story.category}`, type: 'web' });
+    }
+
+    return queries;
 }
 
 /**

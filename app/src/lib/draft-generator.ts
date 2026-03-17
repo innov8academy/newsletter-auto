@@ -4,7 +4,7 @@
 
 import { ResearchReport } from './types';
 import { supabaseAdmin } from './supabase'; // RAG Support
-
+import { callGemini } from './gemini-client';
 
 const OPENROUTER_API_URL = 'https://openrouter.ai/api/v1/chat/completions';
 
@@ -444,33 +444,52 @@ The intro has already been written. Now write:
 Ithrollu innathe AI Update.
 appo adutha l8ril varam.. bie. ✌️`;
 
-        const storiesResponse = await fetch(OPENROUTER_API_URL, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${apiKey}`,
-                'HTTP-Referer': 'https://innov8ai.local',
-                'X-Title': 'Innov8 AI Draft Generator - Stories',
-            },
-            body: JSON.stringify({
-                model: storyModel,
-                messages: [
-                    { role: 'system', content: finalSystemPrompt },
-                    { role: 'user', content: storiesPrompt },
-                ],
+        // Use Gemini API directly for stories (free tier) if it's a Gemini model
+        let storiesContent: string;
+        let finishReason: string | undefined;
+
+        const isGeminiModel = storyModel.startsWith('google/gemini-');
+        if (isGeminiModel) {
+            // Direct Gemini API call (free tier, bypasses OpenRouter)
+            const geminiModelId = storyModel.replace('google/', '');
+            const geminiResponse = await callGemini(storiesPrompt, {
+                model: geminiModelId,
+                systemInstruction: finalSystemPrompt,
                 temperature: 0.7,
-                max_tokens: 8000, // Increased from 6000 to prevent truncation
-            }),
-        });
+                maxOutputTokens: 8000,
+            });
+            storiesContent = geminiResponse.text;
+            finishReason = storiesContent ? 'stop' : 'error';
+        } else {
+            // Non-Gemini models go through OpenRouter
+            const storiesResponse = await fetch(OPENROUTER_API_URL, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${apiKey}`,
+                    'HTTP-Referer': 'https://innov8ai.local',
+                    'X-Title': 'Innov8 AI Draft Generator - Stories',
+                },
+                body: JSON.stringify({
+                    model: storyModel,
+                    messages: [
+                        { role: 'system', content: finalSystemPrompt },
+                        { role: 'user', content: storiesPrompt },
+                    ],
+                    temperature: 0.7,
+                    max_tokens: 8000,
+                }),
+            });
 
-        if (!storiesResponse.ok) {
-            const errorText = await storiesResponse.text();
-            return { success: false, error: `Stories API Error (${storyModel}): ${storiesResponse.status} - ${errorText}` };
+            if (!storiesResponse.ok) {
+                const errorText = await storiesResponse.text();
+                return { success: false, error: `Stories API Error (${storyModel}): ${storiesResponse.status} - ${errorText}` };
+            }
+
+            const storiesData = await storiesResponse.json();
+            storiesContent = storiesData.choices?.[0]?.message?.content || '';
+            finishReason = storiesData.choices?.[0]?.finish_reason;
         }
-
-        const storiesData = await storiesResponse.json();
-        const storiesContent = storiesData.choices?.[0]?.message?.content || '';
-        const finishReason = storiesData.choices?.[0]?.finish_reason;
 
         console.log(`[Draft] Phase 2 complete. Stories generated. Finish reason: ${finishReason}`);
 
