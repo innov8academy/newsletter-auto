@@ -152,7 +152,8 @@ async function extractStories(
     }
 
     // If still no content, return as single story (fallback)
-    if (!content || content.length < 100) {
+    // Threshold is 40 chars (not 100) — even a short title+source is enough for Gemini to categorize
+    if (!content || content.length < 40) {
         return [{
             headline: item.title,
             summary: item.summary || item.title,
@@ -205,7 +206,9 @@ Return JSON array only.`;
             entities: [],
             originalUrl: item.url,
         }];
-    } catch {
+    } catch (error) {
+        console.error(`[Extract] Failed for "${item.title.substring(0, 50)}..." [${item.sourceName}]:`,
+            error instanceof Error ? error.message : error);
         return [{
             headline: item.title,
             summary: item.summary || '',
@@ -401,7 +404,7 @@ export async function curateNews(
         }
 
         // Category boost
-        const categoryBoost = SCORING_CONFIG.categoryBoost[story.category as keyof typeof SCORING_CONFIG.categoryBoost];
+        const categoryBoost = SCORING_CONFIG.categoryBoost[story.category];
         if (categoryBoost) {
             finalScore += categoryBoost;
             boosts.push(`+${categoryBoost} (${story.category})`);
@@ -409,7 +412,11 @@ export async function curateNews(
 
         // Recency scoring — fresh content gets additive boost, old content gets aggressive decay
         const publishedAt = new Date(story.publishedAt);
-        const hoursAgo = (now.getTime() - publishedAt.getTime()) / (1000 * 60 * 60);
+        const rawHoursAgo = (now.getTime() - publishedAt.getTime()) / (1000 * 60 * 60);
+        // Newsletter pubDates reflect send time, not story time — cap to 12h minimum
+        // so they never get "breaking" or "very fresh" boosts for stale aggregated content
+        const isNewsletter = story.sources.some(s => (feedTierMap.get(s) ?? 2) === 1);
+        const hoursAgo = isNewsletter ? Math.max(rawHoursAgo, 12) : rawHoursAgo;
         if (hoursAgo < 4) {
             finalScore += 3;
             boosts.push('+3 (breaking)');
