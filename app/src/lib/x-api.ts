@@ -296,7 +296,38 @@ async function searchInsiderContent(client: TwitterApi): Promise<XTweet[]> {
     }
 }
 
+// ─── Cost-Optimized: Minimal AI Search (10 tweets only) ─────────────────────
+
+async function searchTrendingAIMinimal(client: TwitterApi): Promise<XTweet[]> {
+    console.log('[X API] Minimal search: 10 top AI tweets...');
+    try {
+        const query = [
+            '(AI OR "artificial intelligence" OR GPT OR Claude OR Gemini OR LLM',
+            'OR "AI agent" OR "open source model" OR "AI tool")',
+            '-is:retweet -is:reply lang:en',
+        ].join(' ');
+
+        const result = await client.v2.search(query, {
+            max_results: 10, // Minimum allowed — saves credits
+            sort_order: 'relevancy',
+            'tweet.fields': [...TWEET_FIELDS],
+            'user.fields': [...USER_FIELDS],
+            expansions: [...EXPANSIONS],
+        });
+
+        const tweets = parseTweets(result, 'search');
+        console.log(`[X API] Minimal search: ${tweets.length} tweets`);
+        return tweets;
+    } catch (error: any) {
+        console.error('[X API] Minimal search failed:', error?.message || error);
+        return [];
+    }
+}
+
 // ─── Orchestrator: Fetch All X Content ─────────────────────────────────────────
+// COST-OPTIMIZED: Only News API + one minimal search (10 tweets)
+// Previous version ran 4 strategies = 240 tweets = ~$0.89/refresh
+// Now: News API (10) + minimal search (10) = ~20 tweets = ~$0.08/refresh
 
 export async function fetchAllXContent(): Promise<XFetchResult> {
     const errors: string[] = [];
@@ -305,19 +336,17 @@ export async function fetchAllXContent(): Promise<XFetchResult> {
     try {
         const client = getClient();
 
-        // Run all 4 strategies in parallel — one failure doesn't kill others
+        // Only run News API (cheapest) + one small keyword search as fallback
         const results = await Promise.allSettled([
-            searchTrendingAI(client),
-            searchTechDomain(client),
             fetchAINewsStories(client),
-            discoverAICommunities(client),
+            searchTrendingAIMinimal(client),
         ]);
 
         const allTweets: XTweet[] = [];
 
         results.forEach((result, i) => {
             apiCallsMade++;
-            const strategyNames = ['Trending AI Search', 'Tech Domain', 'News API', 'Communities'];
+            const strategyNames = ['News API', 'Minimal Search'];
             if (result.status === 'fulfilled') {
                 allTweets.push(...result.value);
             } else {
@@ -327,7 +356,7 @@ export async function fetchAllXContent(): Promise<XFetchResult> {
             }
         });
 
-        console.log(`[X API] Total raw tweets: ${allTweets.length} from ${apiCallsMade} API calls`);
+        console.log(`[X API] Total raw tweets: ${allTweets.length} from ${apiCallsMade} API calls (cost-optimized)`);
 
         // Dedup by tweet ID
         const seen = new Set<string>();
