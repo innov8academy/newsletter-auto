@@ -277,15 +277,19 @@ export default function Home() {
 
   function selectXItem(item: any) {
     // Convert X item to CuratedStory format and add to stories + selection
+    // Include linked URLs in summary so the researcher can access the actual articles
+    const linkedUrls = item.linked_urls?.length
+      ? `\n\nLinked articles: ${item.linked_urls.join(', ')}`
+      : '';
     const xStory: CuratedStory = {
       id: `x_${item.id}`,
       headline: item.title,
-      summary: item.summary || item.title,
+      summary: (item.summary || item.title) + linkedUrls,
       category: 'x_twitter',
       baseScore: 7,
       finalScore: 7,
       entities: [],
-      originalUrl: item.url,
+      originalUrl: item.linked_urls?.[0] || item.url, // Prefer the linked article URL over tweet URL
       sources: [`X: @${item.author}`],
       publishedAt: item.publishedAt || new Date().toISOString(),
       crossSourceCount: 1,

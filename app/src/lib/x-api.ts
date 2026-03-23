@@ -10,6 +10,7 @@ export interface XTweet {
     author_name: string;
     created_at: string;
     url: string;
+    linked_urls: string[]; // URLs embedded in the tweet (articles, products, etc.)
     likes: number;
     retweets: number;
     impressions: number;
@@ -86,6 +87,19 @@ function parseTweets(
         const retweets = metrics.retweet_count || 0;
         const impressions = metrics.impression_count || 0;
 
+        // Extract linked URLs from tweet entities (articles, products the tweet references)
+        const linkedUrls: string[] = [];
+        if (tweet.entities?.urls) {
+            for (const urlEntity of tweet.entities.urls) {
+                // Use expanded_url (full URL) or unwound_url (final redirect destination)
+                const realUrl = urlEntity.unwound_url || urlEntity.expanded_url || urlEntity.url || '';
+                // Skip X/Twitter internal links (quote tweets, profiles)
+                if (realUrl && !realUrl.includes('x.com/') && !realUrl.includes('twitter.com/')) {
+                    linkedUrls.push(realUrl);
+                }
+            }
+        }
+
         return {
             id: tweet.id,
             text: tweet.text,
@@ -93,6 +107,7 @@ function parseTweets(
             author_name: author.name,
             created_at: tweet.created_at || new Date().toISOString(),
             url: `https://x.com/${author.username}/status/${tweet.id}`,
+            linked_urls: linkedUrls,
             likes,
             retweets,
             impressions,
@@ -191,6 +206,7 @@ async function fetchAINewsStories(client: TwitterApi): Promise<XTweet[]> {
             author_name: 'X News (Grok-curated)',
             created_at: story.created_at || new Date().toISOString(),
             url: story.url || story.articles?.[0]?.url || '',
+            linked_urls: story.articles?.map((a: any) => a.url).filter(Boolean) || [],
             likes: 0,
             retweets: 0,
             impressions: 0,
@@ -398,6 +414,7 @@ async function cacheToSupabase(tweets: XTweet[]): Promise<void> {
                         impressions: t.impressions,
                         engagement_score: t.engagement_score,
                         source_method: t.source_method,
+                        linked_urls: t.linked_urls,
                     }),
                     published_at: t.created_at,
                     is_processed: false,
@@ -451,6 +468,7 @@ export async function getCachedXNews(): Promise<XTweet[]> {
                 author_name: meta.author_name || username,
                 created_at: item.published_at || item.created_at || new Date().toISOString(),
                 url: item.url || '',
+                linked_urls: meta.linked_urls || [],
                 likes: meta.likes || 0,
                 retweets: meta.retweets || 0,
                 impressions: meta.impressions || 0,
