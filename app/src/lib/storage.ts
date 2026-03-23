@@ -10,6 +10,7 @@ const STORAGE_KEYS = {
     LAST_UPDATED: 'innov8_last_updated',
     API_KEY: 'openrouter_api_key',
     CUSTOM_FEEDS: 'innov8_custom_feeds',
+    SHOWN_HEADLINES: 'innov8_shown_headlines',
 } as const;
 
 // Type for the complete persisted state
@@ -170,6 +171,43 @@ export function loadCustomFeeds(): any[] {
     try {
         const stored = localStorage.getItem(STORAGE_KEYS.CUSTOM_FEEDS);
         return stored ? JSON.parse(stored) : [];
+    } catch (error) {
+        return [];
+    }
+}
+
+interface ShownHeadline {
+    text: string;
+    shownAt: string;
+}
+
+/**
+ * Save shown headlines to localStorage (appends to existing, auto-expires after 48h)
+ */
+export function saveShownHeadlines(headlines: string[]): void {
+    try {
+        const existing = loadShownHeadlines();
+        const now = new Date().toISOString();
+        const newEntries: ShownHeadline[] = headlines.map(text => ({ text, shownAt: now }));
+        const combined = [...existing, ...newEntries];
+        localStorage.setItem(STORAGE_KEYS.SHOWN_HEADLINES, JSON.stringify(combined));
+    } catch (error) {
+        console.error('Failed to save shown headlines:', error);
+    }
+}
+
+/**
+ * Load shown headlines from localStorage (auto-expires entries older than 48h)
+ */
+export function loadShownHeadlines(): ShownHeadline[] {
+    try {
+        const stored = localStorage.getItem(STORAGE_KEYS.SHOWN_HEADLINES);
+        if (!stored) return [];
+        const all: ShownHeadline[] = JSON.parse(stored);
+        const cutoff = new Date();
+        cutoff.setHours(cutoff.getHours() - 48);
+        // Filter out expired entries
+        return all.filter(h => new Date(h.shownAt) >= cutoff);
     } catch (error) {
         return [];
     }

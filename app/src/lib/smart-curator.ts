@@ -188,7 +188,23 @@ Return JSON array only.`;
             .trim();
 
         const parsed = JSON.parse(cleanContent);
-        return Array.isArray(parsed) ? parsed : [];
+        if (Array.isArray(parsed)) return parsed;
+        // Gemini sometimes wraps in an object like {stories: [...]} — unwrap it
+        if (parsed && typeof parsed === 'object') {
+            const arrValue = Object.values(parsed).find(v => Array.isArray(v));
+            if (arrValue) return arrValue as RawExtractedStory[];
+            // Single story object — wrap in array
+            if (parsed.headline) return [parsed as RawExtractedStory];
+        }
+        console.warn(`[Extract] Unexpected Gemini response format for "${item.title.substring(0, 40)}...", using fallback`);
+        return [{
+            headline: item.title,
+            summary: item.summary || '',
+            category: 'other' as string,
+            baseScore: 5,
+            entities: [],
+            originalUrl: item.url,
+        }];
     } catch {
         return [{
             headline: item.title,
@@ -205,7 +221,8 @@ Return JSON array only.`;
 export async function curateNews(
     apiKey: string,
     onProgress?: (progress: CurationProgress) => void,
-    customFeeds: any[] = []
+    customFeeds: any[] = [],
+    excludeHeadlines: string[] = []
 ): Promise<{ stories: CuratedStory[], stats: any }> { // Temporarily using any for stats to avoid import cycle issues if types verify slowly
     const stories: Map<string, CuratedStory> = new Map();
     const statsBreakdown: Record<string, { found: number, kept: number }> = {};
@@ -229,8 +246,12 @@ export async function curateNews(
     // TIERED BUDGET: Give newsletters more slots (they contain multiple stories)
     // Tier 1 (newsletters): 4 items each — they yield 3-6 stories per item
     // Tier 2-4: 2 items each — single stories
-    const TIER_BUDGET: Record<number, number> = { 1: 4, 2: 2, 3: 2, 4: 2 };
-    const SOFT_CAP = 40;
+    // When excluding already-shown stories ("Find More"), increase budgets to discover new content
+    const isFindMore = excludeHeadlines.length > 0;
+    const TIER_BUDGET: Record<number, number> = isFindMore
+        ? { 0: 10, 1: 8, 2: 5, 3: 4, 4: 4 }
+        : { 0: 6, 1: 4, 2: 2, 3: 2, 4: 2 };
+    const SOFT_CAP = isFindMore ? 80 : 40;
 
     const candidateItems: NewsItem[] = [];
     const seenUrls = new Set<string>();
@@ -386,20 +407,47 @@ export async function curateNews(
             boosts.push(`+${categoryBoost} (${story.category})`);
         }
 
-        // Recency boost (reduced for balancing, but still active)
+        // Recency scoring — fresh content gets additive boost, old content gets aggressive decay
         const publishedAt = new Date(story.publishedAt);
         const hoursAgo = (now.getTime() - publishedAt.getTime()) / (1000 * 60 * 60);
-        if (hoursAgo < SCORING_CONFIG.recencyBoostHours) {
-            finalScore += 1;
-            boosts.push('+1 (recent)');
+        if (hoursAgo < 4) {
+            finalScore += 3;
+            boosts.push('+3 (breaking)');
+        } else if (hoursAgo < 8) {
+            finalScore += 2;
+            boosts.push('+2 (very fresh)');
+        } else if (hoursAgo < 16) {
+            finalScore += 1.5;
+            boosts.push('+1.5 (fresh)');
+        } else if (hoursAgo < 24) {
+            finalScore += 0.5;
+            boosts.push('+0.5 (today)');
+        }
+
+        // Aggressive multiplicative decay for content older than 24 hours —
+        // halves score within 12 hours past the 24h mark
+        if (hoursAgo >= 24) {
+            const decayFactor = Math.max(0.3, 1 - (hoursAgo - 24) / 24);
+            finalScore *= decayFactor;
+            boosts.push(`×${decayFactor.toFixed(2)} (${Math.round(hoursAgo)}h old)`);
         }
 
         story.finalScore = Math.min(finalScore, 10); // Cap at 10
         story.boosts = boosts;
     }
 
-    // Filter and sort — primary pass with normal threshold
-    const allScored = Array.from(stories.values()).sort((a, b) => b.finalScore - a.finalScore);
+    // Filter and sort — freshness-first time-bucketed sorting
+    // Stories are grouped by age bucket, then sorted by score within each bucket.
+    // This ensures all fresh stories appear before older ones regardless of score.
+    const now2 = new Date();
+    const allScored = Array.from(stories.values()).sort((a, b) => {
+        const aHours = (now2.getTime() - new Date(a.publishedAt).getTime()) / (1000 * 60 * 60);
+        const bHours = (now2.getTime() - new Date(b.publishedAt).getTime()) / (1000 * 60 * 60);
+        const aBucket = aHours < 12 ? 0 : aHours < 24 ? 1 : 2;
+        const bBucket = bHours < 12 ? 0 : bHours < 24 ? 1 : 2;
+        if (aBucket !== bBucket) return aBucket - bBucket; // fresher bucket first
+        return b.finalScore - a.finalScore; // within bucket, higher score first
+    });
     let result = allScored.filter(s => s.finalScore >= SCORING_CONFIG.minScoreToShow);
     let curationMode = 'normal';
 
@@ -413,7 +461,21 @@ export async function curateNews(
         }
     }
 
-    // Stage 4: Filter out previously used stories
+    // Stage 4: Filter out excluded headlines (already shown in "Find More" flows)
+    if (excludeHeadlines.length > 0) {
+        const beforeExclude = result.length;
+        result = result.filter(story => {
+            return !excludeHeadlines.some(excluded =>
+                calculateSimilarity(story.headline, excluded) > 0.5
+            );
+        });
+        const excludedCount = beforeExclude - result.length;
+        if (excludedCount > 0) {
+            console.log(`[Find More] Excluded ${excludedCount} already-shown stories`);
+        }
+    }
+
+    // Stage 5: Filter out previously used stories
     onProgress?.({ stage: 'scoring', current: 1, total: 1, message: 'Checking for duplicates...' });
 
     const usedHeadlines = await fetchUsedStoryHeadlines();
@@ -423,6 +485,29 @@ export async function curateNews(
         const filtered = beforeCount - result.length;
         if (filtered > 0) {
             console.log(`[Duplicate Check] Filtered out ${filtered} previously used stories`);
+        }
+    }
+
+    // SAFETY NET: If aggressive filtering left us with 0 stories, progressively relax
+    if (result.length === 0 && allScored.length > 0) {
+        console.warn(`[Safety Net] 0 stories after filtering! allScored=${allScored.length}, relaxing dedup threshold...`);
+
+        // Step 1: Re-apply used-story filter with stricter (higher) similarity threshold
+        const usedRelaxed = allScored
+            .filter(s => s.finalScore >= SCORING_CONFIG.hardFloorScore)
+            .filter(story => !isStoryUsed(story.headline, usedHeadlines, 0.85)); // 85% instead of 70%
+
+        if (usedRelaxed.length > 0) {
+            result = usedRelaxed;
+            curationMode = 'safety-net';
+            console.log(`[Safety Net] Recovered ${result.length} stories with relaxed dedup (0.85 threshold)`);
+        } else {
+            // Step 2: Skip dedup entirely — show whatever we have
+            result = allScored
+                .filter(s => s.finalScore >= SCORING_CONFIG.hardFloorScore)
+                .slice(0, SCORING_CONFIG.targetMinStories);
+            curationMode = 'emergency';
+            console.warn(`[Safety Net] Emergency mode: returning ${result.length} stories ignoring dedup`);
         }
     }
 

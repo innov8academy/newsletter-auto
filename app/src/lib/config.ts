@@ -93,6 +93,28 @@ export const defaultConfig: NewsletterConfig = {
         // TLDR AI — DEAD (404)
 
         // =====================
+        // GOOGLE NEWS (real-time, always fresh results)
+        // =====================
+        {
+            name: "Google News: AI",
+            url: "https://news.google.com/rss/search?q=artificial+intelligence+OR+AI+tools&hl=en-US&gl=US&ceid=US:en&when=1d",
+            category: "realtime",
+            tier: 0
+        },
+        {
+            name: "Google News: AI Launches",
+            url: "https://news.google.com/rss/search?q=AI+model+release+OR+AI+launch+OR+AI+update&hl=en-US&gl=US&ceid=US:en&when=1d",
+            category: "realtime",
+            tier: 0
+        },
+        {
+            name: "Google News: AI Products",
+            url: "https://news.google.com/rss/search?q=ChatGPT+OR+Claude+OR+Gemini+OR+open+source+AI&hl=en-US&gl=US&ceid=US:en&when=1d",
+            category: "realtime",
+            tier: 0
+        },
+
+        // =====================
         // TIER 2: TECH NEWS SITES (single stories per item)
         // =====================
         {
@@ -212,12 +234,11 @@ export const SCORING_CONFIG = {
         major_update: 1,
         tool_launch: 1
     },
-    recencyBoostHours: 12, // Stories newer than this get +1
     tierWeight: {
-        0: 1.2,  // X/Twitter (real-time, high-engagement)
-        1: 1.3,  // Newsletters (highest value — curated, multi-story)
+        0: 1.15, // Google News / real-time (fresh, reliable)
+        1: 1.0,  // Newsletters (valuable for discovery but inherently delayed — neutral weight)
         2: 1.0,  // News sites (fair weight — single stories but important)
-        3: 1.1,  // Official blogs (important — primary sources)
+        3: 1.15, // Official blogs (primary sources — important when they publish)
         4: 0.85  // Social (Reddit, HN — community signal)
     } as Record<number, number>
 };

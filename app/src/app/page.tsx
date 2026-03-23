@@ -33,6 +33,8 @@ import {
   clearPersistedState,
   loadCustomFeeds,
   saveCustomFeeds,
+  saveShownHeadlines,
+  loadShownHeadlines,
 } from '@/lib/storage';
 import { addCost } from '@/lib/cost-tracker';
 import { MoveRight, Sparkles, Check, Play, Search, Clock, ExternalLink, BarChart3, Layers, FileText, ListChecks, ArrowRight, RefreshCw, Trash2, Plus, Settings2, X, Heart, Repeat2 } from 'lucide-react';
@@ -232,10 +234,13 @@ export default function Home() {
     setTimeout(() => setProgress('Scoring importance & impact...'), 4000);
 
     try {
+      // Load previously shown headlines to avoid repeating stories
+      const shownHeadlines = loadShownHeadlines().map(h => h.text);
+
       const response = await fetch('/api/curate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ apiKey, customFeeds }),
+        body: JSON.stringify({ apiKey, customFeeds, excludeShownHeadlines: shownHeadlines }),
       });
 
       const data = await response.json();
@@ -244,6 +249,9 @@ export default function Home() {
         setStories(data.stories);
         if (data.stats) setCurationStats(data.stats);
         setProgress(`Curated ${data.stories.length} high-impact stories`);
+
+        // Save shown headlines so they're excluded next time
+        saveShownHeadlines(data.stories.map((s: any) => s.headline));
 
         // Track cost
         if (data.cost) {
@@ -342,10 +350,13 @@ export default function Home() {
     setProgress('Finding more stories...');
 
     try {
+      // Pass existing headlines so the backend can exclude already-shown stories
+      const excludeHeadlines = stories.map(s => s.headline);
+
       const response = await fetch('/api/curate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ apiKey, customFeeds }),
+        body: JSON.stringify({ apiKey, customFeeds, excludeHeadlines }),
       });
 
       const data = await response.json();
@@ -354,7 +365,7 @@ export default function Home() {
         // Merge new stories with existing, avoiding duplicates by ID
         const existingIds = new Set(stories.map(s => s.id));
         const newStories = data.stories.filter((s: CuratedStory) => !existingIds.has(s.id));
-        
+
         if (newStories.length > 0) {
           // Also filter by headline similarity to avoid near-duplicates
           const existingHeadlines = stories.map(s => s.headline.toLowerCase());
