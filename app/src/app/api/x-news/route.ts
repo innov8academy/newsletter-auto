@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { fetchAllXContent, getCachedXNews, isCacheFresh } from '@/lib/x-api';
 
 // GET = return cached X news from Supabase (fast, no API calls)
@@ -39,13 +39,22 @@ export async function GET() {
 }
 
 // POST = trigger fresh X API v2 fetch, then return updated items
-export async function POST() {
+export async function POST(request: NextRequest) {
     try {
+        // Check for force refresh (bypass cache)
+        let forceRefresh = false;
+        try {
+            const body = await request.json();
+            forceRefresh = body?.force === true;
+        } catch { /* no body or not JSON — that's fine */ }
+
         // Check if cache is still fresh (avoid unnecessary API calls)
-        const fresh = await isCacheFresh(30);
-        if (fresh) {
-            console.log('[X News API] Cache is fresh (<30min), returning cached data');
-            return GET();
+        if (!forceRefresh) {
+            const fresh = await isCacheFresh(30);
+            if (fresh) {
+                console.log('[X News API] Cache is fresh (<30min), returning cached data');
+                return GET();
+            }
         }
 
         console.log('[X News API] Fetching fresh data from X API v2...');
