@@ -246,134 +246,108 @@ export async function curateNews(
         }
     });
 
-    // TIERED BUDGET: Give newsletters more slots (they contain multiple stories)
-    // Tier 1 (newsletters): 4 items each — they yield 3-6 stories per item
-    // Tier 2-4: 2 items each — single stories
-    // When excluding already-shown stories ("Find More"), increase budgets to discover new content
-    const isFindMore = excludeHeadlines.length > 0;
-    const TIER_BUDGET: Record<number, number> = isFindMore
-        ? { 0: 10, 1: 8, 2: 5, 3: 4, 4: 4 }
-        : { 0: 6, 1: 4, 2: 2, 3: 2, 4: 2 };
-    const SOFT_CAP = isFindMore ? 80 : 40;
-
-    const candidateItems: NewsItem[] = [];
-    const seenUrls = new Set<string>();
-
-    // Group items by source
-    const itemsBySource = new Map<string, NewsItem[]>();
-    allNews.forEach(item => {
-        if (!itemsBySource.has(item.sourceName)) itemsBySource.set(item.sourceName, []);
-        itemsBySource.get(item.sourceName)?.push(item);
-    });
-
     // Build a tier lookup from feeds config
     const feedTierMap = new Map<string, number>();
     allFeeds.forEach(f => feedTierMap.set(f.name, f.tier ?? 2));
 
-    // Quota round: take tiered budget per source
-    for (const [source, items] of itemsBySource) {
-        // Skip X items (handled separately in their own panel)
-        if (source.startsWith('X: @') || source === 'X/Twitter AI') continue;
+    // No artificial per-source budget — send all fresh items to AI extraction.
+    // The 48h freshness filter + dedup in news-fetcher already limits volume.
+    // AI scoring handles quality filtering.
+    const SOFT_CAP = 80;
 
-        items.sort((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime());
-        const tier = feedTierMap.get(source) ?? 2;
-        const budget = TIER_BUDGET[tier] ?? 2;
-
-        items.slice(0, budget).forEach(item => {
-            if (!seenUrls.has(item.url)) {
-                candidateItems.push(item);
-                seenUrls.add(item.url);
-            }
-        });
-    }
-
-    // Fill round: if under soft cap, add more items by recency
-    if (candidateItems.length < SOFT_CAP) {
-        const remainingNeeded = SOFT_CAP - candidateItems.length;
-        const remainingItems = allNews
-            .filter(item => !seenUrls.has(item.url) && !item.sourceName.startsWith('X: @'))
-            .sort((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime())
-            .slice(0, remainingNeeded);
-
-        candidateItems.push(...remainingItems);
-    }
-
-    // Sort candidates by date so we process newest first
-    candidateItems.sort((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime());
+    const seenUrls = new Set<string>();
+    const candidateItems: NewsItem[] = allNews
+        .filter(item => {
+            // Skip X items (handled separately in their own panel)
+            if (item.sourceName.startsWith('X: @') || item.sourceName === 'X/Twitter AI') return false;
+            // Deduplicate by URL
+            if (seenUrls.has(item.url)) return false;
+            seenUrls.add(item.url);
+            return true;
+        })
+        .sort((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime())
+        .slice(0, SOFT_CAP);
 
     console.log(`[News] ${allNews.length} fresh items → ${candidateItems.length} candidates for extraction`);
 
-    // Stage 2: Extract stories from each item — process ALL candidates (no hard cap)
+    // Stage 2: Extract stories — parallel batches of 5 for speed
     const totalToProcess = candidateItems.length;
+    const BATCH_SIZE = 5;
 
-    for (let i = 0; i < totalToProcess; i++) {
-        const item = candidateItems[i];
-
-        // Track stats
-        if (statsBreakdown[item.sourceName]) {
-            statsBreakdown[item.sourceName].kept++;
-        }
+    for (let batchStart = 0; batchStart < totalToProcess; batchStart += BATCH_SIZE) {
+        const batch = candidateItems.slice(batchStart, batchStart + BATCH_SIZE);
 
         onProgress?.({
             stage: 'extracting',
-            current: i + 1,
+            current: Math.min(batchStart + BATCH_SIZE, totalToProcess),
             total: totalToProcess,
-            message: `Analyzing [${item.sourceName}] ${item.title.substring(0, 30)}...`
+            message: `Analyzing batch ${Math.floor(batchStart / BATCH_SIZE) + 1}/${Math.ceil(totalToProcess / BATCH_SIZE)}...`
         });
 
-        const extracted = await extractStories(item, apiKey);
-
-        // Process each extracted story
-        for (const raw of extracted) {
-            // Find if similar story exists (deduplication)
-            let matchedKey: string | null = null;
-            let maxSimilarity = 0;
-
-            for (const [key, existing] of stories) {
-                const similarity = calculateSimilarity(raw.headline, existing.headline);
-                if (similarity > 0.5 && similarity > maxSimilarity) {
-                    matchedKey = key;
-                    maxSimilarity = similarity;
+        // Extract stories in parallel within each batch
+        const batchResults = await Promise.all(
+            batch.map(async (item) => {
+                if (statsBreakdown[item.sourceName]) {
+                    statsBreakdown[item.sourceName].kept++;
                 }
-            }
+                const extracted = await extractStories(item, apiKey);
+                return { item, extracted };
+            })
+        );
 
-            if (matchedKey) {
-                // Merge with existing story (cross-source boost)
-                const existing = stories.get(matchedKey)!;
-                if (!existing.sources.includes(item.sourceName)) {
-                    existing.sources.push(item.sourceName);
-                    existing.crossSourceCount++;
+        // Process extracted stories (sequential to handle dedup correctly)
+        for (const { item, extracted } of batchResults) {
+            for (const raw of extracted) {
+                // Find if similar story exists (deduplication)
+                let matchedKey: string | null = null;
+                let maxSimilarity = 0;
+
+                for (const [key, existing] of stories) {
+                    const similarity = calculateSimilarity(raw.headline, existing.headline);
+                    if (similarity > 0.5 && similarity > maxSimilarity) {
+                        matchedKey = key;
+                        maxSimilarity = similarity;
+                    }
                 }
 
-                // Take higher base score
-                if (raw.baseScore > existing.baseScore) {
-                    existing.baseScore = raw.baseScore;
-                    existing.headline = raw.headline;
-                    existing.summary = raw.summary;
+                if (matchedKey) {
+                    // Merge with existing story (cross-source boost)
+                    const existing = stories.get(matchedKey)!;
+                    if (!existing.sources.includes(item.sourceName)) {
+                        existing.sources.push(item.sourceName);
+                        existing.crossSourceCount++;
+                    }
+
+                    // Take higher base score
+                    if (raw.baseScore > existing.baseScore) {
+                        existing.baseScore = raw.baseScore;
+                        existing.headline = raw.headline;
+                        existing.summary = raw.summary;
+                    }
+                } else {
+                    // New story
+                    const id = generateId(raw.headline);
+                    stories.set(id, {
+                        id,
+                        headline: raw.headline,
+                        summary: raw.summary,
+                        category: raw.category || 'other',
+                        baseScore: raw.baseScore || 5,
+                        finalScore: 0, // Calculate later
+                        entities: raw.entities || [],
+                        originalUrl: raw.originalUrl,
+                        sources: [item.sourceName],
+                        publishedAt: item.publishedAt,
+                        crossSourceCount: 1,
+                        boosts: [],
+                    });
                 }
-            } else {
-                // New story
-                const id = generateId(raw.headline);
-                stories.set(id, {
-                    id,
-                    headline: raw.headline,
-                    summary: raw.summary,
-                    category: raw.category || 'other',
-                    baseScore: raw.baseScore || 5,
-                    finalScore: 0, // Calculate later
-                    entities: raw.entities || [],
-                    originalUrl: raw.originalUrl,
-                    sources: [item.sourceName],
-                    publishedAt: item.publishedAt,
-                    crossSourceCount: 1,
-                    boosts: [],
-                });
             }
         }
 
-        // Small delay to avoid rate limits
-        if (i < totalToProcess - 1) {
-            await new Promise(r => setTimeout(r, 300));
+        // Delay between batches to avoid rate limits
+        if (batchStart + BATCH_SIZE < totalToProcess) {
+            await new Promise(r => setTimeout(r, 500));
         }
     }
 

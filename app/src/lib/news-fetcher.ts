@@ -23,40 +23,77 @@ function isRedditFeed(url: string): boolean {
     return url.includes('reddit.com') || url.includes('/r/');
 }
 
-// Fetch Reddit posts using Jina (bypasses Reddit's blocking)
-async function fetchRedditViaJina(feed: RSSFeed): Promise<NewsItem[]> {
+// Fetch Reddit posts via direct RSS first, fall back to Jina
+async function fetchRedditPosts(feed: RSSFeed): Promise<NewsItem[]> {
+    // Try direct RSS first (works server-side with proper User-Agent)
     try {
-        // Convert RSS URL back to regular Reddit URL for Jina
-        const redditUrl = feed.url.replace('/.rss', '').replace('.rss', '');
-        console.log(`[Reddit via Jina] Fetching ${feed.name}: ${redditUrl}`);
-
-        const jinaResponse = await fetch(`https://r.jina.ai/${redditUrl}`, {
+        console.log(`[Reddit RSS] Trying direct RSS for ${feed.name}`);
+        const response = await fetch(feed.url, {
             headers: {
-                'Accept': 'text/plain',
+                'User-Agent': 'Mozilla/5.0 (compatible; NewsBot/1.0; +https://innov8ai.com)',
+            },
+        });
+
+        if (response.ok) {
+            const text = await response.text();
+            // Verify we got XML, not an HTML block page
+            if (!text.includes('<!DOCTYPE html>') && !text.includes('<html') && (text.includes('<feed') || text.includes('<rss'))) {
+                const parsed = parser.parse(text);
+                const entries = parsed.feed?.entry || parsed.rss?.channel?.item || [];
+                const entriesArray = Array.isArray(entries) ? entries : [entries];
+
+                const posts: NewsItem[] = entriesArray.slice(0, 10).map((entry: any) => {
+                    const title = entry.title?.['#text'] || entry.title || 'Untitled';
+                    const url = entry.link?.['@_href'] || entry.link || '';
+                    const pubDate = entry.published || entry.updated || entry.pubDate || new Date().toISOString();
+                    const content = entry.content?.['#text'] || entry.content || entry.description || '';
+
+                    return {
+                        id: generateId(title, url),
+                        title: cleanText(title),
+                        url: typeof url === 'string' ? url : '',
+                        source: feed.url,
+                        sourceName: feed.name,
+                        publishedAt: new Date(pubDate).toISOString(),
+                        summary: cleanText(content).substring(0, 500),
+                        imageUrl: '',
+                        author: entry.author?.name || '',
+                        content: cleanText(content),
+                    };
+                });
+
+                console.log(`[Reddit RSS] Got ${posts.length} posts from ${feed.name} (direct RSS)`);
+                return posts;
             }
+        }
+        console.log(`[Reddit RSS] Direct RSS failed/blocked for ${feed.name}, trying Jina fallback`);
+    } catch (e) {
+        console.log(`[Reddit RSS] Direct RSS error for ${feed.name}, trying Jina fallback`);
+    }
+
+    // Fallback: Jina scraper
+    try {
+        const redditUrl = feed.url.replace('/.rss', '').replace('.rss', '').replace(/\?.*$/, '');
+        const jinaResponse = await fetch(`https://r.jina.ai/${redditUrl}`, {
+            headers: { 'Accept': 'text/plain' },
         });
 
         if (!jinaResponse.ok) {
-            console.error(`[Reddit via Jina] Failed for ${feed.name}: ${jinaResponse.status}`);
+            console.error(`[Reddit Jina] Failed for ${feed.name}: ${jinaResponse.status}`);
             return [];
         }
 
         const markdown = await jinaResponse.text();
-        
-        // Parse the Jina markdown output to extract posts
-        // Jina returns markdown with links and content
         const posts: NewsItem[] = [];
         const lines = markdown.split('\n');
-        
+
         let currentTitle = '';
         let currentUrl = '';
         let currentContent = '';
-        
+
         for (const line of lines) {
-            // Match markdown links: [title](url)
             const linkMatch = line.match(/^\[(.+?)\]\((https:\/\/(?:www\.)?reddit\.com\/r\/[^\)]+)\)/);
             if (linkMatch) {
-                // Save previous post if exists
                 if (currentTitle && currentUrl) {
                     posts.push({
                         id: generateId(currentTitle, currentUrl),
@@ -64,7 +101,7 @@ async function fetchRedditViaJina(feed: RSSFeed): Promise<NewsItem[]> {
                         url: currentUrl,
                         source: feed.url,
                         sourceName: feed.name,
-                        publishedAt: new Date().toISOString(),
+                        publishedAt: new Date().toISOString(), // Jina doesn't provide timestamps
                         summary: cleanText(currentContent).substring(0, 500),
                         imageUrl: '',
                         author: '',
@@ -75,12 +112,10 @@ async function fetchRedditViaJina(feed: RSSFeed): Promise<NewsItem[]> {
                 currentUrl = linkMatch[2];
                 currentContent = '';
             } else if (currentTitle && line.trim()) {
-                // Accumulate content for current post
                 currentContent += ' ' + line;
             }
         }
-        
-        // Don't forget the last post
+
         if (currentTitle && currentUrl) {
             posts.push({
                 id: generateId(currentTitle, currentUrl),
@@ -96,10 +131,10 @@ async function fetchRedditViaJina(feed: RSSFeed): Promise<NewsItem[]> {
             });
         }
 
-        console.log(`[Reddit via Jina] Got ${posts.length} posts from ${feed.name}`);
+        console.log(`[Reddit Jina] Got ${posts.length} posts from ${feed.name} (Jina fallback)`);
         return posts.slice(0, 10);
     } catch (error) {
-        console.error(`[Reddit via Jina] Error for ${feed.name}:`, error);
+        console.error(`[Reddit] All methods failed for ${feed.name}:`, error);
         return [];
     }
 }
@@ -129,9 +164,9 @@ function isGoogleNewsFeed(url: string): boolean {
 }
 
 async function parseRSSFeed(feed: RSSFeed): Promise<NewsItem[]> {
-    // Use Jina for Reddit feeds (Reddit blocks most RSS requests)
+    // Reddit feeds: try direct RSS first, fall back to Jina
     if (isRedditFeed(feed.url)) {
-        return fetchRedditViaJina(feed);
+        return fetchRedditPosts(feed);
     }
 
     try {

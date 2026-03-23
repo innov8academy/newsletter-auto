@@ -90,6 +90,18 @@ export const defaultConfig: NewsletterConfig = {
             category: "newsletter",
             tier: 1
         },
+        {
+            name: "Last Week in AI",
+            url: "https://lastweekin.ai/feed",
+            category: "newsletter",
+            tier: 1
+        },
+        {
+            name: "Unwind AI",
+            url: "https://rss.beehiiv.com/feeds/fMHDv0Uk41.xml",
+            category: "newsletter",
+            tier: 1
+        },
         // TLDR AI — DEAD (404)
 
         // =====================
@@ -148,8 +160,26 @@ export const defaultConfig: NewsletterConfig = {
             tier: 2
         },
         {
-            name: "MIT News AI",
-            url: "https://news.mit.edu/topic/artificial-intelligence2-rss.xml",
+            name: "THE DECODER",
+            url: "https://the-decoder.com/feed/",
+            category: "news",
+            tier: 2
+        },
+        {
+            name: "MarkTechPost",
+            url: "https://www.marktechpost.com/feed/",
+            category: "news",
+            tier: 2
+        },
+        {
+            name: "Techmeme",
+            url: "https://www.techmeme.com/feed.xml",
+            category: "news",
+            tier: 2
+        },
+        {
+            name: "Simon Willison",
+            url: "https://simonwillison.net/atom/everything/",
             category: "news",
             tier: 2
         },
@@ -174,24 +204,24 @@ export const defaultConfig: NewsletterConfig = {
             category: "blog",
             tier: 3
         },
+        {
+            name: "Hugging Face Blog",
+            url: "https://huggingface.co/blog/feed.xml",
+            category: "blog",
+            tier: 3
+        },
         // =====================
         // TIER 4: COMMUNITY / SOCIAL
         // =====================
         {
             name: "Hacker News AI",
-            url: "https://hnrss.org/newest?q=AI+OR+GPT+OR+LLM+OR+Claude+OR+OpenAI&points=50",
+            url: "https://hnrss.org/newest?q=AI+OR+GPT+OR+LLM+OR+Claude+OR+OpenAI&points=100",
             category: "social",
             tier: 4
         },
         // =====================
         // REDDIT COMMUNITIES (Sorted by Top Daily to capture high engagement)
         // =====================
-        {
-            name: "r/ArtificialInteligence",
-            url: "https://www.reddit.com/r/ArtificialInteligence/top/.rss?t=day",
-            category: "social",
-            tier: 4
-        },
         {
             name: "r/LocalLLaMA",
             url: "https://www.reddit.com/r/LocalLLaMA/top/.rss?t=day",
@@ -209,12 +239,6 @@ export const defaultConfig: NewsletterConfig = {
             url: "https://www.reddit.com/r/OpenAI/top/.rss?t=day",
             category: "social",
             tier: 4
-        },
-        {
-            name: "r/Singularity",
-            url: "https://www.reddit.com/r/singularity/top/.rss?t=day",
-            category: "social",
-            tier: 4
         }
     ]
 };
@@ -226,7 +250,7 @@ export const SCORING_CONFIG = {
     hardFloorScore: 3, // Absolute minimum for adaptive fallback
     crossSourceBoost: {
         twoSources: 1.5,
-        threePlusSources: 2.5
+        threePlusSources: 3.0
     },
     categoryBoost: {
         model_release: 1.5,
@@ -244,7 +268,7 @@ export const SCORING_CONFIG = {
         1: 1.0,  // Newsletters (valuable for discovery but inherently delayed — neutral weight)
         2: 1.0,  // News sites (fair weight — single stories but important)
         3: 1.15, // Official blogs (primary sources — important when they publish)
-        4: 0.85  // Social (Reddit, HN — community signal)
+        4: 0.95  // Social (Reddit, HN — community signal, less penalty)
     } as Record<number, number>
 };
 
