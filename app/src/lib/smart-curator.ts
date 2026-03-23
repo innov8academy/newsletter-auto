@@ -391,12 +391,26 @@ export async function curateNews(
             boosts.push(`+${categoryBoost} (${story.category})`);
         }
 
-        // Recency boost (reduced for balancing, but still active)
+        // Recency scoring — fresh content gets additive boost, old content gets multiplicative decay
         const publishedAt = new Date(story.publishedAt);
         const hoursAgo = (now.getTime() - publishedAt.getTime()) / (1000 * 60 * 60);
-        if (hoursAgo < SCORING_CONFIG.recencyBoostHours) {
-            finalScore += 1;
-            boosts.push('+1 (recent)');
+        if (hoursAgo < 6) {
+            finalScore += 2;
+            boosts.push('+2 (very fresh)');
+        } else if (hoursAgo < 12) {
+            finalScore += 1.5;
+            boosts.push('+1.5 (fresh)');
+        } else if (hoursAgo < 24) {
+            finalScore += 0.5;
+            boosts.push('+0.5 (today)');
+        }
+
+        // Multiplicative decay for content older than 24 hours —
+        // ensures yesterday's high-scoring stories don't permanently outrank today's news
+        if (hoursAgo >= 24) {
+            const decayFactor = Math.max(0.5, 1 - (hoursAgo - 24) / 48);
+            finalScore *= decayFactor;
+            boosts.push(`×${decayFactor.toFixed(2)} (${Math.round(hoursAgo)}h old)`);
         }
 
         story.finalScore = Math.min(finalScore, 10); // Cap at 10
