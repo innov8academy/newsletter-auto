@@ -8,6 +8,7 @@ export async function POST(request: Request) {
         const apiKey = body.apiKey || process.env.OPENROUTER_API_KEY || '';
         const customFeeds = body.customFeeds || [];
         const excludeHeadlines: string[] = body.excludeHeadlines || [];
+        const excludeShownHeadlines: string[] = body.excludeShownHeadlines || [];
 
         if (!apiKey) {
             return NextResponse.json(
@@ -16,8 +17,9 @@ export async function POST(request: Request) {
             );
         }
 
-        // Run the smart curation, passing excluded headlines for "find more" flows
-        const result = await curateNews(apiKey, undefined, customFeeds, excludeHeadlines);
+        // Run the smart curation, passing excluded headlines for "find more" and shown-story dedup
+        const allExcluded = [...excludeHeadlines, ...excludeShownHeadlines];
+        const result = await curateNews(apiKey, undefined, customFeeds, allExcluded);
 
         // Estimate cost: ~2000 input tokens and ~500 output tokens per article processed
         // The curation processes up to 20 articles

@@ -290,19 +290,29 @@ export async function fetchAllNews(feeds: RSSFeed[]): Promise<{ items: NewsItem[
         return true;
     });
 
-    // Keep items from the last 48 hours (newsletters publish every 2-3 days)
-    const cutoff = new Date();
-    cutoff.setHours(cutoff.getHours() - 48);
+    // Keep items from the last 24 hours by default, with adaptive fallback to 36h
+    const cutoff24h = new Date();
+    cutoff24h.setHours(cutoff24h.getHours() - 24);
 
-    const fresh = deduplicated.filter(item => {
-        const pubDate = new Date(item.publishedAt);
-        // If date is invalid or in the future, keep it (likely fresh)
-        if (isNaN(pubDate.getTime())) return true;
-        if (pubDate > new Date()) return true;
-        return pubDate >= cutoff;
-    });
+    const filterByDate = (items: typeof deduplicated, cutoff: Date) =>
+        items.filter(item => {
+            const pubDate = new Date(item.publishedAt);
+            if (isNaN(pubDate.getTime())) return true;
+            if (pubDate > new Date()) return true;
+            return pubDate >= cutoff;
+        });
 
-    console.log(`[News] ${deduplicated.length} total → ${fresh.length} from last 48h (dropped ${deduplicated.length - fresh.length} stale)`);
+    let fresh = filterByDate(deduplicated, cutoff24h);
+
+    // Adaptive fallback: if too few items with 24h window, expand to 36h
+    if (fresh.length < 10) {
+        const cutoff36h = new Date();
+        cutoff36h.setHours(cutoff36h.getHours() - 36);
+        fresh = filterByDate(deduplicated, cutoff36h);
+        console.log(`[News] ${deduplicated.length} total → ${fresh.length} from last 36h (adaptive fallback, 24h had <10 items)`);
+    } else {
+        console.log(`[News] ${deduplicated.length} total → ${fresh.length} from last 24h (dropped ${deduplicated.length - fresh.length} stale)`);
+    }
 
     return { items: fresh, feedHealth };
 }

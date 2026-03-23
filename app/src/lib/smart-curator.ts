@@ -417,8 +417,18 @@ export async function curateNews(
         story.boosts = boosts;
     }
 
-    // Filter and sort — primary pass with normal threshold
-    const allScored = Array.from(stories.values()).sort((a, b) => b.finalScore - a.finalScore);
+    // Filter and sort — freshness-first time-bucketed sorting
+    // Stories are grouped by age bucket, then sorted by score within each bucket.
+    // This ensures all fresh stories appear before older ones regardless of score.
+    const now2 = new Date();
+    const allScored = Array.from(stories.values()).sort((a, b) => {
+        const aHours = (now2.getTime() - new Date(a.publishedAt).getTime()) / (1000 * 60 * 60);
+        const bHours = (now2.getTime() - new Date(b.publishedAt).getTime()) / (1000 * 60 * 60);
+        const aBucket = aHours < 12 ? 0 : aHours < 24 ? 1 : 2;
+        const bBucket = bHours < 12 ? 0 : bHours < 24 ? 1 : 2;
+        if (aBucket !== bBucket) return aBucket - bBucket; // fresher bucket first
+        return b.finalScore - a.finalScore; // within bucket, higher score first
+    });
     let result = allScored.filter(s => s.finalScore >= SCORING_CONFIG.minScoreToShow);
     let curationMode = 'normal';
 

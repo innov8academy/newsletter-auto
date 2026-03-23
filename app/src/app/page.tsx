@@ -33,6 +33,8 @@ import {
   clearPersistedState,
   loadCustomFeeds,
   saveCustomFeeds,
+  saveShownHeadlines,
+  loadShownHeadlines,
 } from '@/lib/storage';
 import { addCost } from '@/lib/cost-tracker';
 import { MoveRight, Sparkles, Check, Play, Search, Clock, ExternalLink, BarChart3, Layers, FileText, ListChecks, ArrowRight, RefreshCw, Trash2, Plus, Settings2, X, Heart, Repeat2 } from 'lucide-react';
@@ -232,10 +234,13 @@ export default function Home() {
     setTimeout(() => setProgress('Scoring importance & impact...'), 4000);
 
     try {
+      // Load previously shown headlines to avoid repeating stories
+      const shownHeadlines = loadShownHeadlines().map(h => h.text);
+
       const response = await fetch('/api/curate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ apiKey, customFeeds }),
+        body: JSON.stringify({ apiKey, customFeeds, excludeShownHeadlines: shownHeadlines }),
       });
 
       const data = await response.json();
@@ -244,6 +249,9 @@ export default function Home() {
         setStories(data.stories);
         if (data.stats) setCurationStats(data.stats);
         setProgress(`Curated ${data.stories.length} high-impact stories`);
+
+        // Save shown headlines so they're excluded next time
+        saveShownHeadlines(data.stories.map((s: any) => s.headline));
 
         // Track cost
         if (data.cost) {
