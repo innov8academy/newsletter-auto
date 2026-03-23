@@ -1,31 +1,30 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { fetchAllXContent, getCachedXNews, isCacheFresh } from '@/lib/x-api';
+import { fetchAllXContent, getCachedXNews, isCacheFresh, XTweet } from '@/lib/x-api';
+
+function formatTweet(t: XTweet) {
+    return {
+        id: t.id,
+        author: t.author_username,
+        author_name: t.author_name,
+        // Use AI-cleaned title/summary if available, fallback to raw tweet text
+        title: t.cleaned_title || t.text.split('\n')[0].substring(0, 200),
+        summary: t.cleaned_summary || t.text,
+        url: t.url,
+        linked_urls: t.linked_urls,
+        publishedAt: t.created_at,
+        likes: t.likes,
+        retweets: t.retweets,
+        impressions: t.impressions,
+        engagement_score: t.engagement_score,
+        source_method: t.source_method,
+    };
+}
 
 // GET = return cached X news from Supabase (fast, no API calls)
 export async function GET() {
     try {
         const tweets = await getCachedXNews();
-
-        const formatted = tweets.map(t => {
-            // Clean @handle prefix from text for display title
-            const cleanTitle = t.text.split('\n')[0].substring(0, 200);
-
-            return {
-                id: t.id,
-                author: t.author_username,
-                author_name: t.author_name,
-                title: cleanTitle,
-                summary: t.text,
-                url: t.url,
-                linked_urls: t.linked_urls,
-                publishedAt: t.created_at,
-                likes: t.likes,
-                retweets: t.retweets,
-                impressions: t.impressions,
-                engagement_score: t.engagement_score,
-                source_method: t.source_method,
-            };
-        });
+        const formatted = tweets.map(formatTweet);
 
         return NextResponse.json({
             items: formatted,
@@ -59,26 +58,7 @@ export async function POST(request: NextRequest) {
 
         console.log('[X News API] Fetching fresh data from X API v2...');
         const result = await fetchAllXContent();
-
-        const formatted = result.tweets.map(t => {
-            const cleanTitle = t.text.split('\n')[0].substring(0, 200);
-
-            return {
-                id: t.id,
-                author: t.author_username,
-                author_name: t.author_name,
-                title: cleanTitle,
-                summary: t.text,
-                url: t.url,
-                linked_urls: t.linked_urls,
-                publishedAt: t.created_at,
-                likes: t.likes,
-                retweets: t.retweets,
-                impressions: t.impressions,
-                engagement_score: t.engagement_score,
-                source_method: t.source_method,
-            };
-        });
+        const formatted = result.tweets.map(formatTweet);
 
         return NextResponse.json({
             items: formatted,

@@ -1,5 +1,6 @@
 import TwitterApi from 'twitter-api-v2';
 import { supabaseAdmin, isSupabaseConfigured } from './supabase';
+import { callGemini } from './gemini-client';
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
@@ -16,6 +17,10 @@ export interface XTweet {
     impressions: number;
     engagement_score: number; // likes + retweets*2
     source_method: 'search' | 'context_search' | 'news_api' | 'community';
+    // AI-cleaned fields (from Gemini post-processing)
+    cleaned_title?: string;
+    cleaned_summary?: string;
+    ai_relevant?: boolean; // false = spam/irrelevant, filtered out
 }
 
 export interface XFetchResult {
@@ -296,6 +301,89 @@ async function searchInsiderContent(client: TwitterApi): Promise<XTweet[]> {
     }
 }
 
+// ─── Gemini AI Layer: Filter spam + generate clean titles ────────────────────
+
+async function processWithGemini(tweets: XTweet[]): Promise<XTweet[]> {
+    if (tweets.length === 0) return [];
+
+    console.log(`[X AI Layer] Processing ${tweets.length} tweets through Gemini...`);
+
+    // Build a compact representation for the AI
+    const tweetData = tweets.map((t, i) => ({
+        idx: i,
+        author: t.author_username,
+        text: t.text.substring(0, 300),
+        likes: t.likes,
+        retweets: t.retweets,
+    }));
+
+    const prompt = `You are filtering AI/tech tweets for "Innov8 AI" newsletter. Target audience: creators, founders, builders who USE AI tools daily.
+
+TWEETS:
+${JSON.stringify(tweetData)}
+
+For each tweet, decide:
+1. Is it RELEVANT AI news? (not spam, not course promos, not generic opinions, not self-promotion)
+2. If relevant, write a clean headline (max 15 words, news-style, specific)
+3. If relevant, write a 1-2 sentence summary of the actual news/insight
+
+Return JSON array with one object per tweet:
+[{"idx": 0, "relevant": true, "title": "Clean headline here", "summary": "What happened and why it matters"}, ...]
+
+FILTER OUT (relevant: false):
+- "Free courses" / "paid courses free" spam
+- Pure opinions with no news ("I don't read AI code", "75% of replies are AI slop")
+- Self-promotion / "follow me" / "check out my..."
+- Crypto/NFT spam disguised as AI
+- Vague posts with no actual information
+- Emoji-only or one-word posts
+
+KEEP (relevant: true):
+- Product launches, model releases, tool announcements
+- Breaking news about AI companies
+- Significant technical insights or benchmarks
+- Notable AI community discussions with substance
+
+Return ONLY valid JSON array.`;
+
+    try {
+        const response = await callGemini(prompt, {
+            model: 'gemini-3.1-flash-lite-preview',
+            temperature: 0.1,
+            maxOutputTokens: 2000,
+        });
+
+        const cleanContent = response.text
+            .replace(/```json\n?/g, '')
+            .replace(/```\n?/g, '')
+            .trim();
+
+        const results = JSON.parse(cleanContent);
+        if (!Array.isArray(results)) throw new Error('Not an array');
+
+        // Apply AI results to tweets
+        const processed: XTweet[] = [];
+        for (const result of results) {
+            const tweet = tweets[result.idx];
+            if (!tweet) continue;
+
+            if (result.relevant) {
+                tweet.cleaned_title = result.title || tweet.text.split('\n')[0].substring(0, 120);
+                tweet.cleaned_summary = result.summary || tweet.text.substring(0, 300);
+                tweet.ai_relevant = true;
+                processed.push(tweet);
+            }
+        }
+
+        console.log(`[X AI Layer] ${tweets.length} tweets → ${processed.length} relevant (filtered ${tweets.length - processed.length} spam/irrelevant)`);
+        return processed;
+    } catch (error) {
+        console.error('[X AI Layer] Gemini processing failed, returning unfiltered:', error);
+        // Fallback: return all tweets without AI processing
+        return tweets;
+    }
+}
+
 // ─── Cost-Optimized: Minimal AI Search (10 tweets only) ─────────────────────
 
 async function searchTrendingAIMinimal(client: TwitterApi): Promise<XTweet[]> {
@@ -378,16 +466,18 @@ export async function fetchAllXContent(): Promise<XFetchResult> {
         // Sort by engagement score (highest first)
         textDeduped.sort((a, b) => b.engagement_score - a.engagement_score);
 
-        // Take top 20
+        // Take top 20, then run through Gemini to filter spam + clean titles
         const top = textDeduped.slice(0, 20);
-
         console.log(`[X API] After dedup & rank: ${textDeduped.length} unique → top ${top.length}`);
 
+        // AI Layer: Filter irrelevant tweets + generate clean titles/summaries
+        const aiProcessed = await processWithGemini(top);
+
         // Cache to Supabase
-        await cacheToSupabase(top);
+        await cacheToSupabase(aiProcessed);
 
         return {
-            tweets: top,
+            tweets: aiProcessed,
             cached: false,
             fetched_at: new Date().toISOString(),
             api_calls_made: apiCallsMade,
@@ -444,6 +534,8 @@ async function cacheToSupabase(tweets: XTweet[]): Promise<void> {
                         engagement_score: t.engagement_score,
                         source_method: t.source_method,
                         linked_urls: t.linked_urls,
+                        cleaned_title: t.cleaned_title,
+                        cleaned_summary: t.cleaned_summary,
                     }),
                     published_at: t.created_at,
                     is_processed: false,
@@ -503,6 +595,9 @@ export async function getCachedXNews(): Promise<XTweet[]> {
                 impressions: meta.impressions || 0,
                 engagement_score: meta.engagement_score || 0,
                 source_method: meta.source_method || 'search',
+                cleaned_title: meta.cleaned_title,
+                cleaned_summary: meta.cleaned_summary,
+                ai_relevant: true, // cached items are already filtered
             };
         });
     } catch (error) {
