@@ -233,8 +233,8 @@ export async function curateNews(
     // When excluding already-shown stories ("Find More"), increase budgets to discover new content
     const isFindMore = excludeHeadlines.length > 0;
     const TIER_BUDGET: Record<number, number> = isFindMore
-        ? { 1: 8, 2: 5, 3: 4, 4: 4 }
-        : { 1: 4, 2: 2, 3: 2, 4: 2 };
+        ? { 0: 10, 1: 8, 2: 5, 3: 4, 4: 4 }
+        : { 0: 6, 1: 4, 2: 2, 3: 2, 4: 2 };
     const SOFT_CAP = isFindMore ? 80 : 40;
 
     const candidateItems: NewsItem[] = [];
@@ -391,13 +391,16 @@ export async function curateNews(
             boosts.push(`+${categoryBoost} (${story.category})`);
         }
 
-        // Recency scoring — fresh content gets additive boost, old content gets multiplicative decay
+        // Recency scoring — fresh content gets additive boost, old content gets aggressive decay
         const publishedAt = new Date(story.publishedAt);
         const hoursAgo = (now.getTime() - publishedAt.getTime()) / (1000 * 60 * 60);
-        if (hoursAgo < 6) {
+        if (hoursAgo < 4) {
+            finalScore += 3;
+            boosts.push('+3 (breaking)');
+        } else if (hoursAgo < 8) {
             finalScore += 2;
             boosts.push('+2 (very fresh)');
-        } else if (hoursAgo < 12) {
+        } else if (hoursAgo < 16) {
             finalScore += 1.5;
             boosts.push('+1.5 (fresh)');
         } else if (hoursAgo < 24) {
@@ -405,10 +408,10 @@ export async function curateNews(
             boosts.push('+0.5 (today)');
         }
 
-        // Multiplicative decay for content older than 24 hours —
-        // ensures yesterday's high-scoring stories don't permanently outrank today's news
+        // Aggressive multiplicative decay for content older than 24 hours —
+        // halves score within 12 hours past the 24h mark
         if (hoursAgo >= 24) {
-            const decayFactor = Math.max(0.5, 1 - (hoursAgo - 24) / 48);
+            const decayFactor = Math.max(0.3, 1 - (hoursAgo - 24) / 24);
             finalScore *= decayFactor;
             boosts.push(`×${decayFactor.toFixed(2)} (${Math.round(hoursAgo)}h old)`);
         }
