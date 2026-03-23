@@ -205,7 +205,8 @@ Return JSON array only.`;
 export async function curateNews(
     apiKey: string,
     onProgress?: (progress: CurationProgress) => void,
-    customFeeds: any[] = []
+    customFeeds: any[] = [],
+    excludeHeadlines: string[] = []
 ): Promise<{ stories: CuratedStory[], stats: any }> { // Temporarily using any for stats to avoid import cycle issues if types verify slowly
     const stories: Map<string, CuratedStory> = new Map();
     const statsBreakdown: Record<string, { found: number, kept: number }> = {};
@@ -229,8 +230,12 @@ export async function curateNews(
     // TIERED BUDGET: Give newsletters more slots (they contain multiple stories)
     // Tier 1 (newsletters): 4 items each — they yield 3-6 stories per item
     // Tier 2-4: 2 items each — single stories
-    const TIER_BUDGET: Record<number, number> = { 1: 4, 2: 2, 3: 2, 4: 2 };
-    const SOFT_CAP = 40;
+    // When excluding already-shown stories ("Find More"), increase budgets to discover new content
+    const isFindMore = excludeHeadlines.length > 0;
+    const TIER_BUDGET: Record<number, number> = isFindMore
+        ? { 1: 8, 2: 5, 3: 4, 4: 4 }
+        : { 1: 4, 2: 2, 3: 2, 4: 2 };
+    const SOFT_CAP = isFindMore ? 80 : 40;
 
     const candidateItems: NewsItem[] = [];
     const seenUrls = new Set<string>();
@@ -413,7 +418,21 @@ export async function curateNews(
         }
     }
 
-    // Stage 4: Filter out previously used stories
+    // Stage 4: Filter out excluded headlines (already shown in "Find More" flows)
+    if (excludeHeadlines.length > 0) {
+        const beforeExclude = result.length;
+        result = result.filter(story => {
+            return !excludeHeadlines.some(excluded =>
+                calculateSimilarity(story.headline, excluded) > 0.5
+            );
+        });
+        const excludedCount = beforeExclude - result.length;
+        if (excludedCount > 0) {
+            console.log(`[Find More] Excluded ${excludedCount} already-shown stories`);
+        }
+    }
+
+    // Stage 5: Filter out previously used stories
     onProgress?.({ stage: 'scoring', current: 1, total: 1, message: 'Checking for duplicates...' });
 
     const usedHeadlines = await fetchUsedStoryHeadlines();

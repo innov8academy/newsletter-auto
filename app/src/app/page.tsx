@@ -342,10 +342,13 @@ export default function Home() {
     setProgress('Finding more stories...');
 
     try {
+      // Pass existing headlines so the backend can exclude already-shown stories
+      const excludeHeadlines = stories.map(s => s.headline);
+
       const response = await fetch('/api/curate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ apiKey, customFeeds }),
+        body: JSON.stringify({ apiKey, customFeeds, excludeHeadlines }),
       });
 
       const data = await response.json();
@@ -354,7 +357,7 @@ export default function Home() {
         // Merge new stories with existing, avoiding duplicates by ID
         const existingIds = new Set(stories.map(s => s.id));
         const newStories = data.stories.filter((s: CuratedStory) => !existingIds.has(s.id));
-        
+
         if (newStories.length > 0) {
           // Also filter by headline similarity to avoid near-duplicates
           const existingHeadlines = stories.map(s => s.headline.toLowerCase());
