@@ -13,16 +13,23 @@ interface ScrapeResult {
  * 3. Firecrawl is reserved for future upgrade if needed (API key required).
  */
 export async function scrapeUrl(url: string): Promise<ScrapeResult> {
+    // Skip scraping for empty/invalid URLs
+    if (!url || url.length < 10) return { content: '', method: 'fetch' };
+
     try {
         // Method 1: Basic Fetch (Fastest, Free)
         // Works for: TechCrunch, VentureBeat, most blogs
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 8000); // 8s timeout
         const response = await fetch(url, {
             headers: {
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
                 'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8'
             },
+            signal: controller.signal,
             next: { revalidate: 3600 } // Cache for 1 hour
         });
+        clearTimeout(timeout);
 
         if (response.ok) {
             const html = await response.text();
@@ -73,11 +80,15 @@ export async function scrapeUrl(url: string): Promise<ScrapeResult> {
     try {
         // Jina Reader API: https://r.jina.ai/
         console.log(`[Jina Fallback] Scraping ${url}`);
+        const jinaController = new AbortController();
+        const jinaTimeout = setTimeout(() => jinaController.abort(), 10000); // 10s timeout
         const jinaResponse = await fetch(`https://r.jina.ai/${url}`, {
             headers: {
                 'X-With-Generated-Alt': 'true' // Get image descriptions too
-            }
+            },
+            signal: jinaController.signal,
         });
+        clearTimeout(jinaTimeout);
 
         if (jinaResponse.ok) {
             const text = await jinaResponse.text();

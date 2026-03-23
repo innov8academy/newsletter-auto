@@ -112,12 +112,16 @@ async function parseRSSFeed(feed: RSSFeed): Promise<NewsItem[]> {
     }
 
     try {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 10000); // 10s timeout per feed
         const response = await fetch(feed.url, {
             headers: {
                 'User-Agent': 'Mozilla/5.0 (compatible; NewsBot/1.0)',
             },
+            signal: controller.signal,
             next: { revalidate: 300 } // Cache for 5 minutes
         });
+        clearTimeout(timeout);
 
         if (!response.ok) {
             console.error(`Failed to fetch ${feed.name}: ${response.status}`);

@@ -188,7 +188,23 @@ Return JSON array only.`;
             .trim();
 
         const parsed = JSON.parse(cleanContent);
-        return Array.isArray(parsed) ? parsed : [];
+        if (Array.isArray(parsed)) return parsed;
+        // Gemini sometimes wraps in an object like {stories: [...]} — unwrap it
+        if (parsed && typeof parsed === 'object') {
+            const arrValue = Object.values(parsed).find(v => Array.isArray(v));
+            if (arrValue) return arrValue as RawExtractedStory[];
+            // Single story object — wrap in array
+            if (parsed.headline) return [parsed as RawExtractedStory];
+        }
+        console.warn(`[Extract] Unexpected Gemini response format for "${item.title.substring(0, 40)}...", using fallback`);
+        return [{
+            headline: item.title,
+            summary: item.summary || '',
+            category: 'other' as string,
+            baseScore: 5,
+            entities: [],
+            originalUrl: item.url,
+        }];
     } catch {
         return [{
             headline: item.title,
@@ -469,6 +485,29 @@ export async function curateNews(
         const filtered = beforeCount - result.length;
         if (filtered > 0) {
             console.log(`[Duplicate Check] Filtered out ${filtered} previously used stories`);
+        }
+    }
+
+    // SAFETY NET: If aggressive filtering left us with 0 stories, progressively relax
+    if (result.length === 0 && allScored.length > 0) {
+        console.warn(`[Safety Net] 0 stories after filtering! allScored=${allScored.length}, relaxing dedup threshold...`);
+
+        // Step 1: Re-apply used-story filter with stricter (higher) similarity threshold
+        const usedRelaxed = allScored
+            .filter(s => s.finalScore >= SCORING_CONFIG.hardFloorScore)
+            .filter(story => !isStoryUsed(story.headline, usedHeadlines, 0.85)); // 85% instead of 70%
+
+        if (usedRelaxed.length > 0) {
+            result = usedRelaxed;
+            curationMode = 'safety-net';
+            console.log(`[Safety Net] Recovered ${result.length} stories with relaxed dedup (0.85 threshold)`);
+        } else {
+            // Step 2: Skip dedup entirely — show whatever we have
+            result = allScored
+                .filter(s => s.finalScore >= SCORING_CONFIG.hardFloorScore)
+                .slice(0, SCORING_CONFIG.targetMinStories);
+            curationMode = 'emergency';
+            console.warn(`[Safety Net] Emergency mode: returning ${result.length} stories ignoring dedup`);
         }
     }
 

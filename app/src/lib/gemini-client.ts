@@ -88,11 +88,15 @@ export async function callGemini(
 
     console.log(`[Gemini] Calling ${model} (search: ${useGoogleSearch})`);
 
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 30000); // 30s timeout
     const response = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
+        signal: controller.signal,
     });
+    clearTimeout(timeout);
 
     if (!response.ok) {
         const errorText = await response.text();
@@ -161,11 +165,15 @@ export async function callGeminiChat(
 
     console.log(`[Gemini Chat] Calling ${model} with ${messages.length} messages`);
 
+    const chatController = new AbortController();
+    const chatTimeout = setTimeout(() => chatController.abort(), 30000); // 30s timeout
     const response = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
+        signal: chatController.signal,
     });
+    clearTimeout(chatTimeout);
 
     if (!response.ok) {
         const errorText = await response.text();
