@@ -229,11 +229,16 @@ export const SCORING_CONFIG = {
         threePlusSources: 2.5
     },
     categoryBoost: {
-        model_release: 1,
-        acquisition: 1,
-        major_update: 1,
-        tool_launch: 1
-    },
+        model_release: 1.5,
+        tool_launch: 1.5,
+        tutorial: 1.0,
+        acquisition: 1.0,
+        research: 0.5,
+        regulation: 0.5,
+        funding: 0,
+        industry: 0,
+        company_news: 0,
+    } as Record<string, number>,
     tierWeight: {
         0: 1.15, // Google News / real-time (fresh, reliable)
         1: 1.0,  // Newsletters (valuable for discovery but inherently delayed — neutral weight)

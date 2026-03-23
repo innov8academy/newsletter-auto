@@ -105,6 +105,29 @@ async function fetchRedditViaJina(feed: RSSFeed): Promise<NewsItem[]> {
 }
 
 // Parse RSS feed and extract news items
+// Resolve Google News redirect URLs to actual article URLs
+async function resolveGoogleNewsUrl(googleUrl: string): Promise<string> {
+    try {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 5000);
+        const response = await fetch(googleUrl, {
+            redirect: 'manual',
+            signal: controller.signal,
+            headers: { 'User-Agent': 'Mozilla/5.0 (compatible; NewsBot/1.0)' },
+        });
+        clearTimeout(timeout);
+        const location = response.headers.get('location');
+        if (location && !location.includes('news.google.com')) {
+            return location;
+        }
+    } catch { /* return original on failure */ }
+    return googleUrl;
+}
+
+function isGoogleNewsFeed(url: string): boolean {
+    return url.includes('news.google.com');
+}
+
 async function parseRSSFeed(feed: RSSFeed): Promise<NewsItem[]> {
     // Use Jina for Reddit feeds (Reddit blocks most RSS requests)
     if (isRedditFeed(feed.url)) {
@@ -142,7 +165,7 @@ async function parseRSSFeed(feed: RSSFeed): Promise<NewsItem[]> {
         const items = parsed.rss?.channel?.item || parsed.feed?.entry || [];
         const itemsArray = Array.isArray(items) ? items : [items];
 
-        return itemsArray.slice(0, 10).map((item: any) => {
+        const rawItems = itemsArray.slice(0, 10).map((item: any) => {
             const title = item.title?.['#text'] || item.title || 'Untitled';
             const url = item.link?.['@_href'] || item.link || '';
             const pubDate = item.pubDate || item.published || item.updated || new Date().toISOString();
@@ -179,6 +202,24 @@ async function parseRSSFeed(feed: RSSFeed): Promise<NewsItem[]> {
                 content: cleanText(bestContent), // Store full content for extraction
             };
         });
+
+        // Resolve Google News redirect URLs to real article URLs (in parallel)
+        if (isGoogleNewsFeed(feed.url)) {
+            const resolved = await Promise.allSettled(
+                rawItems.map(async (item) => {
+                    const realUrl = await resolveGoogleNewsUrl(item.url);
+                    if (realUrl !== item.url) {
+                        console.log(`[Google News] Resolved: ${item.title.substring(0, 40)}... → ${new URL(realUrl).hostname}`);
+                    }
+                    return { ...item, url: realUrl };
+                })
+            );
+            return resolved
+                .filter((r) => r.status === 'fulfilled')
+                .map(r => (r as PromiseFulfilledResult<typeof rawItems[number]>).value);
+        }
+
+        return rawItems;
     } catch (error) {
         console.error(`Error parsing ${feed.name}:`, error);
         return [];
