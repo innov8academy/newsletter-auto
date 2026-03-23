@@ -114,6 +114,42 @@ export async function callGemini(
 
     if (!text) {
         const finishReason = candidate?.finishReason;
+
+        // RECITATION = Gemini thinks output is too close to copyrighted content
+        // Retry with higher temperature to encourage more original phrasing
+        if (finishReason === 'RECITATION') {
+            console.warn(`[Gemini] RECITATION block — retrying with higher temperature...`);
+            const retryBody = JSON.parse(JSON.stringify(body));
+            (retryBody.generationConfig as Record<string, unknown>).temperature = 0.7;
+
+            const retryController = new AbortController();
+            const retryTimeout = setTimeout(() => retryController.abort(), 30000);
+            const retryResponse = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(retryBody),
+                signal: retryController.signal,
+            });
+            clearTimeout(retryTimeout);
+
+            if (retryResponse.ok) {
+                const retryData = await retryResponse.json();
+                const retryCandidate = retryData.candidates?.[0];
+                const retryText = retryCandidate?.content?.parts
+                    ?.map((p: { text?: string }) => p.text || '')
+                    .join('') || '';
+
+                if (retryText) {
+                    console.log(`[Gemini] RECITATION retry succeeded`);
+                    return {
+                        text: retryText,
+                        groundingMetadata: retryCandidate?.groundingMetadata,
+                        usageMetadata: retryData.usageMetadata,
+                    };
+                }
+            }
+        }
+
         throw new Error(`Gemini returned empty response. Finish reason: ${finishReason}`);
     }
 

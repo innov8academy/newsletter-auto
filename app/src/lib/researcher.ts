@@ -533,9 +533,9 @@ async function generateBudgetResearch(
     mode: string,
     direction?: string
 ): Promise<ResearchResult> {
-    const systemPrompt = getVerbosePrompt();
+    const systemPrompt = `You are a research assistant gathering factual information for an AI newsletter called "Innov8 AI". Your job is to find and organize ALL the relevant facts, details, and context about a news story. Do NOT write opinions, hot takes, or newsletter copy — just deliver comprehensive, well-organized research.`;
 
-    const userPrompt = `Research and write about this story for the newsletter:
+    const userPrompt = `Research this story thoroughly and give me ALL the facts:
 
 **Headline:** ${story.headline}
 
@@ -549,7 +549,32 @@ ${story.originalUrl ? `**Source URL:** ${story.originalUrl}` : ''}
 
 ${direction ? `**RESEARCH DIRECTION:** ${direction}\n\nIMPORTANT: Focus your research specifically on the angle/direction above.` : ''}
 
-Search for the latest information about this topic. Find specific facts, numbers, quotes, and recent developments. Then write this up for the newsletter. Make it engaging and newsletter-ready.`;
+## OUTPUT FORMAT:
+
+## What Happened
+[The core news — what was announced/launched/released. Be specific: names, dates, version numbers, features.]
+
+## Key Details
+[Technical details, specs, pricing, availability, platforms supported. Everything a builder needs to know.]
+
+## Who's Involved
+[Companies, people, their roles. Any notable quotes from official sources.]
+
+## Why It Matters
+[Factual significance — market impact, competitive landscape, what this enables that wasn't possible before. NO opinions, just factual analysis.]
+
+## Timeline & Availability
+[When is it available? Any rollout timeline? Beta vs GA? Regional availability?]
+
+## Sources
+[List all sources used with URLs if available]
+
+RULES:
+- Facts only — no opinions, no hot takes, no "Alex's perspective"
+- Be specific: exact numbers, dates, pricing tiers, feature lists
+- If information is unverified or rumored, label it clearly
+- Include competing/alternative products if relevant
+- Keep it comprehensive but organized`;
 
     try {
         if (mode === 'budget/gemini-grounded') {
@@ -945,8 +970,15 @@ function parseResearchContent(story: CuratedStory, content: string): ResearchRep
     // Extract key sections using regex
     const sections: Record<string, string> = {};
 
-    // New newsletter-style section patterns
+    // Research section patterns — facts-only format
     const sectionPatterns = [
+        'What Happened',
+        'Key Details',
+        "Who's Involved",
+        'Why It Matters',
+        'Timeline & Availability',
+        'Sources',
+        // Legacy patterns for non-budget models still using old format
         'The Story',
         'The Context',
         'The Hot Take',
@@ -978,14 +1010,14 @@ function parseResearchContent(story: CuratedStory, content: string): ResearchRep
         }
     }
 
-    // Extract key points from "What's Next" section
-    const keyPoints = extractBulletPoints(sections["What's Next"] || '');
+    // Extract key points from "Key Details" or "What's Next" (legacy) section
+    const keyPoints = extractBulletPoints(sections["Key Details"] || sections["What's Next"] || '');
 
     return {
         story,
         deepResearch: content, // Full markdown content
         keyPoints,
-        implications: sections['The Context'] || '',
+        implications: sections['Why It Matters'] || sections['The Context'] || '',
         sources: story.sources, // Keep original sources
     };
 }
