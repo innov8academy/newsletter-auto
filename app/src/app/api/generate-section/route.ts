@@ -143,13 +143,14 @@ function normalizeStorySection(candidate: unknown): StorySectionResponse | null 
     const whyItMatters = typeof raw.whyItMatters === 'string' ? raw.whyItMatters.trim() : '';
     const l8rsTake = typeof raw.l8rsTake === 'string' ? raw.l8rsTake.trim() : '';
 
-    const bulletPoints = Array.isArray(raw.bulletPoints)
-        ? raw.bulletPoints
+    const bulletPointsRaw: unknown = raw.bulletPoints;
+    const bulletPoints = Array.isArray(bulletPointsRaw)
+        ? bulletPointsRaw
             .map((item) => (typeof item === 'string' ? item.trim() : ''))
             .filter((item) => item.length > 0)
             .slice(0, 4)
-        : typeof raw.bulletPoints === 'string'
-            ? raw.bulletPoints
+        : typeof bulletPointsRaw === 'string'
+            ? bulletPointsRaw
                 .split(/\r?\n/)
                 .map((line) => line.replace(/^[•*-]\s*/, '').trim())
                 .filter((line) => line.length > 0)
@@ -455,7 +456,7 @@ Summary: ${(report.deepResearch || report.story.summary || '').substring(0, 500)
                 }
 
                 if (!content || content.length < 20) {
-                    lastError = `Empty or too short response (${content.length} chars, finish: ${finishReason})`;
+                    lastError = `Empty or too short response (${content?.length ?? 0} chars, finish: ${finishReason})`;
                     console.warn(`[Section] Attempt ${attempt}: ${lastError}`);
                     continue;
                 }
@@ -502,14 +503,15 @@ Summary: ${(report.deepResearch || report.story.summary || '').substring(0, 500)
             );
         }
 
+        const finalContent = content;
         const duration = ((Date.now() - startTime) / 1000).toFixed(1);
         const inputTokens = systemPrompt.length / 4 + userPrompt.length / 4;
-        const outputTokens = content.length / 4;
+        const outputTokens = finalContent.length / 4;
         const cost = calculateCost(selectedModel, inputTokens, outputTokens);
 
         return NextResponse.json({
             success: true,
-            content,
+            content: finalContent,
             story: parsedStory,
             sectionType,
             storyIndex,
