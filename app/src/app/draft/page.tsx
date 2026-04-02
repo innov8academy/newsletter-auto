@@ -643,90 +643,86 @@ ${(localStory.bulletPoints || []).map(p => `• ${p}`).join('\n')}
     const parseStoryContent = (content: string, storyIndex: number): StoryBlock => {
         const emojis = ['🧠', '💰', '🤖', '🔥', '⚡', '🎯'];
 
-        // Extract title - handle "### emoji Title" or "### Title"
+        console.log(`[Parse] Raw content for story ${storyIndex + 1}:`, content.substring(0, 500));
+
+        // Split content into sections by finding **bold** markers
+        // This is much more robust than trying to regex-match specific section names
+        const sectionMarkers = [
+            /\*\*[^*]*(?:details|key\s*points)[^*]*\*\*/i,
+            /\*\*[^*]*(?:why\s*it\s*matters|why\s*this\s*matters)[^*]*\*\*/i,
+            /\*\*[^*]*L8R'?s?\s*Take[^*]*\*\*/i,
+        ];
+
+        // Find all marker positions
+        const markers: { index: number; end: number; type: string }[] = [];
+        for (const marker of sectionMarkers) {
+            const match = content.match(marker);
+            if (match && match.index !== undefined) {
+                const type = marker.source.includes('details|key') ? 'details'
+                    : marker.source.includes('why') ? 'whyItMatters'
+                    : 'l8rsTake';
+                markers.push({ index: match.index, end: match.index + match[0].length, type });
+            }
+        }
+        markers.sort((a, b) => a.index - b.index);
+
+        console.log(`[Parse] Found ${markers.length} section markers:`, markers.map(m => m.type));
+
+        // Extract title
         const titleMatch = content.match(/###?\s*[🧠💰🤖🔥⚡🎯💡🚀🎬📰🏥◆◇○●]?\s*([^\n]+)/);
-        // Clean up title - remove any leading special chars the AI might add
         const title = titleMatch
             ? titleMatch[1].replace(/^[◆◇○●♦♢✦✧⬥⯑\s]+/, '').trim()
             : '';
 
-        // Extract hook paragraph - text between title and first **section**
-        const hookMatch = content.match(/###?[^\n]+\n\n([\s\S]*?)(?=\*\*(?:The details|🔍|Why it matters|🚨|💡))/i);
-        const hookParagraph = hookMatch ? hookMatch[1].trim() : '';
+        // Extract hook - text between title and first section marker
+        let hookParagraph = '';
+        if (markers.length > 0) {
+            const titleEnd = titleMatch ? (titleMatch.index || 0) + titleMatch[0].length : 0;
+            hookParagraph = content.substring(titleEnd, markers[0].index).replace(/^[\s\n-]+|[\s\n-]+$/g, '');
+        }
 
-        // Robust bullet extraction - tries multiple patterns
-        const extractBullets = (sectionName: string, emoji?: string): string[] => {
-            // Wrap alternation in group so | works inside larger regex
-            const namePattern = sectionName.includes('|') ? `(?:${sectionName})` : sectionName;
-            // Pattern variations to try (most specific to least)
-            const patterns = [
-                // Pattern 1: **emoji Section Name:** with bullets below
-                emoji ? new RegExp(`\\*\\*${emoji}[^*]*${namePattern}[^*]*\\*\\*:?\\s*\\n([\\s\\S]*?)(?=\\*\\*(?:[🔍🚨💡]|The details|Why it matters|L8R)|$)`, 'i') : null,
-                // Pattern 2: **Section Name:** (no emoji)
-                new RegExp(`\\*\\*[^*]*${namePattern}[^*]*\\*\\*:?\\s*\\n([\\s\\S]*?)(?=\\*\\*(?:[🔍🚨💡]|The details|Why it matters|L8R)|$)`, 'i'),
-                // Pattern 3: Section Name: on its own line
-                new RegExp(`${namePattern}:?\\s*\\n([\\s\\S]*?)(?=\\n\\s*\\*\\*|\\n\\s*[A-Z][a-z]+:|$)`, 'i'),
-            ].filter(Boolean) as RegExp[];
-
-            for (const pattern of patterns) {
-                const match = content.match(pattern);
-                if (match && match[1]) {
-                    const bullets = match[1]
-                        .split('\n')
-                        .map(line => line.trim())
-                        .filter(line => line.match(/^[•\-\*]/))
-                        .map(line => line.replace(/^[•\-\*]\s*/, '').trim())
-                        .filter(line => line.length > 5); // Filter out too-short lines
-
-                    if (bullets.length > 0) {
-                        console.log(`[Parse] Found ${bullets.length} bullets for "${sectionName}"`);
-                        return bullets.slice(0, 4);
-                    }
-                }
-            }
-
-            console.warn(`[Parse] No bullets found for "${sectionName}"`);
-            return [];
+        // Extract section content between markers
+        const getSectionContent = (type: string): string => {
+            const markerIdx = markers.findIndex(m => m.type === type);
+            if (markerIdx === -1) return '';
+            const start = markers[markerIdx].end;
+            const end = markerIdx < markers.length - 1 ? markers[markerIdx + 1].index : content.length;
+            return content.substring(start, end).replace(/^[:：\s]*/, '').trim();
         };
 
-        // Extract paragraph sections (not bullets) — content can be on same line or next line
-        const extractParagraph = (sectionName: string, emoji?: string): string => {
-            const namePattern = sectionName.includes('|') ? `(?:${sectionName})` : sectionName;
-            const patterns = [
-                // Pattern 1: **emoji Section Name:** text (same line or next line)
-                emoji ? new RegExp(`\\*\\*${emoji}[^*]*${namePattern}[^*]*\\*\\*:?\\s*([\\s\\S]*?)(?=\\*\\*(?:[🔍🚨💡]|The details|Why it matters|L8R)|$)`, 'i') : null,
-                // Pattern 2: **Section Name:** text
-                new RegExp(`\\*\\*[^*]*${namePattern}[^*]*\\*\\*:?\\s*([\\s\\S]*?)(?=\\*\\*(?:[🔍🚨💡]|The details|Why it matters|L8R)|$)`, 'i'),
-                // Pattern 3: Section Name: text (no bold)
-                new RegExp(`${namePattern}:?\\s+([^\\n]+(?:\\n(?!\\*\\*)[^\\n]+)*)`, 'i'),
-            ].filter(Boolean) as RegExp[];
+        // Parse bullets from "The details" section
+        const detailsRaw = getSectionContent('details');
+        const bulletPoints = detailsRaw
+            .split('\n')
+            .map(line => line.trim())
+            .filter(line => line.match(/^[•\-\*]/))
+            .map(line => line.replace(/^[•\-\*]\s*/, '').trim())
+            .filter(line => line.length > 5)
+            .slice(0, 4);
 
-            for (const pattern of patterns) {
-                const match = content.match(pattern);
-                if (match && match[1]) {
-                    // Join lines into a paragraph, strip bullet markers if LLM used them
-                    return match[1]
-                        .split('\n')
-                        .map(line => line.replace(/^[•\-\*]\s*/, '').trim())
-                        .filter(line => line.length > 0)
-                        .join(' ');
-                }
-            }
-            return '';
+        // Parse paragraphs from "Why it matters" and "L8R's Take"
+        const parseParagraph = (raw: string): string => {
+            if (!raw) return '';
+            return raw
+                .split('\n')
+                .map(line => line.replace(/^[•\-\*]\s*/, '').trim())
+                .filter(line => line.length > 0)
+                .join(' ');
         };
 
-        const result = {
+        const whyItMatters = parseParagraph(getSectionContent('whyItMatters'));
+        const l8rsTake = parseParagraph(getSectionContent('l8rsTake'));
+
+        console.log(`[Parse] Story ${storyIndex + 1}: title="${title.substring(0, 30)}...", hook=${hookParagraph.length > 0}, bullets=${bulletPoints.length}, whyItMatters=${whyItMatters.length > 0}, l8rsTake=${l8rsTake.length > 0}`);
+
+        return {
             emoji: emojis[storyIndex % emojis.length],
             title,
             hookParagraph,
-            bulletPoints: extractBullets('details|Key Points', '🔍'),
-            whyItMatters: extractParagraph('Why it matters|Why This Matters', '🚨'),
-            l8rsTake: extractParagraph("L8R's Take", '💡'),
+            bulletPoints,
+            whyItMatters,
+            l8rsTake,
         };
-
-        console.log(`[Parse] Story ${storyIndex + 1}: title="${title.substring(0, 30)}...", bullets=${result.bulletPoints.length}, whyItMatters=${result.whyItMatters.length > 0}, l8rsTake=${result.l8rsTake.length > 0}`);
-
-        return result;
     };
 
     const updateField = (field: keyof StoryBlock, value: string | string[]) => {

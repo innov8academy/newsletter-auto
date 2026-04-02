@@ -566,9 +566,9 @@ function parseNewsletterDraft(content: string, reports: ResearchReport[]): Newsl
             const hookMatch = storyContent.match(/^([^*#\n]+(?:\n[^*#\n]+)*)/);
             const hookParagraph = hookMatch ? hookMatch[1].trim() : reports[i].story.summary;
 
-            const bulletPoints = extractBulletsFromSection(storyContent, 'details|Key Points');
-            const whyItMatters = extractParagraphFromSection(storyContent, 'Why it matters|Why This Matters');
-            const l8rsTake = extractParagraphFromSection(storyContent, "L8R's Take");
+            const bulletPoints = extractBulletsFromSection(storyContent);
+            const whyItMatters = extractParagraphFromSection(storyContent, /\*\*[^*]*(?:why\s*it\s*matters|why\s*this\s*matters)[^*]*\*\*/i);
+            const l8rsTake = extractParagraphFromSection(storyContent, /\*\*[^*]*L8R'?s?\s*Take[^*]*\*\*/i);
 
             stories.push({
                 emoji,
@@ -661,53 +661,45 @@ function extractMemeIdeas(content: string): { templateName: string; topText: str
     return memes;
 }
 
-// Extract bullets from a specific section
-function extractBulletsFromSection(content: string, sectionName: string): string[] {
-    const namePattern = sectionName.includes('|') ? `(?:${sectionName})` : sectionName;
-    const pattern = new RegExp(
-        `\\*\\*[^*]*${namePattern}[^*]*\\*\\*:?\\s*\\n([\\s\\S]*?)(?=\\*\\*[^*]+\\*\\*:|##|$)`,
-        'i'
-    );
-    const match = content.match(pattern);
-    if (!match) return [];
+// Find section content by locating bold markers and extracting text between them
+function findSectionContent(content: string, sectionPattern: RegExp): string {
+    const match = content.match(sectionPattern);
+    if (!match || match.index === undefined) return '';
 
-    // Section header emojis that should NOT appear in bullet content
-    const sectionEmojis = ['🔍', '🚨'];
+    const start = match.index + match[0].length;
+    // Find the next bold section marker after this one
+    const rest = content.substring(start);
+    const nextSection = rest.match(/\*\*[^*]+\*\*/);
+    const sectionText = nextSection && nextSection.index !== undefined
+        ? rest.substring(0, nextSection.index)
+        : rest;
 
-    return match[1]
+    return sectionText.replace(/^[:：\s]*/, '').trim();
+}
+
+// Extract bullets from "The details" / "Key Points" section
+function extractBulletsFromSection(content: string): string[] {
+    const raw = findSectionContent(content, /\*\*[^*]*(?:details|key\s*points)[^*]*\*\*/i);
+    if (!raw) return [];
+
+    return raw
         .split('\n')
         .filter(line => line.trim().match(/^[•\-\*]/))
         .map(line => line.replace(/^[•\-\*]\s*/, '').trim())
-        .filter(line => {
-            if (line.length === 0) return false;
-            // Filter out placeholder text
-            if (line.match(/^(Point|Impact|Watch|Fact)\s*\d/i)) return false;
-            // Filter out lines that are actually section headers embedded in bullets
-            if (sectionEmojis.some(emoji => line.includes(emoji) && line.includes('**'))) return false;
-            // Filter out lines that look like section headers
-            if (line.match(/^(\*\*)?(Key Points|The details|Why.*[Mm]atters|L8R's Take)/i)) return false;
-            return true;
-        });
+        .filter(line => line.length > 5)
+        .filter(line => !line.match(/^(Point|Impact|Watch|Fact)\s*\d/i));
 }
 
-// Fallback: extract content from research when parsing fails
-// Extract a paragraph (not bullets) from a section like "Why it matters" or "L8R's Take"
-function extractParagraphFromSection(content: string, sectionName: string): string {
-    const pattern = new RegExp(
-        `\\*\\*[^*]*(?:${sectionName})[^*]*\\*\\*:?\\s*([\\s\\S]*?)(?=\\*\\*[^*]+\\*\\*:|##|$)`,
-        'i'
-    );
-    const match = content.match(pattern);
-    if (!match) return '';
+// Extract a paragraph from "Why it matters" or "L8R's Take" section
+function extractParagraphFromSection(content: string, sectionPattern: RegExp): string {
+    const raw = findSectionContent(content, sectionPattern);
+    if (!raw) return '';
 
-    // Get the text after the header, strip bullet markers if the LLM used them anyway
-    const raw = match[1]
+    return raw
         .split('\n')
         .map(line => line.replace(/^[•\-\*]\s*/, '').trim())
         .filter(line => line.length > 0)
         .join(' ');
-
-    return raw;
 }
 
 function extractFromResearch(research: string, type: 'key' | 'matters' | 'next'): string[] {
