@@ -67,6 +67,18 @@ interface DraftGenerationResult {
     };
 }
 
+function sanitizeHookParagraph(hook: string): string {
+    const sanitized = hook
+        .replace(/^\s*Yesterday\s*,?\s*on\s+[A-Z][a-z]+\s+\d{1,2},\s+\d{4}\s*,?\s*/i, '')
+        .replace(/^\s*Today\s*,?\s*on\s+[A-Z][a-z]+\s+\d{1,2},\s+\d{4}\s*,?\s*/i, '')
+        .replace(/^\s*On\s+[A-Z][a-z]+\s+\d{1,2},\s+\d{4}\s*,?\s*/i, '')
+        .replace(/^\s*As of\s+[A-Z][a-z]+\s+\d{1,2},\s+\d{4}\s*,?\s*/i, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+
+    return sanitized || hook.trim();
+}
+
 /**
  * Generate a complete newsletter draft from research reports.
  * The order of reports determines story priority (first = main story).
@@ -274,7 +286,7 @@ Let's dive deep 🧠👇
 
 ### [Emoji] [Story Title - Catchy, not boring]
 
-[2-3 sentences. What happened? Explain it simply. Make the reader instantly get why this is worth knowing. Rhetorical questions work great here.]
+[2-3 sentences. What happened? Explain it simply. Make the reader instantly get why this is worth knowing. Lead with the most interesting angle, not the date. Do NOT start with "Yesterday", "Today", or "On March 30, 2026". Rhetorical questions work great here.]
 
 **The details:**
 • [Important fact — be specific. Use numbers, company names, dollar amounts.]
@@ -309,10 +321,10 @@ appo adutha l8ril varam.. bie. ✌️
 2. **Write ACTUAL content.** Never use placeholder text.
 3. **Each section is DIFFERENT.** Hook = What happened. The details = Facts. Why it matters = Impact paragraph. L8R's Take = Opinion paragraph.
 4. **Be specific.** Use company names, numbers, dates from the research.
-5. **Hook first.** Opening sentences must grab attention immediately.
+5. **Hook first.** Opening sentences must grab attention immediately, and they must NOT open with date-led phrasing like "Yesterday" or "On March 30, 2026."
 6. **"Why it matters" is a PARAGRAPH.** 2-4 flowing sentences. NO bullet points.
 7. **"L8R's Take" is a PARAGRAPH.** Strong opinion. 2-3 sentences. NO bullet points.
-8. **Max 4 bullets in "The details".** Less is more.
+8. **Give enough detail.** "The details" can use 3-6 bullets when the story deserves it.
 9. **NO subsections in Intro/TOC/Summary.** Only stories get subsections.
 10. **Use the Manglish outro.** "Ithrollu innathe AI Update. appo adutha l8ril varam.. bie."`;
 
@@ -399,7 +411,7 @@ The intro has already been written. Now write:
 
 ### [Emoji] [Story Title]
 
-[2-3 sentences. What happened? Make the reader get why this matters.]
+[2-3 sentences. What happened? Make the reader get why this matters. Lead with the most interesting angle, not the date. Do NOT start with "Yesterday", "Today", or "On March 30, 2026".]
 
 **The details:**
 • [Key fact — specific, interesting, use numbers]
@@ -564,7 +576,7 @@ function parseNewsletterDraft(content: string, reports: ResearchReport[]): Newsl
 
             // Extract sections
             const hookMatch = storyContent.match(/^([^*#\n]+(?:\n[^*#\n]+)*)/);
-            const hookParagraph = hookMatch ? hookMatch[1].trim() : reports[i].story.summary;
+            const hookParagraph = sanitizeHookParagraph(hookMatch ? hookMatch[1].trim() : reports[i].story.summary);
 
             const bulletPoints = extractBulletsFromSection(storyContent);
             const whyItMatters = extractParagraphFromSection(storyContent, /\*\*[^*]*(?:why\s*it\s*matters|why\s*this\s*matters)[^*]*\*\*/i);
@@ -583,7 +595,7 @@ function parseNewsletterDraft(content: string, reports: ResearchReport[]): Newsl
             stories.push({
                 emoji,
                 title: reports[i].story.headline,
-                hookParagraph: reports[i].story.summary,
+                hookParagraph: sanitizeHookParagraph(reports[i].story.summary),
                 bulletPoints: extractFromResearch(reports[i].deepResearch, 'key'),
                 whyItMatters: '',
                 l8rsTake: '',
@@ -717,7 +729,7 @@ function extractFromResearch(research: string, type: 'key' | 'matters' | 'next')
             .filter(line => line.trim().match(/^[•\-\*]/))
             .map(line => line.replace(/^[•\-\*]\s*/, '').trim())
             .filter(line => line.length > 0)
-            .slice(0, 4);
+            .slice(0, 6);
     }
 
     // If no bullets found, try to extract first few sentences

@@ -7,6 +7,18 @@ import { calculateCost } from '@/lib/cost-tracker';
 
 const OPENROUTER_API_URL = 'https://openrouter.ai/api/v1/chat/completions';
 
+function sanitizeHookParagraph(hook: string): string {
+    const sanitized = hook
+        .replace(/^\s*Yesterday\s*,?\s*on\s+[A-Z][a-z]+\s+\d{1,2},\s+\d{4}\s*,?\s*/i, '')
+        .replace(/^\s*Today\s*,?\s*on\s+[A-Z][a-z]+\s+\d{1,2},\s+\d{4}\s*,?\s*/i, '')
+        .replace(/^\s*On\s+[A-Z][a-z]+\s+\d{1,2},\s+\d{4}\s*,?\s*/i, '')
+        .replace(/^\s*As of\s+[A-Z][a-z]+\s+\d{1,2},\s+\d{4}\s*,?\s*/i, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+
+    return sanitized || hook.trim();
+}
+
 
 export async function POST(request: NextRequest) {
     try {
@@ -41,8 +53,8 @@ export async function POST(request: NextRequest) {
         // Section-specific instructions to prevent duplication
         const sectionInstructions: Record<string, string> = {
             title: 'Rewrite the story TITLE only. Make it catchy, punchy, and informative. Not clickbait — just interesting.',
-            hook: 'Rewrite the HOOK paragraph only. This is the opening that grabs attention. 2-3 sentences max. Use a rhetorical question if it fits. Make it scannable.',
-            bullets: 'Rewrite "The details" only. These are the KEY FACTS. 3-4 bullet points max. Each bullet = ONE sentence. Be specific with numbers and company names.',
+            hook: 'Rewrite the HOOK paragraph only. This is the opening that grabs attention. 2-3 sentences max. Use a rhetorical question if it fits. Make it scannable. Lead with the most interesting angle, not the date. Do NOT start with "Yesterday", "Today", "On [date]", or "As of [date]".',
+            bullets: 'Rewrite "The details" only. These are the KEY FACTS. Give enough useful bullet points to cover the story properly, usually 3-6. Each bullet = ONE sentence. Be specific with numbers and company names.',
             whyMatters: 'Rewrite "Why it matters" only. Write a 2-4 sentence PARAGRAPH (not bullets). Focus on how this affects people and the bigger picture.',
             l8rsTake: 'Rewrite "L8R\'s Take" only. Write a 2-3 sentence PARAGRAPH (not bullets). Strong opinion, no hedging. One clear takeaway.',
             summary: 'Rewrite the QUICK SUMMARY only. One punchy sentence per story with **bold** keywords.',
@@ -83,6 +95,7 @@ export async function POST(request: NextRequest) {
 4. Each bullet point must be UNIQUE. Never repeat information across bullets.
 5. Keep bullet points SHORT — one sentence each. MAX 2 lines.
 6. Be specific with facts, companies, and numbers.
+7. Hooks must never open with date-first phrasing like "Yesterday", "Today", "On March 30, 2026", or "As of April 1, 2026".
 
 ## HUMANIZE (Kill AI patterns):
 - NO "testament to" / "serves as" / "underscores" / "highlights"
@@ -161,7 +174,7 @@ Rewrite the ${sectionType} according to the user's request. Return ONLY the rewr
 
             return NextResponse.json({
                 success: true,
-                content: items.slice(0, 4), // Max 4 items
+                content: items,
                 isArray: true,
                 cost,
                 costSource: 'regen-section',
@@ -174,7 +187,7 @@ Rewrite the ${sectionType} according to the user's request. Return ONLY the rewr
 
         return NextResponse.json({
             success: true,
-            content: content.trim(),
+            content: sectionType === 'hook' ? sanitizeHookParagraph(content) : content.trim(),
             isArray: false,
             cost,
             costSource: 'regen-section',

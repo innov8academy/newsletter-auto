@@ -207,6 +207,17 @@ export default function DraftPage() {
 
     // Parse story content from generated text
     function parseStoryContent(content: string, storyIndex: number): StoryBlock {
+        const sanitizeHookParagraph = (hook: string): string => {
+            const sanitized = hook
+                .replace(/^\s*Yesterday\s*,?\s*on\s+[A-Z][a-z]+\s+\d{1,2},\s+\d{4}\s*,?\s*/i, '')
+                .replace(/^\s*Today\s*,?\s*on\s+[A-Z][a-z]+\s+\d{1,2},\s+\d{4}\s*,?\s*/i, '')
+                .replace(/^\s*On\s+[A-Z][a-z]+\s+\d{1,2},\s+\d{4}\s*,?\s*/i, '')
+                .replace(/^\s*As of\s+[A-Z][a-z]+\s+\d{1,2},\s+\d{4}\s*,?\s*/i, '')
+                .replace(/\s+/g, ' ')
+                .trim();
+
+            return sanitized || hook.trim();
+        };
         const emojis = ['🧠', '💰', '🤖', '🔥', '⚡', '🎯'];
 
         // Extract title
@@ -217,7 +228,7 @@ export default function DraftPage() {
 
         // Extract hook (first paragraph after title)
         const hookMatch = content.match(/###?[^\n]+\n\n([^*#]+)/);
-        const hookParagraph = hookMatch ? hookMatch[1].trim() : '';
+        const hookParagraph = sanitizeHookParagraph(hookMatch ? hookMatch[1].trim() : '');
 
         // Extract bullet sections
         const extractBullets = (sectionName: string): string[] => {
@@ -228,8 +239,7 @@ export default function DraftPage() {
                 .split('\n')
                 .filter(line => line.trim().match(/^[•\-\*]/))
                 .map(line => line.replace(/^[•\-\*]\s*/, '').trim())
-                .filter(Boolean)
-                .slice(0, 4);
+                .filter(Boolean);
         };
 
         // Extract paragraph sections

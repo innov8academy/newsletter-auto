@@ -7,6 +7,18 @@ import { calculateCost } from '@/lib/cost-tracker';
 
 const OPENROUTER_API_URL = 'https://openrouter.ai/api/v1/chat/completions';
 
+function sanitizeHookParagraph(hook: string): string {
+    const sanitized = hook
+        .replace(/^\s*Yesterday\s*,?\s*on\s+[A-Z][a-z]+\s+\d{1,2},\s+\d{4}\s*,?\s*/i, '')
+        .replace(/^\s*Today\s*,?\s*on\s+[A-Z][a-z]+\s+\d{1,2},\s+\d{4}\s*,?\s*/i, '')
+        .replace(/^\s*On\s+[A-Z][a-z]+\s+\d{1,2},\s+\d{4}\s*,?\s*/i, '')
+        .replace(/^\s*As of\s+[A-Z][a-z]+\s+\d{1,2},\s+\d{4}\s*,?\s*/i, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+
+    return sanitized || hook.trim();
+}
+
 export async function POST(request: NextRequest) {
     try {
         const body = await request.json();
@@ -49,7 +61,7 @@ You must output a VALID JSON object matching the StoryBlock structure.
 ## JSON STRUCTURE:
 {
   "title": "New Title",
-  "hookParagraph": "2-3 sentence hook",
+  "hookParagraph": "2-3 sentence hook that leads with the interesting angle, not the date",
   "bulletPoints": ["Fact 1", "Fact 2", "Fact 3"],
   "whyItMatters": "2-4 sentence paragraph about why this matters",
   "l8rsTake": "2-3 sentence paragraph with strong opinion"
@@ -62,6 +74,7 @@ You must output a VALID JSON object matching the StoryBlock structure.
 4. **Unique Content.** No repetition between sections.
 5. **Tone.** Conversational, "Alex" persona, slight humor, strong opinions.
 6. **Emojis.** You can use emojis in the text, but NOT in the JSON keys.
+7. **No date-first hooks.** Do NOT open with "Yesterday", "Today", "On [date]", or "As of [date]". If a date matters, mention it later.
 
 ## HUMANIZE (Kill AI patterns):
 - BANNED: "testament to", "serves as", "underscores", "highlights", "showcases"
@@ -142,10 +155,11 @@ Rewrite the full story as a JSON object. Return ONLY the valid JSON, no markdown
                 throw new Error('Invalid JSON structure returned from AI');
             }
 
-            // Ensure bulletPoints array exists and is limited
-            newStory.bulletPoints = (newStory.bulletPoints || []).slice(0, 4);
+            // Ensure bulletPoints array exists without crushing useful detail
+            newStory.bulletPoints = (newStory.bulletPoints || []).filter((item: unknown) => typeof item === 'string' && item.trim().length > 0);
 
             // Ensure paragraph fields are strings
+            newStory.hookParagraph = sanitizeHookParagraph(newStory.hookParagraph || currentStory.hookParagraph || '');
             newStory.whyItMatters = newStory.whyItMatters || currentStory.whyItMatters || '';
             newStory.l8rsTake = newStory.l8rsTake || currentStory.l8rsTake || '';
 

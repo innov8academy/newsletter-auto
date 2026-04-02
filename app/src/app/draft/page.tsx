@@ -643,6 +643,18 @@ ${(localStory.bulletPoints || []).map(p => `• ${p}`).join('\n')}
 
     const storyEmojis = ['🧠', '💰', '🤖', '🔥', '⚡', '🎯'];
 
+    const sanitizeHookParagraph = (hook: string): string => {
+        const sanitized = hook
+            .replace(/^\s*Yesterday\s*,?\s*on\s+[A-Z][a-z]+\s+\d{1,2},\s+\d{4}\s*,?\s*/i, '')
+            .replace(/^\s*Today\s*,?\s*on\s+[A-Z][a-z]+\s+\d{1,2},\s+\d{4}\s*,?\s*/i, '')
+            .replace(/^\s*On\s+[A-Z][a-z]+\s+\d{1,2},\s+\d{4}\s*,?\s*/i, '')
+            .replace(/^\s*As of\s+[A-Z][a-z]+\s+\d{1,2},\s+\d{4}\s*,?\s*/i, '')
+            .replace(/\s+/g, ' ')
+            .trim();
+
+        return sanitized || hook.trim();
+    };
+
     const hydrateStoryBlock = (candidate: unknown, storyIndex: number): StoryBlock | null => {
         if (!candidate || typeof candidate !== 'object') {
             return null;
@@ -657,7 +669,6 @@ ${(localStory.bulletPoints || []).map(p => `• ${p}`).join('\n')}
             ? raw.bulletPoints
                 .map((item) => (typeof item === 'string' ? item.trim() : ''))
                 .filter((item) => item.length > 0)
-                .slice(0, 4)
             : [];
 
         if (!title || !hookParagraph || bulletPoints.length === 0 || !whyItMatters || !l8rsTake) {
@@ -667,7 +678,7 @@ ${(localStory.bulletPoints || []).map(p => `• ${p}`).join('\n')}
         return {
             emoji: raw.emoji || storyEmojis[storyIndex % storyEmojis.length],
             title,
-            hookParagraph,
+            hookParagraph: sanitizeHookParagraph(hookParagraph),
             bulletPoints,
             whyItMatters,
             l8rsTake,
@@ -712,7 +723,9 @@ ${(localStory.bulletPoints || []).map(p => `• ${p}`).join('\n')}
         let hookParagraph = '';
         if (markers.length > 0) {
             const titleEnd = titleMatch ? (titleMatch.index || 0) + titleMatch[0].length : 0;
-            hookParagraph = content.substring(titleEnd, markers[0].index).replace(/^[\s\n-]+|[\s\n-]+$/g, '');
+            hookParagraph = sanitizeHookParagraph(
+                content.substring(titleEnd, markers[0].index).replace(/^[\s\n-]+|[\s\n-]+$/g, '')
+            );
         }
 
         // Extract section content between markers
@@ -731,8 +744,7 @@ ${(localStory.bulletPoints || []).map(p => `• ${p}`).join('\n')}
             .map(line => line.trim())
             .filter(line => line.match(/^[•\-\*]/))
             .map(line => line.replace(/^[•\-\*]\s*/, '').trim())
-            .filter(line => line.length > 5)
-            .slice(0, 4);
+            .filter(line => line.length > 5);
 
         // Parse paragraphs from "Why it matters" and "L8R's Take"
         const parseParagraph = (raw: string): string => {

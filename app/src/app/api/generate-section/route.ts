@@ -27,6 +27,18 @@ interface StorySectionResponse {
     l8rsTake: string;
 }
 
+function sanitizeHookParagraph(hook: string): string {
+    const sanitized = hook
+        .replace(/^\s*Yesterday\s*,?\s*on\s+[A-Z][a-z]+\s+\d{1,2},\s+\d{4}\s*,?\s*/i, '')
+        .replace(/^\s*Today\s*,?\s*on\s+[A-Z][a-z]+\s+\d{1,2},\s+\d{4}\s*,?\s*/i, '')
+        .replace(/^\s*On\s+[A-Z][a-z]+\s+\d{1,2},\s+\d{4}\s*,?\s*/i, '')
+        .replace(/^\s*As of\s+[A-Z][a-z]+\s+\d{1,2},\s+\d{4}\s*,?\s*/i, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+
+    return sanitized || hook.trim();
+}
+
 function stripCodeFences(content: string): string {
     return content
         .replace(/^```json\s*/i, '')
@@ -114,8 +126,7 @@ function parseStorySectionFromMarkdown(content: string): Partial<StorySectionRes
     const bulletPoints = sections.details
         .flatMap((line) => line.split(/\s+(?=[*-]\s|[•]\s)/))
         .map((line) => line.replace(/^[•*-]\s*/, '').trim())
-        .filter((line) => line.length > 0)
-        .slice(0, 4);
+        .filter((line) => line.length > 0);
 
     const joinParagraph = (linesToJoin: string[]) =>
         linesToJoin
@@ -125,7 +136,7 @@ function parseStorySectionFromMarkdown(content: string): Partial<StorySectionRes
 
     return {
         title,
-        hookParagraph: hookLines.join(' ').trim(),
+        hookParagraph: sanitizeHookParagraph(hookLines.join(' ').trim()),
         bulletPoints,
         whyItMatters: joinParagraph(sections.whyItMatters),
         l8rsTake: joinParagraph(sections.l8rsTake),
@@ -148,13 +159,11 @@ function normalizeStorySection(candidate: unknown): StorySectionResponse | null 
         ? bulletPointsRaw
             .map((item) => (typeof item === 'string' ? item.trim() : ''))
             .filter((item) => item.length > 0)
-            .slice(0, 4)
         : typeof bulletPointsRaw === 'string'
             ? bulletPointsRaw
                 .split(/\r?\n/)
                 .map((line) => line.replace(/^[•*-]\s*/, '').trim())
                 .filter((line) => line.length > 0)
-                .slice(0, 4)
             : [];
 
     if (!title || !hookParagraph || bulletPoints.length === 0 || !whyItMatters || !l8rsTake) {
@@ -163,7 +172,7 @@ function normalizeStorySection(candidate: unknown): StorySectionResponse | null 
 
     return {
         title,
-        hookParagraph,
+        hookParagraph: sanitizeHookParagraph(hookParagraph),
         bulletPoints,
         whyItMatters,
         l8rsTake,
@@ -244,7 +253,8 @@ function getBaseSystemPrompt(dateContext: string): string {
 - Short, punchy sentences.
 - Talk to the reader.
 - Strong opinions, no hedging.
-- Avoid jargon and corporate speak.`;
+- Avoid jargon and corporate speak.
+- Never open a hook with "Yesterday", "Today", "On [date]", or any date-first phrasing.`;
 }
 
 function getSectionPrompt(
@@ -306,7 +316,7 @@ ${researchSummaries}
 Return ONLY a valid JSON object with this exact structure:
 {
   "title": "Catchy Story Title",
-  "hookParagraph": "2-3 sentences. What happened and why it matters.",
+  "hookParagraph": "2-3 sentences. What happened and why it matters. Lead with the most interesting angle, not the date.",
   "bulletPoints": [
     "Key fact with numbers or names",
     "Key fact about what is new or surprising",
@@ -318,7 +328,9 @@ Return ONLY a valid JSON object with this exact structure:
 
 ## RULES:
 - Output JSON only. No markdown. No code fences. No extra keys.
-- bulletPoints must be an array of 3-4 one-sentence strings.
+- Do NOT start hookParagraph with "Yesterday", "Today", "On [date]", "As of [date]", or any date-first wording.
+- If a date matters, place it later in the hook or in bulletPoints, not in the opening phrase.
+- bulletPoints must be an array of useful one-sentence strings. Prefer depth over brevity, usually 3-6 points.
 - whyItMatters and l8rsTake must be plain strings, not arrays.
 - Be specific with company names, numbers, and dates.
 
