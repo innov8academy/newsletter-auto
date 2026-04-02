@@ -489,17 +489,12 @@ function StoryStep() {
 
 ${localStory.hookParagraph}
 
-**🔍 Key Points:**
+**The details:**
 ${(localStory.bulletPoints || []).map(p => `• ${p}`).join('\n')}
 
-**🚨 Why This Matters:**
-${(localStory.whyItMatters || []).map(p => `• ${p}`).join('\n')}
+**Why it matters:** ${localStory.whyItMatters || ''}
 
-**⏭️ What's Next:**
-${(localStory.whatsNext || []).map(p => `• ${p}`).join('\n')}
-
-**💡 L8R's Take:**
-${(localStory.l8rsTake || []).map(p => `• ${p}`).join('\n')}`;
+**💡 L8R's Take:** ${localStory.l8rsTake || ''}`;
         await navigator.clipboard.writeText(text);
         setCopied(true);
         setTimeout(() => setCopied(false), 2000);
@@ -656,7 +651,7 @@ ${(localStory.l8rsTake || []).map(p => `• ${p}`).join('\n')}`;
             : '';
 
         // Extract hook paragraph - text between title and first **section**
-        const hookMatch = content.match(/###?[^\n]+\n\n([\s\S]*?)(?=\*\*[🔍🚨⏭️💡])/);
+        const hookMatch = content.match(/###?[^\n]+\n\n([\s\S]*?)(?=\*\*(?:The details|🔍|Why it matters|🚨|💡))/i);
         const hookParagraph = hookMatch ? hookMatch[1].trim() : '';
 
         // Robust bullet extraction - tries multiple patterns
@@ -664,9 +659,9 @@ ${(localStory.l8rsTake || []).map(p => `• ${p}`).join('\n')}`;
             // Pattern variations to try (most specific to least)
             const patterns = [
                 // Pattern 1: **emoji Section Name:** with bullets below
-                emoji ? new RegExp(`\\*\\*${emoji}[^*]*${sectionName}[^*]*\\*\\*:?\\s*\\n([\\s\\S]*?)(?=\\*\\*[🔍🚨⏭️💡]|$)`, 'i') : null,
+                emoji ? new RegExp(`\\*\\*${emoji}[^*]*${sectionName}[^*]*\\*\\*:?\\s*\\n([\\s\\S]*?)(?=\\*\\*(?:[🔍🚨💡]|The details|Why it matters|L8R)|$)`, 'i') : null,
                 // Pattern 2: **Section Name:** (no emoji)
-                new RegExp(`\\*\\*[^*]*${sectionName}[^*]*\\*\\*:?\\s*\\n([\\s\\S]*?)(?=\\*\\*[🔍🚨⏭️💡]|$)`, 'i'),
+                new RegExp(`\\*\\*[^*]*${sectionName}[^*]*\\*\\*:?\\s*\\n([\\s\\S]*?)(?=\\*\\*(?:[🔍🚨💡]|The details|Why it matters|L8R)|$)`, 'i'),
                 // Pattern 3: Section Name: on its own line
                 new RegExp(`${sectionName}:?\\s*\\n([\\s\\S]*?)(?=\\n\\s*\\*\\*|\\n\\s*[A-Z][a-z]+:|$)`, 'i'),
             ].filter(Boolean) as RegExp[];
@@ -692,17 +687,37 @@ ${(localStory.l8rsTake || []).map(p => `• ${p}`).join('\n')}`;
             return [];
         };
 
+        // Extract paragraph sections (not bullets)
+        const extractParagraph = (sectionName: string, emoji?: string): string => {
+            const patterns = [
+                emoji ? new RegExp(`\\*\\*${emoji}[^*]*${sectionName}[^*]*\\*\\*:?\\s*([\\s\\S]*?)(?=\\*\\*(?:[🔍🚨💡]|The details|Why it matters|L8R)|$)`, 'i') : null,
+                new RegExp(`\\*\\*[^*]*${sectionName}[^*]*\\*\\*:?\\s*([\\s\\S]*?)(?=\\*\\*(?:[🔍🚨💡]|The details|Why it matters|L8R)|$)`, 'i'),
+            ].filter(Boolean) as RegExp[];
+
+            for (const pattern of patterns) {
+                const match = content.match(pattern);
+                if (match && match[1]) {
+                    // Join lines into a paragraph, strip bullet markers if LLM used them
+                    return match[1]
+                        .split('\n')
+                        .map(line => line.replace(/^[•\-\*]\s*/, '').trim())
+                        .filter(line => line.length > 0)
+                        .join(' ');
+                }
+            }
+            return '';
+        };
+
         const result = {
             emoji: emojis[storyIndex % emojis.length],
             title,
             hookParagraph,
-            bulletPoints: extractBullets('Key Points', '🔍'),
-            whyItMatters: extractBullets('Why This Matters', '🚨'),
-            whatsNext: extractBullets("What's Next", '⏭️'),
-            l8rsTake: extractBullets("L8R's Take", '💡'),
+            bulletPoints: extractBullets('details|Key Points', '🔍'),
+            whyItMatters: extractParagraph('Why it matters|Why This Matters', '🚨'),
+            l8rsTake: extractParagraph("L8R's Take", '💡'),
         };
 
-        console.log(`[Parse] Story ${storyIndex + 1}: title="${title.substring(0, 30)}...", bullets=[${result.bulletPoints.length}, ${result.whyItMatters.length}, ${result.whatsNext.length}, ${result.l8rsTake.length}]`);
+        console.log(`[Parse] Story ${storyIndex + 1}: title="${title.substring(0, 30)}...", bullets=${result.bulletPoints.length}, whyItMatters=${result.whyItMatters.length > 0}, l8rsTake=${result.l8rsTake.length > 0}`);
 
         return result;
     };
@@ -907,10 +922,10 @@ ${(localStory.l8rsTake || []).map(p => `• ${p}`).join('\n')}`;
                             />
                         </div>
 
-                        {/* Key Points */}
+                        {/* The details */}
                         <div>
                             <label className="text-xs text-white/40 uppercase tracking-wider mb-2 flex items-center gap-2">
-                                🔍 Key Points
+                                The details
                             </label>
                             <div className="space-y-2">
                                 {(localStory.bulletPoints || []).map((point, i) => (
@@ -929,70 +944,28 @@ ${(localStory.l8rsTake || []).map(p => `• ${p}`).join('\n')}`;
                             </div>
                         </div>
 
-                        {/* Why This Matters */}
+                        {/* Why it matters */}
                         <div>
                             <label className="text-xs text-white/40 uppercase tracking-wider mb-2 flex items-center gap-2">
-                                🚨 Why This Matters
+                                Why it matters
                             </label>
-                            <div className="space-y-2">
-                                {(localStory.whyItMatters || []).map((point, i) => (
-                                    <input
-                                        key={i}
-                                        type="text"
-                                        value={point}
-                                        onChange={(e) => {
-                                            const newPoints = [...localStory.whyItMatters];
-                                            newPoints[i] = e.target.value;
-                                            updateField('whyItMatters', newPoints);
-                                        }}
-                                        className="w-full bg-black/20 border border-white/10 rounded-lg px-3 py-2 text-white text-sm"
-                                    />
-                                ))}
-                            </div>
-                        </div>
-
-                        {/* What's Next */}
-                        <div>
-                            <label className="text-xs text-white/40 uppercase tracking-wider mb-2 flex items-center gap-2">
-                                ⏭️ What's Next
-                            </label>
-                            <div className="space-y-2">
-                                {(localStory.whatsNext || []).map((point, i) => (
-                                    <input
-                                        key={i}
-                                        type="text"
-                                        value={point}
-                                        onChange={(e) => {
-                                            const newPoints = [...localStory.whatsNext];
-                                            newPoints[i] = e.target.value;
-                                            updateField('whatsNext', newPoints);
-                                        }}
-                                        className="w-full bg-black/20 border border-white/10 rounded-lg px-3 py-2 text-white text-sm"
-                                    />
-                                ))}
-                            </div>
+                            <Textarea
+                                value={localStory.whyItMatters || ''}
+                                onChange={(e) => updateField('whyItMatters', e.target.value)}
+                                className="bg-black/20 border-white/10 text-white min-h-[80px]"
+                            />
                         </div>
 
                         {/* L8R's Take */}
                         <div>
                             <label className="text-xs text-white/40 uppercase tracking-wider mb-2 flex items-center gap-2">
-                                💡 L8R's Take (Alex's Opinion)
+                                💡 L8R's Take
                             </label>
-                            <div className="space-y-2">
-                                {(localStory.l8rsTake || []).map((point, i) => (
-                                    <input
-                                        key={i}
-                                        type="text"
-                                        value={point}
-                                        onChange={(e) => {
-                                            const newPoints = [...(localStory.l8rsTake || [])];
-                                            newPoints[i] = e.target.value;
-                                            updateField('l8rsTake', newPoints);
-                                        }}
-                                        className="w-full bg-black/20 border border-white/10 rounded-lg px-3 py-2 text-white text-sm"
-                                    />
-                                ))}
-                            </div>
+                            <Textarea
+                                value={localStory.l8rsTake || ''}
+                                onChange={(e) => updateField('l8rsTake', e.target.value)}
+                                className="bg-black/20 border-white/10 text-white min-h-[80px]"
+                            />
                         </div>
                     </div>
                 ) : null}

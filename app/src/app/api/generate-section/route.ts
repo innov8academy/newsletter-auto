@@ -160,7 +160,7 @@ ${researchSummaries}
 - Output EXACTLY 3 bullet points (or match number of stories)
 - Each bullet = ONE emoji + short catchy title ONLY
 - NO explanations, NO descriptions after the title
-- NO "Key Points", NO "Why This Matters", NO "What's Next"
+- NO "The details", NO "Why it matters", NO "L8R's Take"
 - NO additional formatting or sections
 - STOP immediately after the last bullet point
 
@@ -174,32 +174,21 @@ ${researchSummaries}
 ## OUTPUT FORMAT:
 ### [Emoji] [Catchy Story Title]
 
-[HOOK: 2-3 sentences explaining what happened. Grab attention immediately.]
+[2-3 sentences. What happened and why it's a big deal. Simple words, grab attention.]
 
-**🔍 Key Points:**
-• [Essential fact #1 - ONE sentence with specific numbers/names]
-• [Essential fact #2 - ONE sentence]
-• [Essential fact #3 - ONE sentence]
+**The details:**
+• [Key fact — specific numbers, names, context]
+• [Key fact — what's new or surprising]
+• [Key fact — something interesting from the research]
 
-**🚨 Why This Matters:**
-• [How does this affect a 25-year-old reader?]
-• [Bigger picture for the AI industry]
-• [What should readers know or do?]
+**Why it matters:** [2-4 sentence paragraph. NOT bullets. Connect the dots — how does this affect people? What's the bigger picture?]
 
-**⏭️ What's Next:**
-• [Future prediction with timeline]
-• [Who will be affected?]
-• [What to watch for]
-
-**💡 L8R's Take:**
-• [Alex's strong opinion - no hedging, say what you think]
-• [Your honest take on whether this is overhyped or actually big]
-• [One actionable insight or hot take]
+**💡 L8R's Take:** [2-3 sentence paragraph. NOT bullets. Honest opinion, no hedging. One clear takeaway.]
 
 ## RULES:
-- Each bullet = 1 sentence MAX (readers scan, they don't read)
+- Each bullet in "The details" = 1 sentence MAX
+- "Why it matters" and "L8R's Take" are PARAGRAPHS, not bullets
 - Be specific with company names, numbers, dates
-- Strong opinions in L8R's Take - don't hedge or be wishy-washy
 - All dates must be from January 2026 forward
 
 Output ONLY this story section. Nothing else.${userNote}`;
@@ -349,15 +338,14 @@ Summary: ${(r.deepResearch || r.story.summary || '').substring(0, 500)}...
 
                 // For story type, validate we got all sections
                 if (sectionType === 'story') {
-                    const hasKeyPoints = content.includes('Key Points') || content.includes('🔍');
-                    const hasWhyMatters = content.includes('Why This Matters') || content.includes('🚨');
-                    const hasWhatsNext = content.includes("What's Next") || content.includes('⏭️');
-                    
-                    if (!hasKeyPoints || !hasWhyMatters || !hasWhatsNext) {
-                        console.warn(`[Section] Story missing sections: KeyPoints=${hasKeyPoints}, WhyMatters=${hasWhyMatters}, WhatsNext=${hasWhatsNext}`);
+                    const hasDetails = content.includes('The details') || content.includes('Key Points') || content.includes('🔍');
+                    const hasWhyMatters = content.includes('Why it matters') || content.includes('Why This Matters') || content.includes('🚨');
+                    const hasL8rsTake = content.includes("L8R's Take") || content.includes('💡');
+
+                    if (!hasDetails || !hasWhyMatters || !hasL8rsTake) {
+                        console.warn(`[Section] Story missing sections: Details=${hasDetails}, WhyMatters=${hasWhyMatters}, L8rsTake=${hasL8rsTake}`);
                         lastError = `Incomplete story - missing sections (finish: ${finishReason})`;
                         if (attempt < maxRetries) continue;
-                        // Don't break - return what we have, but log the issue
                     }
                 }
 
