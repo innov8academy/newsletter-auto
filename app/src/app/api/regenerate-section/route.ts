@@ -14,7 +14,7 @@ export async function POST(request: NextRequest) {
         const { currentContent, userPrompt, sectionType, modelId, apiKey: clientApiKey, context } = body as {
             currentContent: string;
             userPrompt: string;
-            sectionType: 'intro' | 'hook' | 'bullets' | 'whyMatters' | 'whatsNext' | 'summary' | 'title';
+            sectionType: 'intro' | 'hook' | 'bullets' | 'whyMatters' | 'l8rsTake' | 'summary' | 'title';
             modelId: DraftModelId;
             apiKey: string;
             context?: string; // Full story context for better regeneration
@@ -42,9 +42,9 @@ export async function POST(request: NextRequest) {
         const sectionInstructions: Record<string, string> = {
             title: 'Rewrite the story TITLE only. Make it catchy, punchy, and informative. Not clickbait — just interesting.',
             hook: 'Rewrite the HOOK paragraph only. This is the opening that grabs attention. 2-3 sentences max. Use a rhetorical question if it fits. Make it scannable.',
-            bullets: 'Rewrite the KEY POINTS only. These are the FACTS. 3-4 bullet points max. Each bullet = ONE sentence. ONE specific fact. Be specific with numbers and company names.',
-            whyMatters: 'Rewrite the WHY THIS MATTERS section only. Focus on how this affects a 25-year-old Malayali reader. Their job? Their daily life? 3 bullets max. Each point must be UNIQUE.',
-            whatsNext: 'Rewrite the WHAT\'S NEXT section only. Focus on FUTURE predictions — what to watch for, timelines, who will be affected. 3 bullets max. Each point must be UNIQUE.',
+            bullets: 'Rewrite "The details" only. These are the KEY FACTS. 3-4 bullet points max. Each bullet = ONE sentence. Be specific with numbers and company names.',
+            whyMatters: 'Rewrite "Why it matters" only. Write a 2-4 sentence PARAGRAPH (not bullets). Focus on how this affects people and the bigger picture.',
+            l8rsTake: 'Rewrite "L8R\'s Take" only. Write a 2-3 sentence PARAGRAPH (not bullets). Strong opinion, no hedging. One clear takeaway.',
             summary: 'Rewrite the QUICK SUMMARY only. One punchy sentence per story with **bold** keywords.',
             intro: 'Rewrite the INTRODUCTION only. Structure: 1) Main story hook (2-3 sentences), 2) Tease other stories with questions/bullets, 3) End with: "I\'m Alex. Welcome to **L8R by Innov8**. Let\'s dive deep 🧠👇"',
         };
@@ -150,11 +150,11 @@ Rewrite the ${sectionType} according to the user's request. Return ONLY the rewr
             .trim();
 
         // For bullet lists, parse into array
-        if (sectionType === 'bullets' || sectionType === 'whyMatters' || sectionType === 'whatsNext') {
+        if (sectionType === 'bullets') {
             const items = content
                 .split('\n')
                 .map((line: string) => line.replace(/^[•\-\*\d\.]+\s*/, '').trim())
-                .filter((line: string) => line.length > 0 && !line.match(/^(Key Points|Why This Matters|What's Next)/i));
+                .filter((line: string) => line.length > 0 && !line.match(/^(Key Points|The details|Why it matters)/i));
 
             // Estimate cost: ~1000 input tokens, ~500 output tokens
             const cost = calculateCost(modelId, 1000, 500);

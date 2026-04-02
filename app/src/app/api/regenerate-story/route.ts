@@ -49,10 +49,10 @@ You must output a VALID JSON object matching the StoryBlock structure.
 ## JSON STRUCTURE:
 {
   "title": "New Title",
-  "hookParagraph": "New Hook",
-  "bulletPoints": ["Point 1", "Point 2", "Point 3", "Point 4"],
-  "whyItMatters": ["Point 1", "Point 2", "Point 3"],
-  "whatsNext": ["Point 1", "Point 2", "Point 3"]
+  "hookParagraph": "2-3 sentence hook",
+  "bulletPoints": ["Fact 1", "Fact 2", "Fact 3"],
+  "whyItMatters": "2-4 sentence paragraph about why this matters",
+  "l8rsTake": "2-3 sentence paragraph with strong opinion"
 }
 
 ## WRITING RULES:
@@ -79,9 +79,9 @@ ${context ? `\nFOR CONTEXT, here is the original research:\n${context}\n` : ''}`
 """
 Title: ${currentStory.title}
 Hook: ${currentStory.hookParagraph}
-Key Points: ${currentStory.bulletPoints.join('\n')}
-Why It Matters: ${currentStory.whyItMatters.join('\n')}
-What's Next: ${currentStory.whatsNext.join('\n')}
+The details: ${(currentStory.bulletPoints || []).join('\n')}
+Why it matters: ${currentStory.whyItMatters || ''}
+L8R's Take: ${currentStory.l8rsTake || ''}
 """
 
 User Request: ${userPrompt}
@@ -142,25 +142,16 @@ Rewrite the full story as a JSON object. Return ONLY the valid JSON, no markdown
                 throw new Error('Invalid JSON structure returned from AI');
             }
 
-            // Ensure arrays exist and are limited to correct length
+            // Ensure bulletPoints array exists and is limited
             newStory.bulletPoints = (newStory.bulletPoints || []).slice(0, 4);
-            newStory.whyItMatters = (newStory.whyItMatters || []).slice(0, 3);
-            newStory.whatsNext = (newStory.whatsNext || []).slice(0, 3);
-            
-            // Ensure L8R's Take exists
-            if (!newStory.l8rsTake) {
-                newStory.l8rsTake = currentStory.l8rsTake || [];
-            }
 
-            // Fill in missing arrays with fallback
+            // Ensure paragraph fields are strings
+            newStory.whyItMatters = newStory.whyItMatters || currentStory.whyItMatters || '';
+            newStory.l8rsTake = newStory.l8rsTake || currentStory.l8rsTake || '';
+
+            // Fill in missing bulletPoints with fallback
             if (newStory.bulletPoints.length === 0) {
                 newStory.bulletPoints = currentStory.bulletPoints || ['[Points to be filled]'];
-            }
-            if (newStory.whyItMatters.length === 0) {
-                newStory.whyItMatters = currentStory.whyItMatters || ['[Impact to be filled]'];
-            }
-            if (newStory.whatsNext.length === 0) {
-                newStory.whatsNext = currentStory.whatsNext || ['[Next steps to be filled]'];
             }
 
             // Estimate cost: ~2000 input tokens, ~2000 output tokens

@@ -489,17 +489,12 @@ function StoryStep() {
 
 ${localStory.hookParagraph}
 
-**🔍 Key Points:**
+**The details:**
 ${(localStory.bulletPoints || []).map(p => `• ${p}`).join('\n')}
 
-**🚨 Why This Matters:**
-${(localStory.whyItMatters || []).map(p => `• ${p}`).join('\n')}
+**Why it matters:** ${localStory.whyItMatters || ''}
 
-**⏭️ What's Next:**
-${(localStory.whatsNext || []).map(p => `• ${p}`).join('\n')}
-
-**💡 L8R's Take:**
-${(localStory.l8rsTake || []).map(p => `• ${p}`).join('\n')}`;
+**💡 L8R's Take:** ${localStory.l8rsTake || ''}`;
         await navigator.clipboard.writeText(text);
         setCopied(true);
         setTimeout(() => setCopied(false), 2000);
@@ -544,8 +539,8 @@ ${(localStory.l8rsTake || []).map(p => `• ${p}`).join('\n')}`;
             const data = await response.json();
 
             if (data.success) {
-                // Parse the story content
-                const parsed = parseStoryContent(data.content, targetIndex);
+                const parsed = hydrateStoryBlock(data.story, targetIndex)
+                    ?? parseStoryContent(data.content, targetIndex);
                 
                 // Update local state only if still viewing this story
                 if (targetIndex === currentStoryIndex) {
@@ -610,7 +605,8 @@ ${(localStory.l8rsTake || []).map(p => `• ${p}`).join('\n')}`;
                 const data = await response.json();
 
                 if (data.success) {
-                    const parsed = parseStoryContent(data.content, storyIndex);
+                    const parsed = hydrateStoryBlock(data.story, storyIndex)
+                        ?? parseStoryContent(data.content, storyIndex);
                     saveStory(storyIndex, parsed);
 
                     // If this is the current story, update local state
@@ -645,66 +641,122 @@ ${(localStory.l8rsTake || []).map(p => `• ${p}`).join('\n')}`;
         });
     }, [selectedReports, selectedModel, completed.stories, currentStoryIndex, saveStory, setError]);
 
+    const storyEmojis = ['🧠', '💰', '🤖', '🔥', '⚡', '🎯'];
+
+    const hydrateStoryBlock = (candidate: unknown, storyIndex: number): StoryBlock | null => {
+        if (!candidate || typeof candidate !== 'object') {
+            return null;
+        }
+
+        const raw = candidate as Partial<StoryBlock> & { bulletPoints?: unknown };
+        const title = typeof raw.title === 'string' ? raw.title.trim() : '';
+        const hookParagraph = typeof raw.hookParagraph === 'string' ? raw.hookParagraph.trim() : '';
+        const whyItMatters = typeof raw.whyItMatters === 'string' ? raw.whyItMatters.trim() : '';
+        const l8rsTake = typeof raw.l8rsTake === 'string' ? raw.l8rsTake.trim() : '';
+        const bulletPoints = Array.isArray(raw.bulletPoints)
+            ? raw.bulletPoints
+                .map((item) => (typeof item === 'string' ? item.trim() : ''))
+                .filter((item) => item.length > 0)
+                .slice(0, 4)
+            : [];
+
+        if (!title || !hookParagraph || bulletPoints.length === 0 || !whyItMatters || !l8rsTake) {
+            return null;
+        }
+
+        return {
+            emoji: raw.emoji || storyEmojis[storyIndex % storyEmojis.length],
+            title,
+            hookParagraph,
+            bulletPoints,
+            whyItMatters,
+            l8rsTake,
+        };
+    };
+
     const parseStoryContent = (content: string, storyIndex: number): StoryBlock => {
         const emojis = ['🧠', '💰', '🤖', '🔥', '⚡', '🎯'];
 
-        // Extract title - handle "### emoji Title" or "### Title"
+        console.log(`[Parse] Raw content for story ${storyIndex + 1}:`, content.substring(0, 500));
+
+        // Split content into sections by finding **bold** markers
+        // This is much more robust than trying to regex-match specific section names
+        const sectionMarkers = [
+            /\*\*[^*]*(?:details|key\s*points)[^*]*\*\*/i,
+            /\*\*[^*]*(?:why\s*it\s*matters|why\s*this\s*matters)[^*]*\*\*/i,
+            /\*\*[^*]*L8R'?s?\s*Take[^*]*\*\*/i,
+        ];
+
+        // Find all marker positions
+        const markers: { index: number; end: number; type: string }[] = [];
+        for (const marker of sectionMarkers) {
+            const match = content.match(marker);
+            if (match && match.index !== undefined) {
+                const type = marker.source.includes('details|key') ? 'details'
+                    : marker.source.includes('why') ? 'whyItMatters'
+                    : 'l8rsTake';
+                markers.push({ index: match.index, end: match.index + match[0].length, type });
+            }
+        }
+        markers.sort((a, b) => a.index - b.index);
+
+        console.log(`[Parse] Found ${markers.length} section markers:`, markers.map(m => m.type));
+
+        // Extract title
         const titleMatch = content.match(/###?\s*[🧠💰🤖🔥⚡🎯💡🚀🎬📰🏥◆◇○●]?\s*([^\n]+)/);
-        // Clean up title - remove any leading special chars the AI might add
         const title = titleMatch
             ? titleMatch[1].replace(/^[◆◇○●♦♢✦✧⬥⯑\s]+/, '').trim()
             : '';
 
-        // Extract hook paragraph - text between title and first **section**
-        const hookMatch = content.match(/###?[^\n]+\n\n([\s\S]*?)(?=\*\*[🔍🚨⏭️💡])/);
-        const hookParagraph = hookMatch ? hookMatch[1].trim() : '';
+        // Extract hook - text between title and first section marker
+        let hookParagraph = '';
+        if (markers.length > 0) {
+            const titleEnd = titleMatch ? (titleMatch.index || 0) + titleMatch[0].length : 0;
+            hookParagraph = content.substring(titleEnd, markers[0].index).replace(/^[\s\n-]+|[\s\n-]+$/g, '');
+        }
 
-        // Robust bullet extraction - tries multiple patterns
-        const extractBullets = (sectionName: string, emoji?: string): string[] => {
-            // Pattern variations to try (most specific to least)
-            const patterns = [
-                // Pattern 1: **emoji Section Name:** with bullets below
-                emoji ? new RegExp(`\\*\\*${emoji}[^*]*${sectionName}[^*]*\\*\\*:?\\s*\\n([\\s\\S]*?)(?=\\*\\*[🔍🚨⏭️💡]|$)`, 'i') : null,
-                // Pattern 2: **Section Name:** (no emoji)
-                new RegExp(`\\*\\*[^*]*${sectionName}[^*]*\\*\\*:?\\s*\\n([\\s\\S]*?)(?=\\*\\*[🔍🚨⏭️💡]|$)`, 'i'),
-                // Pattern 3: Section Name: on its own line
-                new RegExp(`${sectionName}:?\\s*\\n([\\s\\S]*?)(?=\\n\\s*\\*\\*|\\n\\s*[A-Z][a-z]+:|$)`, 'i'),
-            ].filter(Boolean) as RegExp[];
-
-            for (const pattern of patterns) {
-                const match = content.match(pattern);
-                if (match && match[1]) {
-                    const bullets = match[1]
-                        .split('\n')
-                        .map(line => line.trim())
-                        .filter(line => line.match(/^[•\-\*]/))
-                        .map(line => line.replace(/^[•\-\*]\s*/, '').trim())
-                        .filter(line => line.length > 5); // Filter out too-short lines
-
-                    if (bullets.length > 0) {
-                        console.log(`[Parse] Found ${bullets.length} bullets for "${sectionName}"`);
-                        return bullets.slice(0, 4);
-                    }
-                }
-            }
-
-            console.warn(`[Parse] No bullets found for "${sectionName}"`);
-            return [];
+        // Extract section content between markers
+        const getSectionContent = (type: string): string => {
+            const markerIdx = markers.findIndex(m => m.type === type);
+            if (markerIdx === -1) return '';
+            const start = markers[markerIdx].end;
+            const end = markerIdx < markers.length - 1 ? markers[markerIdx + 1].index : content.length;
+            return content.substring(start, end).replace(/^[:：\s]*/, '').trim();
         };
 
-        const result = {
+        // Parse bullets from "The details" section
+        const detailsRaw = getSectionContent('details');
+        const bulletPoints = detailsRaw
+            .split('\n')
+            .map(line => line.trim())
+            .filter(line => line.match(/^[•\-\*]/))
+            .map(line => line.replace(/^[•\-\*]\s*/, '').trim())
+            .filter(line => line.length > 5)
+            .slice(0, 4);
+
+        // Parse paragraphs from "Why it matters" and "L8R's Take"
+        const parseParagraph = (raw: string): string => {
+            if (!raw) return '';
+            return raw
+                .split('\n')
+                .map(line => line.replace(/^[•\-\*]\s*/, '').trim())
+                .filter(line => line.length > 0)
+                .join(' ');
+        };
+
+        const whyItMatters = parseParagraph(getSectionContent('whyItMatters'));
+        const l8rsTake = parseParagraph(getSectionContent('l8rsTake'));
+
+        console.log(`[Parse] Story ${storyIndex + 1}: title="${title.substring(0, 30)}...", hook=${hookParagraph.length > 0}, bullets=${bulletPoints.length}, whyItMatters=${whyItMatters.length > 0}, l8rsTake=${l8rsTake.length > 0}`);
+
+        return {
             emoji: emojis[storyIndex % emojis.length],
             title,
             hookParagraph,
-            bulletPoints: extractBullets('Key Points', '🔍'),
-            whyItMatters: extractBullets('Why This Matters', '🚨'),
-            whatsNext: extractBullets("What's Next", '⏭️'),
-            l8rsTake: extractBullets("L8R's Take", '💡'),
+            bulletPoints,
+            whyItMatters,
+            l8rsTake,
         };
-
-        console.log(`[Parse] Story ${storyIndex + 1}: title="${title.substring(0, 30)}...", bullets=[${result.bulletPoints.length}, ${result.whyItMatters.length}, ${result.whatsNext.length}, ${result.l8rsTake.length}]`);
-
-        return result;
     };
 
     const updateField = (field: keyof StoryBlock, value: string | string[]) => {
@@ -907,10 +959,10 @@ ${(localStory.l8rsTake || []).map(p => `• ${p}`).join('\n')}`;
                             />
                         </div>
 
-                        {/* Key Points */}
+                        {/* The details */}
                         <div>
                             <label className="text-xs text-white/40 uppercase tracking-wider mb-2 flex items-center gap-2">
-                                🔍 Key Points
+                                The details
                             </label>
                             <div className="space-y-2">
                                 {(localStory.bulletPoints || []).map((point, i) => (
@@ -929,70 +981,28 @@ ${(localStory.l8rsTake || []).map(p => `• ${p}`).join('\n')}`;
                             </div>
                         </div>
 
-                        {/* Why This Matters */}
+                        {/* Why it matters */}
                         <div>
                             <label className="text-xs text-white/40 uppercase tracking-wider mb-2 flex items-center gap-2">
-                                🚨 Why This Matters
+                                Why it matters
                             </label>
-                            <div className="space-y-2">
-                                {(localStory.whyItMatters || []).map((point, i) => (
-                                    <input
-                                        key={i}
-                                        type="text"
-                                        value={point}
-                                        onChange={(e) => {
-                                            const newPoints = [...localStory.whyItMatters];
-                                            newPoints[i] = e.target.value;
-                                            updateField('whyItMatters', newPoints);
-                                        }}
-                                        className="w-full bg-black/20 border border-white/10 rounded-lg px-3 py-2 text-white text-sm"
-                                    />
-                                ))}
-                            </div>
-                        </div>
-
-                        {/* What's Next */}
-                        <div>
-                            <label className="text-xs text-white/40 uppercase tracking-wider mb-2 flex items-center gap-2">
-                                ⏭️ What's Next
-                            </label>
-                            <div className="space-y-2">
-                                {(localStory.whatsNext || []).map((point, i) => (
-                                    <input
-                                        key={i}
-                                        type="text"
-                                        value={point}
-                                        onChange={(e) => {
-                                            const newPoints = [...localStory.whatsNext];
-                                            newPoints[i] = e.target.value;
-                                            updateField('whatsNext', newPoints);
-                                        }}
-                                        className="w-full bg-black/20 border border-white/10 rounded-lg px-3 py-2 text-white text-sm"
-                                    />
-                                ))}
-                            </div>
+                            <Textarea
+                                value={localStory.whyItMatters || ''}
+                                onChange={(e) => updateField('whyItMatters', e.target.value)}
+                                className="bg-black/20 border-white/10 text-white min-h-[80px]"
+                            />
                         </div>
 
                         {/* L8R's Take */}
                         <div>
                             <label className="text-xs text-white/40 uppercase tracking-wider mb-2 flex items-center gap-2">
-                                💡 L8R's Take (Alex's Opinion)
+                                💡 L8R's Take
                             </label>
-                            <div className="space-y-2">
-                                {(localStory.l8rsTake || []).map((point, i) => (
-                                    <input
-                                        key={i}
-                                        type="text"
-                                        value={point}
-                                        onChange={(e) => {
-                                            const newPoints = [...(localStory.l8rsTake || [])];
-                                            newPoints[i] = e.target.value;
-                                            updateField('l8rsTake', newPoints);
-                                        }}
-                                        className="w-full bg-black/20 border border-white/10 rounded-lg px-3 py-2 text-white text-sm"
-                                    />
-                                ))}
-                            </div>
+                            <Textarea
+                                value={localStory.l8rsTake || ''}
+                                onChange={(e) => updateField('l8rsTake', e.target.value)}
+                                className="bg-black/20 border-white/10 text-white min-h-[80px]"
+                            />
                         </div>
                     </div>
                 ) : null}
