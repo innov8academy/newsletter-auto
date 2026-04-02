@@ -663,8 +663,9 @@ function extractMemeIdeas(content: string): { templateName: string; topText: str
 
 // Extract bullets from a specific section
 function extractBulletsFromSection(content: string, sectionName: string): string[] {
+    const namePattern = sectionName.includes('|') ? `(?:${sectionName})` : sectionName;
     const pattern = new RegExp(
-        `\\*\\*[^*]*${sectionName}[^*]*\\*\\*:?\\s*\\n([\\s\\S]*?)(?=\\*\\*[^*]+\\*\\*:|##|$)`,
+        `\\*\\*[^*]*${namePattern}[^*]*\\*\\*:?\\s*\\n([\\s\\S]*?)(?=\\*\\*[^*]+\\*\\*:|##|$)`,
         'i'
     );
     const match = content.match(pattern);

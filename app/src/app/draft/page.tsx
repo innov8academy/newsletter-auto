@@ -656,14 +656,16 @@ ${(localStory.bulletPoints || []).map(p => `• ${p}`).join('\n')}
 
         // Robust bullet extraction - tries multiple patterns
         const extractBullets = (sectionName: string, emoji?: string): string[] => {
+            // Wrap alternation in group so | works inside larger regex
+            const namePattern = sectionName.includes('|') ? `(?:${sectionName})` : sectionName;
             // Pattern variations to try (most specific to least)
             const patterns = [
                 // Pattern 1: **emoji Section Name:** with bullets below
-                emoji ? new RegExp(`\\*\\*${emoji}[^*]*${sectionName}[^*]*\\*\\*:?\\s*\\n([\\s\\S]*?)(?=\\*\\*(?:[🔍🚨💡]|The details|Why it matters|L8R)|$)`, 'i') : null,
+                emoji ? new RegExp(`\\*\\*${emoji}[^*]*${namePattern}[^*]*\\*\\*:?\\s*\\n([\\s\\S]*?)(?=\\*\\*(?:[🔍🚨💡]|The details|Why it matters|L8R)|$)`, 'i') : null,
                 // Pattern 2: **Section Name:** (no emoji)
-                new RegExp(`\\*\\*[^*]*${sectionName}[^*]*\\*\\*:?\\s*\\n([\\s\\S]*?)(?=\\*\\*(?:[🔍🚨💡]|The details|Why it matters|L8R)|$)`, 'i'),
+                new RegExp(`\\*\\*[^*]*${namePattern}[^*]*\\*\\*:?\\s*\\n([\\s\\S]*?)(?=\\*\\*(?:[🔍🚨💡]|The details|Why it matters|L8R)|$)`, 'i'),
                 // Pattern 3: Section Name: on its own line
-                new RegExp(`${sectionName}:?\\s*\\n([\\s\\S]*?)(?=\\n\\s*\\*\\*|\\n\\s*[A-Z][a-z]+:|$)`, 'i'),
+                new RegExp(`${namePattern}:?\\s*\\n([\\s\\S]*?)(?=\\n\\s*\\*\\*|\\n\\s*[A-Z][a-z]+:|$)`, 'i'),
             ].filter(Boolean) as RegExp[];
 
             for (const pattern of patterns) {
@@ -687,11 +689,16 @@ ${(localStory.bulletPoints || []).map(p => `• ${p}`).join('\n')}
             return [];
         };
 
-        // Extract paragraph sections (not bullets)
+        // Extract paragraph sections (not bullets) — content can be on same line or next line
         const extractParagraph = (sectionName: string, emoji?: string): string => {
+            const namePattern = sectionName.includes('|') ? `(?:${sectionName})` : sectionName;
             const patterns = [
-                emoji ? new RegExp(`\\*\\*${emoji}[^*]*${sectionName}[^*]*\\*\\*:?\\s*([\\s\\S]*?)(?=\\*\\*(?:[🔍🚨💡]|The details|Why it matters|L8R)|$)`, 'i') : null,
-                new RegExp(`\\*\\*[^*]*${sectionName}[^*]*\\*\\*:?\\s*([\\s\\S]*?)(?=\\*\\*(?:[🔍🚨💡]|The details|Why it matters|L8R)|$)`, 'i'),
+                // Pattern 1: **emoji Section Name:** text (same line or next line)
+                emoji ? new RegExp(`\\*\\*${emoji}[^*]*${namePattern}[^*]*\\*\\*:?\\s*([\\s\\S]*?)(?=\\*\\*(?:[🔍🚨💡]|The details|Why it matters|L8R)|$)`, 'i') : null,
+                // Pattern 2: **Section Name:** text
+                new RegExp(`\\*\\*[^*]*${namePattern}[^*]*\\*\\*:?\\s*([\\s\\S]*?)(?=\\*\\*(?:[🔍🚨💡]|The details|Why it matters|L8R)|$)`, 'i'),
+                // Pattern 3: Section Name: text (no bold)
+                new RegExp(`${namePattern}:?\\s+([^\\n]+(?:\\n(?!\\*\\*)[^\\n]+)*)`, 'i'),
             ].filter(Boolean) as RegExp[];
 
             for (const pattern of patterns) {
