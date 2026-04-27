@@ -35,6 +35,8 @@ import {
   saveCustomFeeds,
   saveShownHeadlines,
   loadShownHeadlines,
+  loadSharedSelection,
+  saveSharedSelection,
 } from '@/lib/storage';
 import { addCost } from '@/lib/cost-tracker';
 import { MoveRight, Sparkles, Check, Play, Search, Clock, ExternalLink, BarChart3, Layers, FileText, ListChecks, ArrowRight, RefreshCw, Trash2, Plus, Settings2, X, Heart, Repeat2 } from 'lucide-react';
@@ -76,6 +78,7 @@ export default function Home() {
   const [researchReports, setResearchReports] = useState<ResearchReport[]>([]);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
+  const [sharedSelectionLoaded, setSharedSelectionLoaded] = useState(false);
 
   // X/Twitter News State
   const [xNews, setXNews] = useState<any[]>([]);
@@ -123,6 +126,23 @@ export default function Home() {
       })
       .catch(err => console.error('Failed to check server status', err));
 
+    // Load shared selected-news queue so another browser can continue the workflow
+    loadSharedSelection()
+      .then(shared => {
+        if (!shared) return;
+        const hasSharedState = shared.curatedStories.length > 0 || shared.selectedIds.length > 0;
+        if (!hasSharedState) return;
+
+        setStories(shared.curatedStories);
+        setSelectedIds(new Set(shared.selectedIds));
+        setHasSearched(shared.curatedStories.length > 0);
+        if (shared.updatedAt) setLastUpdated(new Date(shared.updatedAt));
+
+        saveCuratedStories(shared.curatedStories);
+        saveSelectedIds(shared.selectedIds);
+      })
+      .finally(() => setSharedSelectionLoaded(true));
+
     // Load X news from Supabase
     fetchXNews();
   }, []);
@@ -167,6 +187,16 @@ export default function Home() {
   useEffect(() => {
     saveSelectedIds(Array.from(selectedIds));
   }, [selectedIds]);
+
+  // Keep the shared handoff queue synced for the single shared account
+  useEffect(() => {
+    if (!sharedSelectionLoaded) return;
+
+    saveSharedSelection({
+      curatedStories: stories,
+      selectedIds: Array.from(selectedIds),
+    });
+  }, [stories, selectedIds, sharedSelectionLoaded]);
 
   // Persist custom feeds
   useEffect(() => {

@@ -22,6 +22,12 @@ export interface PersistedState {
     customFeeds: any[];
 }
 
+export interface SharedSelectionState {
+    curatedStories: CuratedStory[];
+    selectedIds: string[];
+    updatedAt: string | null;
+}
+
 /**
  * Save curated stories to localStorage
  */
@@ -118,6 +124,43 @@ export function loadPersistedState(): PersistedState {
         lastUpdated: getLastUpdated()?.toISOString() || '',
         customFeeds: loadCustomFeeds(),
     };
+}
+
+/**
+ * Load the shared selected-news handoff queue from the server.
+ */
+export async function loadSharedSelection(): Promise<SharedSelectionState | null> {
+    try {
+        const response = await fetch('/api/shared-selection', { cache: 'no-store' });
+        if (!response.ok) return null;
+
+        const data = await response.json();
+        if (!data.success || !data.state) return null;
+
+        return {
+            curatedStories: Array.isArray(data.state.curatedStories) ? data.state.curatedStories : [],
+            selectedIds: Array.isArray(data.state.selectedIds) ? data.state.selectedIds : [],
+            updatedAt: data.state.updatedAt ?? null,
+        };
+    } catch (error) {
+        console.error('Failed to load shared selection:', error);
+        return null;
+    }
+}
+
+/**
+ * Save the shared selected-news handoff queue to the server.
+ */
+export async function saveSharedSelection(state: Pick<SharedSelectionState, 'curatedStories' | 'selectedIds'>): Promise<void> {
+    try {
+        await fetch('/api/shared-selection', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(state),
+        });
+    } catch (error) {
+        console.error('Failed to save shared selection:', error);
+    }
 }
 
 /**

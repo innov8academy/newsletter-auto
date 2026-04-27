@@ -19,6 +19,9 @@ import {
     loadCuratedStories,
     loadSelectedIds,
     loadResearchReports,
+    loadSharedSelection,
+    saveCuratedStories,
+    saveSelectedIds,
     saveResearchReports,
     getApiKey,
     getLastUpdated,
@@ -86,38 +89,62 @@ export default function ResearchPage() {
 
     // Load persisted state on mount
     useEffect(() => {
-        const loadedStories = loadCuratedStories();
-        const loadedIds = loadSelectedIds();
-        const loadedReports = loadResearchReports();
-        const loadedKey = getApiKey();
-        const loadedTime = getLastUpdated();
+        let cancelled = false;
 
-        // Flow protection: redirect to Home if no selected stories
-        if (loadedIds.length === 0 && loadedReports.length === 0) {
-            router.push('/');
-            return;
+        async function restoreState() {
+            let loadedStories = loadCuratedStories();
+            let loadedIds = loadSelectedIds();
+            const loadedReports = loadResearchReports();
+            const loadedKey = getApiKey();
+            let loadedTime = getLastUpdated();
+
+            if (loadedIds.length === 0 && loadedReports.length === 0) {
+                const shared = await loadSharedSelection();
+                if (cancelled) return;
+
+                if (shared && (shared.curatedStories.length > 0 || shared.selectedIds.length > 0)) {
+                    loadedStories = shared.curatedStories;
+                    loadedIds = shared.selectedIds;
+                    loadedTime = shared.updatedAt ? new Date(shared.updatedAt) : loadedTime;
+
+                    saveCuratedStories(shared.curatedStories);
+                    saveSelectedIds(shared.selectedIds);
+                }
+            }
+
+            // Flow protection: redirect to Home if no selected stories
+            if (loadedIds.length === 0 && loadedReports.length === 0) {
+                router.push('/');
+                return;
+            }
+
+            setStories(loadedStories);
+            setSelectedIds(new Set(loadedIds));
+            setResearchReports(loadedReports);
+            setApiKey(loadedKey);
+            setLastUpdated(loadedTime);
+
+            // Initialize research states from saved reports
+            const initialStates: Record<string, StoryResearchState> = {};
+            loadedReports.forEach(report => {
+                initialStates[report.story.id] = { status: 'success', report };
+            });
+            setResearchStates(initialStates);
+
+            // Auto-select first report if available
+            if (loadedReports.length > 0) {
+                setActiveReportId(loadedReports[0].story.id);
+            }
+
+            // Mark as mounted for client-side only rendering
+            setIsMounted(true);
         }
 
-        setStories(loadedStories);
-        setSelectedIds(new Set(loadedIds));
-        setResearchReports(loadedReports);
-        setApiKey(loadedKey);
-        setLastUpdated(loadedTime);
+        restoreState();
 
-        // Initialize research states from saved reports
-        const initialStates: Record<string, StoryResearchState> = {};
-        loadedReports.forEach(report => {
-            initialStates[report.story.id] = { status: 'success', report };
-        });
-        setResearchStates(initialStates);
-
-        // Auto-select first report if available
-        if (loadedReports.length > 0) {
-            setActiveReportId(loadedReports[0].story.id);
-        }
-
-        // Mark as mounted for client-side only rendering
-        setIsMounted(true);
+        return () => {
+            cancelled = true;
+        };
     }, [router]);
 
     // Get selected stories
