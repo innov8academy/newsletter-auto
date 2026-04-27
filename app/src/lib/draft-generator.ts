@@ -46,10 +46,9 @@ export interface StoryBlock {
     emoji: string;
     title: string;
     hookParagraph: string;
-    bulletPoints: string[];      // 🔍 Key Points
-    whyItMatters: string[];      // 🚨 Why This Matters
-    whatsNext: string[];         // ⏭️ What's Next
-    l8rsTake: string[];          // 💡 L8R's Take (Alex's opinion)
+    bulletPoints: string[];      // The details — key facts
+    whyItMatters: string;        // Why it matters — paragraph
+    l8rsTake: string;            // 💡 L8R's Take — paragraph
     imageUrl?: string;           // Generated image URL for this story
 }
 
@@ -66,6 +65,18 @@ interface DraftGenerationResult {
         intro: DraftModelId;
         stories: DraftModelId;
     };
+}
+
+function sanitizeHookParagraph(hook: string): string {
+    const sanitized = hook
+        .replace(/^\s*Yesterday\s*,?\s*on\s+[A-Z][a-z]+\s+\d{1,2},\s+\d{4}\s*,?\s*/i, '')
+        .replace(/^\s*Today\s*,?\s*on\s+[A-Z][a-z]+\s+\d{1,2},\s+\d{4}\s*,?\s*/i, '')
+        .replace(/^\s*On\s+[A-Z][a-z]+\s+\d{1,2},\s+\d{4}\s*,?\s*/i, '')
+        .replace(/^\s*As of\s+[A-Z][a-z]+\s+\d{1,2},\s+\d{4}\s*,?\s*/i, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+
+    return sanitized || hook.trim();
 }
 
 /**
@@ -275,27 +286,17 @@ Let's dive deep 🧠👇
 
 ### [Emoji] [Story Title - Catchy, not boring]
 
-[HOOK: 2-3 sentences explaining what happened. Simple terms. Make it interesting. You can use rhetorical questions here.]
+[2-3 sentences. What happened? Explain it simply. Make the reader instantly get why this is worth knowing. Lead with the most interesting angle, not the date. Do NOT start with "Yesterday", "Today", or "On March 30, 2026". Rhetorical questions work great here.]
 
-**🔍 Key Points:**
-• [Fact 1 - ONE sentence. Be specific. Use numbers.]
-• [Fact 2 - ONE sentence.]
-• [Fact 3 - ONE sentence.]
+**The details:**
+• [Important fact — be specific. Use numbers, company names, dollar amounts.]
+• [Another fact the reader needs to know.]
+• [Something surprising or interesting from the research.]
+• [Optional 4th point — only if genuinely important.]
 
-**🚨 Why This Matters:**
-• [How does this affect a 25-year-old Malayali? Their job? Their daily life?]
-• [The bigger picture for the AI industry]
-• [What should readers know or do?]
+**Why it matters:** [2-4 sentence paragraph. NOT bullets. Explain the "so what" — how does this affect regular people? What's the bigger picture? Write it like you're explaining to a friend why they should care.]
 
-**⏭️ What's Next:**
-• [What to watch for in the coming weeks/months]
-• [Expected timeline or next steps]
-• [Who will be most affected?]
-
-**💡 L8R's Take:**
-• [Alex's strong opinion - no hedging, say what you actually think]
-• [Is this overhyped or actually groundbreaking? Be honest.]
-• [One actionable insight or hot take for readers]
+**💡 L8R's Take:** [2-3 sentence paragraph. NOT bullets. Your honest opinion. Don't hedge. Is this overhyped or the real deal? Give one clear takeaway.]
 
 ---
 
@@ -316,15 +317,16 @@ appo adutha l8ril varam.. bie. ✌️
 
 ## CRITICAL RULES - READ BEFORE WRITING:
 
-1. **SCANNABILITY IS KING.** Every bullet point = 1 sentence. Max 2 lines. Readers SCAN, they don't read.
-2. **Write ACTUAL content.** Never use "Point 1" or placeholder text.
-3. **Each section must be UNIQUE.** Key Points = Facts. Why This Matters = Impact. What's Next = Future. L8R's Take = Opinion.
+1. **SCANNABILITY IS KING.** "The details" bullets = 1 sentence each. Max 2 lines.
+2. **Write ACTUAL content.** Never use placeholder text.
+3. **Each section is DIFFERENT.** Hook = What happened. The details = Facts. Why it matters = Impact paragraph. L8R's Take = Opinion paragraph.
 4. **Be specific.** Use company names, numbers, dates from the research.
-5. **Hook first.** The intro and story hooks must grab attention immediately.
-6. **Use the Manglish outro.** "Ithrollu innathe AI Update. appo adutha l8ril varam.. bie."
-7. **Give strong opinions in L8R's Take.** Don't hedge. Say what you think.
-8. **Max 4 bullets per section.** Less is more.
-9. **NO subsections in Intro/TOC/Summary.** Only stories get the 4 subsections.`;
+5. **Hook first.** Opening sentences must grab attention immediately, and they must NOT open with date-led phrasing like "Yesterday" or "On March 30, 2026."
+6. **"Why it matters" is a PARAGRAPH.** 2-4 flowing sentences. NO bullet points.
+7. **"L8R's Take" is a PARAGRAPH.** Strong opinion. 2-3 sentences. NO bullet points.
+8. **Give enough detail.** "The details" can use 3-6 bullets when the story deserves it.
+9. **NO subsections in Intro/TOC/Summary.** Only stories get subsections.
+10. **Use the Manglish outro.** "Ithrollu innathe AI Update. appo adutha l8ril varam.. bie."`;
 
     try {
         console.log(`[Draft] Phase 1: Generating intro with ${introModel}`);
@@ -409,27 +411,16 @@ The intro has already been written. Now write:
 
 ### [Emoji] [Story Title]
 
-[HOOK: 2-3 sentences explaining what happened]
+[2-3 sentences. What happened? Make the reader get why this matters. Lead with the most interesting angle, not the date. Do NOT start with "Yesterday", "Today", or "On March 30, 2026".]
 
-**🔍 Key Points:**
-• [Fact 1 - ONE sentence]
-• [Fact 2 - ONE sentence]
-• [Fact 3 - ONE sentence]
+**The details:**
+• [Key fact — specific, interesting, use numbers]
+• [Key fact — what's new or surprising]
+• [Key fact — context that makes it land]
 
-**🚨 Why This Matters:**
-• [Impact on readers]
-• [Bigger picture]
-• [What to do]
+**Why it matters:** [2-4 sentence paragraph. NOT bullets. How does this affect people? What's the bigger picture?]
 
-**⏭️ What's Next:**
-• [Future prediction]
-• [Timeline]
-• [Who's affected]
-
-**💡 L8R's Take:**
-• [Alex's strong opinion - be honest]
-• [Is this overhyped or actually big?]
-• [One actionable insight]
+**💡 L8R's Take:** [2-3 sentence paragraph. NOT bullets. Honest opinion, no hedging. One clear takeaway.]
 
 ---
 
@@ -585,12 +576,11 @@ function parseNewsletterDraft(content: string, reports: ResearchReport[]): Newsl
 
             // Extract sections
             const hookMatch = storyContent.match(/^([^*#\n]+(?:\n[^*#\n]+)*)/);
-            const hookParagraph = hookMatch ? hookMatch[1].trim() : reports[i].story.summary;
+            const hookParagraph = sanitizeHookParagraph(hookMatch ? hookMatch[1].trim() : reports[i].story.summary);
 
-            const bulletPoints = extractBulletsFromSection(storyContent, 'Key Points');
-            const whyItMatters = extractBulletsFromSection(storyContent, 'Why This Matters');
-            const whatsNext = extractBulletsFromSection(storyContent, "What's Next");
-            const l8rsTake = extractBulletsFromSection(storyContent, "L8R's Take");
+            const bulletPoints = extractBulletsFromSection(storyContent);
+            const whyItMatters = extractParagraphFromSection(storyContent, /\*\*[^*]*(?:why\s*it\s*matters|why\s*this\s*matters)[^*]*\*\*/i);
+            const l8rsTake = extractParagraphFromSection(storyContent, /\*\*[^*]*L8R'?s?\s*Take[^*]*\*\*/i);
 
             stories.push({
                 emoji,
@@ -598,7 +588,6 @@ function parseNewsletterDraft(content: string, reports: ResearchReport[]): Newsl
                 hookParagraph,
                 bulletPoints,
                 whyItMatters,
-                whatsNext,
                 l8rsTake,
             });
         } else {
@@ -606,11 +595,10 @@ function parseNewsletterDraft(content: string, reports: ResearchReport[]): Newsl
             stories.push({
                 emoji,
                 title: reports[i].story.headline,
-                hookParagraph: reports[i].story.summary,
+                hookParagraph: sanitizeHookParagraph(reports[i].story.summary),
                 bulletPoints: extractFromResearch(reports[i].deepResearch, 'key'),
-                whyItMatters: extractFromResearch(reports[i].deepResearch, 'matters'),
-                whatsNext: extractFromResearch(reports[i].deepResearch, 'next'),
-                l8rsTake: [], // Will be generated via L8R's Take section
+                whyItMatters: '',
+                l8rsTake: '',
             });
         }
     }
@@ -625,30 +613,16 @@ function parseNewsletterDraft(content: string, reports: ResearchReport[]): Newsl
     // Validate stories - ensure each has complete sections
     for (let i = 0; i < stories.length; i++) {
         const story = stories[i];
-        
+
         // Fill in missing sections with fallback if research available
         if (story.bulletPoints.length === 0 && reports[i]) {
             console.warn(`[Draft] Story ${i + 1} missing bulletPoints, using fallback`);
             story.bulletPoints = extractFromResearch(reports[i].deepResearch, 'key');
         }
-        if (story.whyItMatters.length === 0 && reports[i]) {
-            console.warn(`[Draft] Story ${i + 1} missing whyItMatters, using fallback`);
-            story.whyItMatters = extractFromResearch(reports[i].deepResearch, 'matters');
-        }
-        if (story.whatsNext.length === 0 && reports[i]) {
-            console.warn(`[Draft] Story ${i + 1} missing whatsNext, using fallback`);
-            story.whatsNext = extractFromResearch(reports[i].deepResearch, 'next');
-        }
 
         // Ensure minimum content
         if (story.bulletPoints.length === 0) {
             story.bulletPoints = ['[Key points to be filled]'];
-        }
-        if (story.whyItMatters.length === 0) {
-            story.whyItMatters = ['[Impact to be filled]'];
-        }
-        if (story.whatsNext.length === 0) {
-            story.whatsNext = ['[Future outlook to be filled]'];
         }
     }
 
@@ -699,35 +673,47 @@ function extractMemeIdeas(content: string): { templateName: string; topText: str
     return memes;
 }
 
-// Extract bullets from a specific section
-function extractBulletsFromSection(content: string, sectionName: string): string[] {
-    const pattern = new RegExp(
-        `\\*\\*[^*]*${sectionName}[^*]*\\*\\*:?\\s*\\n([\\s\\S]*?)(?=\\*\\*[^*]+\\*\\*:|##|$)`,
-        'i'
-    );
-    const match = content.match(pattern);
-    if (!match) return [];
+// Find section content by locating bold markers and extracting text between them
+function findSectionContent(content: string, sectionPattern: RegExp): string {
+    const match = content.match(sectionPattern);
+    if (!match || match.index === undefined) return '';
 
-    // Section header emojis that should NOT appear in bullet content
-    const sectionEmojis = ['🔍', '🚨', '⏭️'];
+    const start = match.index + match[0].length;
+    // Find the next bold section marker after this one
+    const rest = content.substring(start);
+    const nextSection = rest.match(/\*\*[^*]+\*\*/);
+    const sectionText = nextSection && nextSection.index !== undefined
+        ? rest.substring(0, nextSection.index)
+        : rest;
 
-    return match[1]
+    return sectionText.replace(/^[:：\s]*/, '').trim();
+}
+
+// Extract bullets from "The details" / "Key Points" section
+function extractBulletsFromSection(content: string): string[] {
+    const raw = findSectionContent(content, /\*\*[^*]*(?:details|key\s*points)[^*]*\*\*/i);
+    if (!raw) return [];
+
+    return raw
         .split('\n')
         .filter(line => line.trim().match(/^[•\-\*]/))
         .map(line => line.replace(/^[•\-\*]\s*/, '').trim())
-        .filter(line => {
-            if (line.length === 0) return false;
-            // Filter out placeholder text
-            if (line.match(/^(Point|Impact|Watch|Fact)\s*\d/i)) return false;
-            // Filter out lines that are actually section headers embedded in bullets
-            if (sectionEmojis.some(emoji => line.includes(emoji) && line.includes('**'))) return false;
-            // Filter out lines that look like section headers
-            if (line.match(/^(\*\*)?(Key Points|Why This Matters|What's Next)/i)) return false;
-            return true;
-        });
+        .filter(line => line.length > 5)
+        .filter(line => !line.match(/^(Point|Impact|Watch|Fact)\s*\d/i));
 }
 
-// Fallback: extract content from research when parsing fails
+// Extract a paragraph from "Why it matters" or "L8R's Take" section
+function extractParagraphFromSection(content: string, sectionPattern: RegExp): string {
+    const raw = findSectionContent(content, sectionPattern);
+    if (!raw) return '';
+
+    return raw
+        .split('\n')
+        .map(line => line.replace(/^[•\-\*]\s*/, '').trim())
+        .filter(line => line.length > 0)
+        .join(' ');
+}
+
 function extractFromResearch(research: string, type: 'key' | 'matters' | 'next'): string[] {
     // Try to extract from the research sections
     const patterns: Record<string, RegExp> = {
@@ -743,7 +729,7 @@ function extractFromResearch(research: string, type: 'key' | 'matters' | 'next')
             .filter(line => line.trim().match(/^[•\-\*]/))
             .map(line => line.replace(/^[•\-\*]\s*/, '').trim())
             .filter(line => line.length > 0)
-            .slice(0, 4);
+            .slice(0, 6);
     }
 
     // If no bullets found, try to extract first few sentences

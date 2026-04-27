@@ -7,6 +7,18 @@ import { calculateCost } from '@/lib/cost-tracker';
 
 const OPENROUTER_API_URL = 'https://openrouter.ai/api/v1/chat/completions';
 
+function sanitizeHookParagraph(hook: string): string {
+    const sanitized = hook
+        .replace(/^\s*Yesterday\s*,?\s*on\s+[A-Z][a-z]+\s+\d{1,2},\s+\d{4}\s*,?\s*/i, '')
+        .replace(/^\s*Today\s*,?\s*on\s+[A-Z][a-z]+\s+\d{1,2},\s+\d{4}\s*,?\s*/i, '')
+        .replace(/^\s*On\s+[A-Z][a-z]+\s+\d{1,2},\s+\d{4}\s*,?\s*/i, '')
+        .replace(/^\s*As of\s+[A-Z][a-z]+\s+\d{1,2},\s+\d{4}\s*,?\s*/i, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+
+    return sanitized || hook.trim();
+}
+
 export async function POST(request: NextRequest) {
     try {
         const body = await request.json();
@@ -49,10 +61,10 @@ You must output a VALID JSON object matching the StoryBlock structure.
 ## JSON STRUCTURE:
 {
   "title": "New Title",
-  "hookParagraph": "New Hook",
-  "bulletPoints": ["Point 1", "Point 2", "Point 3", "Point 4"],
-  "whyItMatters": ["Point 1", "Point 2", "Point 3"],
-  "whatsNext": ["Point 1", "Point 2", "Point 3"]
+  "hookParagraph": "2-3 sentence hook that leads with the interesting angle, not the date",
+  "bulletPoints": ["Fact 1", "Fact 2", "Fact 3"],
+  "whyItMatters": "2-4 sentence paragraph about why this matters",
+  "l8rsTake": "2-3 sentence paragraph with strong opinion"
 }
 
 ## WRITING RULES:
@@ -62,6 +74,7 @@ You must output a VALID JSON object matching the StoryBlock structure.
 4. **Unique Content.** No repetition between sections.
 5. **Tone.** Conversational, "Alex" persona, slight humor, strong opinions.
 6. **Emojis.** You can use emojis in the text, but NOT in the JSON keys.
+7. **No date-first hooks.** Do NOT open with "Yesterday", "Today", "On [date]", or "As of [date]". If a date matters, mention it later.
 
 ## HUMANIZE (Kill AI patterns):
 - BANNED: "testament to", "serves as", "underscores", "highlights", "showcases"
@@ -79,9 +92,9 @@ ${context ? `\nFOR CONTEXT, here is the original research:\n${context}\n` : ''}`
 """
 Title: ${currentStory.title}
 Hook: ${currentStory.hookParagraph}
-Key Points: ${currentStory.bulletPoints.join('\n')}
-Why It Matters: ${currentStory.whyItMatters.join('\n')}
-What's Next: ${currentStory.whatsNext.join('\n')}
+The details: ${(currentStory.bulletPoints || []).join('\n')}
+Why it matters: ${currentStory.whyItMatters || ''}
+L8R's Take: ${currentStory.l8rsTake || ''}
 """
 
 User Request: ${userPrompt}
@@ -142,25 +155,17 @@ Rewrite the full story as a JSON object. Return ONLY the valid JSON, no markdown
                 throw new Error('Invalid JSON structure returned from AI');
             }
 
-            // Ensure arrays exist and are limited to correct length
-            newStory.bulletPoints = (newStory.bulletPoints || []).slice(0, 4);
-            newStory.whyItMatters = (newStory.whyItMatters || []).slice(0, 3);
-            newStory.whatsNext = (newStory.whatsNext || []).slice(0, 3);
-            
-            // Ensure L8R's Take exists
-            if (!newStory.l8rsTake) {
-                newStory.l8rsTake = currentStory.l8rsTake || [];
-            }
+            // Ensure bulletPoints array exists without crushing useful detail
+            newStory.bulletPoints = (newStory.bulletPoints || []).filter((item: unknown) => typeof item === 'string' && item.trim().length > 0);
 
-            // Fill in missing arrays with fallback
+            // Ensure paragraph fields are strings
+            newStory.hookParagraph = sanitizeHookParagraph(newStory.hookParagraph || currentStory.hookParagraph || '');
+            newStory.whyItMatters = newStory.whyItMatters || currentStory.whyItMatters || '';
+            newStory.l8rsTake = newStory.l8rsTake || currentStory.l8rsTake || '';
+
+            // Fill in missing bulletPoints with fallback
             if (newStory.bulletPoints.length === 0) {
                 newStory.bulletPoints = currentStory.bulletPoints || ['[Points to be filled]'];
-            }
-            if (newStory.whyItMatters.length === 0) {
-                newStory.whyItMatters = currentStory.whyItMatters || ['[Impact to be filled]'];
-            }
-            if (newStory.whatsNext.length === 0) {
-                newStory.whatsNext = currentStory.whatsNext || ['[Next steps to be filled]'];
             }
 
             // Estimate cost: ~2000 input tokens, ~2000 output tokens

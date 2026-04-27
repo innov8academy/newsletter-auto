@@ -146,9 +146,8 @@ export default function DraftPage() {
                 title: '',
                 hookParagraph: '',
                 bulletPoints: [],
-                whyItMatters: [],
-                whatsNext: [],
-                l8rsTake: [],
+                whyItMatters: '',
+                l8rsTake: '',
             })),
             quickSummary: '',
             rawMarkdown: '',
@@ -208,6 +207,17 @@ export default function DraftPage() {
 
     // Parse story content from generated text
     function parseStoryContent(content: string, storyIndex: number): StoryBlock {
+        const sanitizeHookParagraph = (hook: string): string => {
+            const sanitized = hook
+                .replace(/^\s*Yesterday\s*,?\s*on\s+[A-Z][a-z]+\s+\d{1,2},\s+\d{4}\s*,?\s*/i, '')
+                .replace(/^\s*Today\s*,?\s*on\s+[A-Z][a-z]+\s+\d{1,2},\s+\d{4}\s*,?\s*/i, '')
+                .replace(/^\s*On\s+[A-Z][a-z]+\s+\d{1,2},\s+\d{4}\s*,?\s*/i, '')
+                .replace(/^\s*As of\s+[A-Z][a-z]+\s+\d{1,2},\s+\d{4}\s*,?\s*/i, '')
+                .replace(/\s+/g, ' ')
+                .trim();
+
+            return sanitized || hook.trim();
+        };
         const emojis = ['🧠', '💰', '🤖', '🔥', '⚡', '🎯'];
 
         // Extract title
@@ -218,7 +228,7 @@ export default function DraftPage() {
 
         // Extract hook (first paragraph after title)
         const hookMatch = content.match(/###?[^\n]+\n\n([^*#]+)/);
-        const hookParagraph = hookMatch ? hookMatch[1].trim() : '';
+        const hookParagraph = sanitizeHookParagraph(hookMatch ? hookMatch[1].trim() : '');
 
         // Extract bullet sections
         const extractBullets = (sectionName: string): string[] => {
@@ -229,18 +239,31 @@ export default function DraftPage() {
                 .split('\n')
                 .filter(line => line.trim().match(/^[•\-\*]/))
                 .map(line => line.replace(/^[•\-\*]\s*/, '').trim())
-                .filter(Boolean)
-                .slice(0, 4);
+                .filter(Boolean);
+        };
+
+        // Extract paragraph sections
+        const extractParagraph = (sectionName: string): string => {
+            const pattern = new RegExp(
+                `\\*\\*[^*]*${sectionName}[^*]*\\*\\*:?\\s*([\\s\\S]*?)(?=\\*\\*[^*]+\\*\\*:|##|$)`,
+                'i'
+            );
+            const match = content.match(pattern);
+            if (!match) return '';
+            return match[1]
+                .split('\n')
+                .map(line => line.replace(/^[•\-\*]\s*/, '').trim())
+                .filter(line => line.length > 0)
+                .join(' ');
         };
 
         return {
             emoji: emojis[storyIndex % emojis.length],
             title,
             hookParagraph,
-            bulletPoints: extractBullets('Key Points'),
-            whyItMatters: extractBullets('Why This Matters'),
-            whatsNext: extractBullets("What's Next"),
-            l8rsTake: extractBullets("L8R's Take"),
+            bulletPoints: extractBullets('details|Key Points'),
+            whyItMatters: extractParagraph('Why it matters|Why This Matters'),
+            l8rsTake: extractParagraph("L8R's Take"),
         };
     }
 
@@ -302,14 +325,12 @@ Story Title: ${story.title}
 
 Hook: ${story.hookParagraph}
 
-Key Points:
+The details:
 ${(story.bulletPoints || []).map(p => `• ${p}`).join('\n')}
 
-Why This Matters:
-${(story.whyItMatters || []).map(p => `• ${p}`).join('\n')}
+Why it matters: ${story.whyItMatters || ''}
 
-What's Next:
-${(story.whatsNext || []).map(p => `• ${p}`).join('\n')}
+L8R's Take: ${story.l8rsTake || ''}
 `.trim();
     }
 
@@ -1142,9 +1163,9 @@ ${(story.whatsNext || []).map(p => `• ${p}`).join('\n')}
                                                     storyContext={getStoryContext(storyIndex)}
                                                 />
 
-                                                {/* Key Points */}
+                                                {/* The details */}
                                                 <EditableBulletList
-                                                    title="The Key Points"
+                                                    title="The details"
                                                     emoji="🔍"
                                                     items={story.bulletPoints}
                                                     onUpdate={(items) => updateStory(storyIndex, 'bulletPoints', items)}
@@ -1152,23 +1173,21 @@ ${(story.whatsNext || []).map(p => `• ${p}`).join('\n')}
                                                     storyContext={getStoryContext(storyIndex)}
                                                 />
 
-                                                {/* Why It Matters */}
-                                                <EditableBulletList
-                                                    title="Why This Matters"
-                                                    emoji="🚨"
-                                                    items={story.whyItMatters}
-                                                    onUpdate={(items) => updateStory(storyIndex, 'whyItMatters', items)}
-                                                    onRegenerate={(prompt, model) => regenerateBullets('whyMatters', story.whyItMatters, prompt, model, getStoryContext(storyIndex))}
+                                                {/* Why it matters */}
+                                                <EditableSection
+                                                    title="Why it matters"
+                                                    content={story.whyItMatters}
+                                                    onUpdate={(newContent) => updateStory(storyIndex, 'whyItMatters', newContent)}
+                                                    onRegenerate={(prompt, model) => regenerateSection('whyMatters', story.whyItMatters, prompt, model, getStoryContext(storyIndex))}
                                                     storyContext={getStoryContext(storyIndex)}
                                                 />
 
-                                                {/* What's Next */}
-                                                <EditableBulletList
-                                                    title="What's Next"
-                                                    emoji="⏭️"
-                                                    items={story.whatsNext}
-                                                    onUpdate={(items) => updateStory(storyIndex, 'whatsNext', items)}
-                                                    onRegenerate={(prompt, model) => regenerateBullets('whatsNext', story.whatsNext, prompt, model, getStoryContext(storyIndex))}
+                                                {/* L8R's Take */}
+                                                <EditableSection
+                                                    title="💡 L8R's Take"
+                                                    content={story.l8rsTake}
+                                                    onUpdate={(newContent) => updateStory(storyIndex, 'l8rsTake', newContent)}
+                                                    onRegenerate={(prompt, model) => regenerateSection('l8rsTake', story.l8rsTake, prompt, model, getStoryContext(storyIndex))}
                                                     storyContext={getStoryContext(storyIndex)}
                                                 />
                                             </div>
