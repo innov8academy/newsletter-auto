@@ -158,6 +158,7 @@ const WizardContext = createContext<WizardContextValue | undefined>(undefined);
 // Provider component
 export function WizardProvider({ children }: { children: ReactNode }) {
     const [state, setState] = useState<WizardState>(initialState);
+    const [hasRestored, setHasRestored] = useState(false);
 
     // Load state from localStorage on mount
     useEffect(() => {
@@ -217,6 +218,8 @@ export function WizardProvider({ children }: { children: ReactNode }) {
                 }
             } catch (e) {
                 console.error('[Wizard] Failed to restore state:', e);
+            } finally {
+                setHasRestored(true);
             }
         }, 0);
 
@@ -225,6 +228,8 @@ export function WizardProvider({ children }: { children: ReactNode }) {
 
     // Save state to localStorage on changes (debounced)
     useEffect(() => {
+        if (!hasRestored) return;
+
         const timeoutId = setTimeout(() => {
             try {
                 const toSave = {
@@ -242,7 +247,7 @@ export function WizardProvider({ children }: { children: ReactNode }) {
         }, 300);
 
         return () => clearTimeout(timeoutId);
-    }, [state.currentStep, state.currentStoryIndex, state.selectedReports, state.completed]);
+    }, [hasRestored, state.currentStep, state.currentStoryIndex, state.selectedReports, state.completed]);
 
     // Navigation
     const goToStep = useCallback((step: number) => {

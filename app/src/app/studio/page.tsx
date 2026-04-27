@@ -48,15 +48,10 @@ function isArticleStyleStory(story: Partial<StoryBlock> | undefined): story is S
     return Boolean(
         story &&
         typeof story.title === 'string' &&
-        story.title.trim() &&
         typeof story.hookParagraph === 'string' &&
-        story.hookParagraph.trim() &&
         Array.isArray(story.bulletPoints) &&
-        story.bulletPoints.length > 0 &&
         typeof story.whyItMatters === 'string' &&
-        story.whyItMatters.trim() &&
-        typeof story.l8rsTake === 'string' &&
-        story.l8rsTake.trim()
+        typeof story.l8rsTake === 'string'
     );
 }
 
