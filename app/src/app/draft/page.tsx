@@ -102,12 +102,16 @@ function SetupStep() {
     const [allReports, setAllReports] = useState<ResearchReport[]>([]);
 
     useEffect(() => {
-        const reports = loadResearchReports();
-        if (reports.length === 0) {
-            router.push('/research');
-            return;
-        }
-        setAllReports(reports);
+        const timeoutId = window.setTimeout(() => {
+            const reports = loadResearchReports();
+            if (reports.length === 0) {
+                router.push('/research');
+                return;
+            }
+            setAllReports(reports);
+        }, 0);
+
+        return () => window.clearTimeout(timeoutId);
     }, [router]);
 
     const isSelected = (reportId: string) =>
@@ -252,11 +256,13 @@ function SetupStep() {
 }
 
 // Generic generation step component
+type GeneratedSectionContent = string | string[] | { title: string; subtitle: string };
+
 interface GenerationStepProps {
     title: string;
     sectionType: 'title' | 'intro' | 'toc' | 'summary';
     content: string | string[] | { title: string; subtitle: string } | null;
-    onSave: (content: any) => void;
+    onSave: (content: GeneratedSectionContent) => void;
     placeholder: string;
 }
 
@@ -266,6 +272,32 @@ function GenerationStep({ title, sectionType, content, onSave, placeholder }: Ge
     const [hasGenerated, setHasGenerated] = useState(false);
     const [selectedModel, setSelectedModel] = useState<DraftModelId>('anthropic/claude-sonnet-4.5');
     const [copied, setCopied] = useState(false);
+
+    const parseSectionContent = useCallback((value: string): GeneratedSectionContent => {
+        if (sectionType === 'title') {
+            const titleMatch = value.match(/^#\s+(.+?)(?:\n|$)/m);
+            const subtitleMatch = value.match(/PLUS:\s*(.+?)(?:\n|$)/i);
+            return {
+                title: titleMatch ? titleMatch[1].trim() : value.split('\n')[0].replace(/^#\s*/, '').trim(),
+                subtitle: subtitleMatch ? subtitleMatch[1].trim() : '',
+            };
+        }
+
+        if (sectionType === 'toc') {
+            return value
+                .split('\n')
+                .filter(line => line.trim().match(/^[•\-\*]/))
+                .map(line => line.replace(/^[•\-\*]\s*/, '').trim())
+                .filter(Boolean);
+        }
+
+        return value;
+    }, [sectionType]);
+
+    const saveCurrentContent = useCallback((value: string) => {
+        if (!value.trim()) return;
+        onSave(parseSectionContent(value));
+    }, [onSave, parseSectionContent]);
 
     // Reset state when section type changes (navigating between steps)
     useEffect(() => {
@@ -317,6 +349,7 @@ function GenerationStep({ title, sectionType, content, onSave, placeholder }: Ge
             if (data.success) {
                 setLocalContent(data.content);
                 setHasGenerated(true);
+                saveCurrentContent(data.content);
 
                 // Track cost
                 if (data.cost) {
@@ -335,35 +368,24 @@ function GenerationStep({ title, sectionType, content, onSave, placeholder }: Ge
         } finally {
             setIsGenerating(false);
         }
-    }, [selectedReports, sectionType, selectedModel, setIsGenerating, setError]);
+    }, [selectedReports, sectionType, selectedModel, setIsGenerating, setError, saveCurrentContent]);
 
     // Auto-generate on mount if no content
     useEffect(() => {
-        if (!content && !hasGenerated && selectedReports.length > 0) {
+        if (!content && !hasGenerated && !isGenerating && selectedReports.length > 0) {
             generateContent();
         }
-    }, [content, hasGenerated, selectedReports.length, generateContent]);
+    }, [content, hasGenerated, isGenerating, selectedReports.length, generateContent]);
 
     const handleConfirm = () => {
-        // Parse content based on section type
-        if (sectionType === 'title') {
-            const titleMatch = localContent.match(/^#\s+(.+?)(?:\n|$)/m);
-            const subtitleMatch = localContent.match(/PLUS:\s*(.+?)(?:\n|$)/i);
-            onSave({
-                title: titleMatch ? titleMatch[1].trim() : localContent.split('\n')[0],
-                subtitle: subtitleMatch ? subtitleMatch[1].trim() : '',
-            });
-        } else if (sectionType === 'toc') {
-            const items = localContent
-                .split('\n')
-                .filter(line => line.trim().match(/^[•\-\*]/))
-                .map(line => line.replace(/^[•\-\*]\s*/, '').trim())
-                .filter(Boolean);
-            onSave(items);
-        } else {
-            onSave(localContent);
-        }
+        saveCurrentContent(localContent);
         nextStep();
+    };
+
+    const handleContentChange = (value: string) => {
+        setLocalContent(value);
+        setHasGenerated(Boolean(value.trim()));
+        saveCurrentContent(value);
     };
 
     return (
@@ -434,7 +456,7 @@ function GenerationStep({ title, sectionType, content, onSave, placeholder }: Ge
                 ) : (
                     <Textarea
                         value={localContent}
-                        onChange={(e) => setLocalContent(e.target.value)}
+                        onChange={(e) => handleContentChange(e.target.value)}
                         placeholder={placeholder}
                         className="h-full min-h-[300px] resize-none bg-black/20 border-white/10 text-white font-mono text-sm"
                     />
@@ -709,7 +731,9 @@ ${(localStory.l8rsTake || []).map(p => `• ${p}`).join('\n')}`;
 
     const updateField = (field: keyof StoryBlock, value: string | string[]) => {
         if (!localStory) return;
-        setLocalStory({ ...localStory, [field]: value });
+        const updatedStory = { ...localStory, [field]: value };
+        setLocalStory(updatedStory);
+        saveStory(currentStoryIndex, updatedStory);
     };
 
     const handleConfirmStory = () => {
@@ -730,6 +754,19 @@ ${(localStory.l8rsTake || []).map(p => `• ${p}`).join('\n')}`;
             prevStep();
         }
     };
+
+    if (totalStories === 0 || !currentReport) {
+        return (
+            <div className="bg-surface/80 backdrop-blur-xl border border-white/10 rounded-2xl p-6 h-full flex flex-col items-center justify-center text-center">
+                <FileText className="w-10 h-10 text-white/20 mb-4" />
+                <h2 className="font-display text-xl text-white/90 mb-2">No stories selected</h2>
+                <p className="text-sm text-white/40 mb-6">Go back to setup and choose the researched stories for this newsletter.</p>
+                <Button onClick={prevStep} className="bg-gradient-to-r from-amber-500 to-coral-500 text-[#0B0B0F]">
+                    Back to Setup
+                </Button>
+            </div>
+        );
+    }
 
     return (
         <div className="bg-surface/80 backdrop-blur-xl border border-white/10 rounded-2xl p-6 h-full flex flex-col">
@@ -951,10 +988,10 @@ ${(localStory.l8rsTake || []).map(p => `• ${p}`).join('\n')}`;
                             </div>
                         </div>
 
-                        {/* What's Next */}
+                        {/* What is Next */}
                         <div>
                             <label className="text-xs text-white/40 uppercase tracking-wider mb-2 flex items-center gap-2">
-                                ⏭️ What's Next
+                                ⏭️ What&apos;s Next
                             </label>
                             <div className="space-y-2">
                                 {(localStory.whatsNext || []).map((point, i) => (
@@ -973,10 +1010,10 @@ ${(localStory.l8rsTake || []).map(p => `• ${p}`).join('\n')}`;
                             </div>
                         </div>
 
-                        {/* L8R's Take */}
+                        {/* L8R Take */}
                         <div>
                             <label className="text-xs text-white/40 uppercase tracking-wider mb-2 flex items-center gap-2">
-                                💡 L8R's Take (Alex's Opinion)
+                                💡 L8R&apos;s Take (Alex&apos;s Opinion)
                             </label>
                             <div className="space-y-2">
                                 {(localStory.l8rsTake || []).map((point, i) => (
@@ -1045,7 +1082,10 @@ function WizardContent() {
                         title="Generate Hook (Title & Subtitle)"
                         sectionType="title"
                         content={completed.hook}
-                        onSave={({ title, subtitle }) => saveHook(title, subtitle)}
+                        onSave={(value) => {
+                            const hook = value as { title: string; subtitle: string };
+                            saveHook(hook.title, hook.subtitle);
+                        }}
                         placeholder="# Your Newsletter Title Here&#10;&#10;PLUS: Story 2 teaser | Story 3 teaser"
                     />
                 );
@@ -1055,7 +1095,7 @@ function WizardContent() {
                         title="Generate Introduction"
                         sectionType="intro"
                         content={completed.intro}
-                        onSave={saveIntro}
+                        onSave={(value) => saveIntro(value as string)}
                         placeholder="Write your introduction here..."
                     />
                 );
@@ -1065,7 +1105,7 @@ function WizardContent() {
                         title="Generate Table of Contents"
                         sectionType="toc"
                         content={completed.toc}
-                        onSave={saveToc}
+                        onSave={(value) => saveToc(value as string[])}
                         placeholder="**In today's post:**&#10;• 🎬 Story 1 title&#10;• 💰 Story 2 title&#10;• 📰 Story 3 title"
                     />
                 );
@@ -1077,7 +1117,8 @@ function WizardContent() {
                         title="Generate Quick Summary"
                         sectionType="summary"
                         content={completed.summary}
-                        onSave={(summary) => {
+                        onSave={(value) => {
+                            const summary = value as string;
                             saveSummary(summary);
 
                             // Save with the new summary value (completed.summary won't have it yet)

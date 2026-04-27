@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import { ResearchReport } from '@/lib/types';
 import { StoryBlock } from '@/lib/draft-generator';
+import { loadResearchReports } from '@/lib/storage';
 
 // Wizard step definitions
 export const WIZARD_STEPS = [
@@ -84,15 +85,45 @@ interface WizardContextValue extends WizardState {
 
 const STORAGE_KEY = 'newsletter-wizard-state';
 
+function createInitialCompletedSections(): CompletedSections {
+    return {
+        hook: null,
+        intro: null,
+        toc: null,
+        stories: [],
+        summary: null,
+        memeIdeas: [],
+    };
+}
+
+function getReportSignature(reports: ResearchReport[]): string {
+    return reports.map(report => report.story.id).join('|');
+}
+
+function clampStep(step: number): number {
+    if (!Number.isFinite(step)) return 0;
+    return Math.max(0, Math.min(step, WIZARD_STEPS.length - 1));
+}
+
+function reconcileCompletedStories(
+    completed: CompletedSections,
+    previousReports: ResearchReport[],
+    nextReports: ResearchReport[],
+): CompletedSections {
+    const storiesById = new Map<string, StoryBlock>();
+    previousReports.forEach((report, index) => {
+        const story = completed.stories[index];
+        if (story) storiesById.set(report.story.id, story);
+    });
+
+    return {
+        ...completed,
+        stories: nextReports.map(report => storiesById.get(report.story.id)) as StoryBlock[],
+    };
+}
+
 // Initial state
-const initialCompletedSections: CompletedSections = {
-    hook: null,
-    intro: null,
-    toc: null,
-    stories: [],
-    summary: null,
-    memeIdeas: [],
-};
+const initialCompletedSections: CompletedSections = createInitialCompletedSections();
 
 const initialState: WizardState = {
     currentStep: 0,
@@ -112,25 +143,55 @@ export function WizardProvider({ children }: { children: ReactNode }) {
 
     // Load state from localStorage on mount
     useEffect(() => {
-        try {
-            const saved = localStorage.getItem(STORAGE_KEY);
-            if (saved) {
-                const parsed = JSON.parse(saved);
-                // Don't restore isGenerating or error state
-                setState(prev => ({
-                    ...prev,
-                    currentStep: parsed.currentStep ?? 0,
-                    currentStoryIndex: parsed.currentStoryIndex ?? 0,
-                    selectedReports: parsed.selectedReports ?? [],
-                    completed: {
-                        ...initialCompletedSections,
-                        ...parsed.completed,
-                    },
-                }));
+        const timeoutId = window.setTimeout(() => {
+            try {
+                const currentReports = loadResearchReports();
+                const currentSignature = getReportSignature(currentReports);
+                const saved = localStorage.getItem(STORAGE_KEY);
+
+                if (saved) {
+                    const parsed = JSON.parse(saved);
+                    const savedReports: ResearchReport[] = parsed.selectedReports ?? [];
+                    const savedSignature = parsed.reportSignature ?? getReportSignature(savedReports);
+
+                    if (currentReports.length > 0 && currentSignature !== savedSignature) {
+                        setState({
+                            ...initialState,
+                            selectedReports: currentReports,
+                            completed: createInitialCompletedSections(),
+                        });
+                        return;
+                    }
+
+                    const selectedReports = savedReports.length > 0 ? savedReports : currentReports;
+                    const maxStoryIndex = Math.max(0, selectedReports.length - 1);
+
+                    // Don't restore isGenerating or error state
+                    setState(prev => ({
+                        ...prev,
+                        currentStep: clampStep(parsed.currentStep ?? 0),
+                        currentStoryIndex: Math.max(0, Math.min(parsed.currentStoryIndex ?? 0, maxStoryIndex)),
+                        selectedReports,
+                        completed: {
+                            ...createInitialCompletedSections(),
+                            ...parsed.completed,
+                        },
+                    }));
+                    return;
+                }
+
+                if (currentReports.length > 0) {
+                    setState(prev => ({
+                        ...prev,
+                        selectedReports: currentReports,
+                    }));
+                }
+            } catch (e) {
+                console.error('[Wizard] Failed to restore state:', e);
             }
-        } catch (e) {
-            console.error('[Wizard] Failed to restore state:', e);
-        }
+        }, 0);
+
+        return () => window.clearTimeout(timeoutId);
     }, []);
 
     // Save state to localStorage on changes (debounced)
@@ -141,6 +202,7 @@ export function WizardProvider({ children }: { children: ReactNode }) {
                     currentStep: state.currentStep,
                     currentStoryIndex: state.currentStoryIndex,
                     selectedReports: state.selectedReports,
+                    reportSignature: getReportSignature(state.selectedReports),
                     completed: state.completed,
                 };
                 localStorage.setItem(STORAGE_KEY, JSON.stringify(toSave));
@@ -195,7 +257,12 @@ export function WizardProvider({ children }: { children: ReactNode }) {
 
     // Report management
     const setSelectedReports = useCallback((reports: ResearchReport[]) => {
-        setState(prev => ({ ...prev, selectedReports: reports }));
+        setState(prev => ({
+            ...prev,
+            currentStoryIndex: Math.min(prev.currentStoryIndex, Math.max(0, reports.length - 1)),
+            selectedReports: reports,
+            completed: reconcileCompletedStories(prev.completed, prev.selectedReports, reports),
+        }));
     }, []);
 
     const addReport = useCallback((report: ResearchReport) => {
@@ -203,15 +270,25 @@ export function WizardProvider({ children }: { children: ReactNode }) {
             if (prev.selectedReports.find(r => r.story.id === report.story.id)) {
                 return prev;
             }
-            return { ...prev, selectedReports: [...prev.selectedReports, report] };
+            const selectedReports = [...prev.selectedReports, report];
+            return {
+                ...prev,
+                selectedReports,
+                completed: reconcileCompletedStories(prev.completed, prev.selectedReports, selectedReports),
+            };
         });
     }, []);
 
     const removeReport = useCallback((reportId: string) => {
-        setState(prev => ({
-            ...prev,
-            selectedReports: prev.selectedReports.filter(r => r.story.id !== reportId),
-        }));
+        setState(prev => {
+            const selectedReports = prev.selectedReports.filter(r => r.story.id !== reportId);
+            return {
+                ...prev,
+                currentStoryIndex: Math.min(prev.currentStoryIndex, Math.max(0, selectedReports.length - 1)),
+                selectedReports,
+                completed: reconcileCompletedStories(prev.completed, prev.selectedReports, selectedReports),
+            };
+        });
     }, []);
 
     const reorderReports = useCallback((fromIndex: number, toIndex: number) => {
@@ -219,7 +296,11 @@ export function WizardProvider({ children }: { children: ReactNode }) {
             const reports = [...prev.selectedReports];
             const [removed] = reports.splice(fromIndex, 1);
             reports.splice(toIndex, 0, removed);
-            return { ...prev, selectedReports: reports };
+            return {
+                ...prev,
+                selectedReports: reports,
+                completed: reconcileCompletedStories(prev.completed, prev.selectedReports, reports),
+            };
         });
     }, []);
 
@@ -281,7 +362,7 @@ export function WizardProvider({ children }: { children: ReactNode }) {
 
     // Utility
     const resetWizard = useCallback(() => {
-        setState(initialState);
+        setState({ ...initialState, completed: createInitialCompletedSections() });
         localStorage.removeItem(STORAGE_KEY);
     }, []);
 
