@@ -45,6 +45,26 @@ import Link from 'next/link';
 // Helper function to convert wizard state to NewsletterDraft and save to localStorage
 const CURRENT_DRAFT_SCHEMA_VERSION = 2;
 
+function normalizeStoryForStudio(story: StoryBlock | undefined, report: ResearchReport | undefined, index: number): StoryBlock | null {
+    if (!story && !report) return null;
+
+    const bulletPoints = Array.isArray(story?.bulletPoints)
+        ? story.bulletPoints.filter(point => typeof point === 'string' && point.trim())
+        : [];
+    const fallbackSummary = report?.deepResearch || report?.story.summary || '';
+    const fallbackBullet = fallbackSummary.replace(/\s+/g, ' ').trim().slice(0, 220);
+
+    return {
+        emoji: story?.emoji || ['🧠', '💰', '🤖', '🔥', '⚡', '🎯'][index % 6],
+        title: story?.title?.trim() || report?.story.headline || `Story ${index + 1}`,
+        hookParagraph: story?.hookParagraph?.trim() || fallbackBullet || report?.story.headline || '',
+        bulletPoints: bulletPoints.length > 0 ? bulletPoints : fallbackBullet ? [fallbackBullet] : [],
+        whyItMatters: story?.whyItMatters?.trim() || '',
+        l8rsTake: story?.l8rsTake?.trim() || '',
+        imageUrl: story?.imageUrl,
+    };
+}
+
 function saveWizardStateToCurrentDraft(completed: {
     hook: { title: string; subtitle: string } | null;
     intro: string | null;
@@ -52,15 +72,20 @@ function saveWizardStateToCurrentDraft(completed: {
     stories: StoryBlock[];
     summary: string | null;
     memeIdeas: Array<{ templateName: string; topText: string; bottomText: string; angle: string }>;
-}) {
+}, selectedReports: ResearchReport[] = []) {
+    const storyCount = Math.max(completed.stories.length, selectedReports.length);
+    const stories = Array.from({ length: storyCount }, (_, index) =>
+        normalizeStoryForStudio(completed.stories[index], selectedReports[index], index)
+    ).filter((story): story is StoryBlock => Boolean(story));
+
     const draft: NewsletterDraft = {
-        title: completed.hook?.title || '',
+        title: completed.hook?.title || 'Newsletter Draft',
         subtitle: completed.hook?.subtitle || '',
         date: getCurrentDateContext(),
         memeIdeas: completed.memeIdeas || [],
         intro: completed.intro || '',
         toc: completed.toc || [],
-        stories: completed.stories || [],
+        stories,
         quickSummary: completed.summary || '',
         rawMarkdown: '',
         storageSchemaVersion: CURRENT_DRAFT_SCHEMA_VERSION,
@@ -71,11 +96,11 @@ function saveWizardStateToCurrentDraft(completed: {
 // Skip to Studio button component with context access
 function SkipToStudioButton() {
     const router = useRouter();
-    const { completed } = useWizard();
+    const { completed, selectedReports } = useWizard();
 
     const handleSkipToStudio = () => {
         // Save current state to localStorage before navigating
-        saveWizardStateToCurrentDraft(completed);
+        saveWizardStateToCurrentDraft(completed, selectedReports);
         router.push('/studio');
     };
 
@@ -1097,7 +1122,7 @@ ${(localStory.bulletPoints || []).map(p => `• ${p}`).join('\n')}
 // Main content component that renders based on current step
 function WizardContent() {
     const router = useRouter();
-    const { currentStep, completed, saveHook, saveIntro, saveToc, saveSummary } = useWizard();
+    const { currentStep, selectedReports, completed, saveHook, saveIntro, saveToc, saveSummary } = useWizard();
 
     const renderStep = () => {
         switch (currentStep) {
@@ -1150,7 +1175,7 @@ function WizardContent() {
 
                             // Save with the new summary value (completed.summary won't have it yet)
                             const updatedCompleted = { ...completed, summary };
-                            saveWizardStateToCurrentDraft(updatedCompleted);
+                            saveWizardStateToCurrentDraft(updatedCompleted, selectedReports);
 
                             router.push('/studio');
                         }}
