@@ -37,7 +37,7 @@ import {
 const IMAGE_MODELS = [
     { id: 'google/gemini-3.1-flash-image-preview', name: 'Nano Banana 2', description: 'Best & Cheapest Image Gen (Gemini 3.1 Flash)' },
     { id: 'google/gemini-3-pro-image-preview', name: 'Gemini 3.1 Pro', description: 'Google Flagship (High Fidelity)' },
-    { id: 'google/gemini-2.0-flash-001', name: 'Gemini 2.0 Flash', description: 'Fastest Multimodal' },
+    { id: 'google/gemini-2.5-flash-image', name: 'Gemini 2.5 Flash Image', description: 'Reliable image fallback' },
     { id: 'bytedance-seed/seedream-4.5', name: 'SeedDream 4.5', description: 'Artistic consistency' },
     { id: 'black-forest-labs/flux-pro-1.1', name: 'Flux Pro 1.1', description: 'Reliable Fallback' },
 ];
@@ -74,7 +74,8 @@ export default function StudioPage() {
     const [apiKey, setApiKey] = useState('');
     const [selectedStoryIndex, setSelectedStoryIndex] = useState<number>(0);
     const [generatedPrompts, setGeneratedPrompts] = useState<{ [key: number]: string }>({});
-    const [generatingStates, setGeneratingStates] = useState<{ [key: number]: boolean }>({});
+    const [generatingPromptStates, setGeneratingPromptStates] = useState<{ [key: number]: boolean }>({});
+    const [generatingImageStates, setGeneratingImageStates] = useState<{ [key: number]: boolean }>({});
     const [globalModel, setGlobalModel] = useState<string>('google/gemini-3.1-flash-image-preview');
     const [useStyleRefs, setUseStyleRefs] = useState(true);
 
@@ -346,7 +347,7 @@ export default function StudioPage() {
     // Generate Prompt for a Story (with user ideas + reference images)
     async function generatePrompt(index: number) {
         if (!draft) return;
-        setGeneratingStates(prev => ({ ...prev, [index]: true }));
+        setGeneratingPromptStates(prev => ({ ...prev, [index]: true }));
 
         const story = draft.stories[index];
         const ideas = userIdeas[index] || '';
@@ -379,24 +380,29 @@ export default function StudioPage() {
                 })
             });
 
-            if (!promptRes.ok) throw new Error('Prompt API failed');
             const data = await promptRes.json();
+
+            if (!promptRes.ok || !data.success) {
+                throw new Error(data.error || 'Prompt API failed');
+            }
+
             setGeneratedPrompts(prev => ({ ...prev, [index]: data.prompt }));
 
             // Track cost
             if (data.cost) {
                 addCost({
                     source: data.costSource || 'image-prompt',
-                    model: data.model || 'google/gemini-2.0-flash-001',
+                    model: data.model || 'google/gemini-2.5-flash',
                     cost: data.cost,
                     description: `Prompt for story ${index + 1}`,
                 });
             }
         } catch (err) {
             console.error(err);
-            alert('Failed to generate prompt');
+            const message = err instanceof Error ? err.message : 'Unknown error';
+            alert(`Failed to generate prompt:\n${message.substring(0, 500)}`);
         } finally {
-            setGeneratingStates(prev => ({ ...prev, [index]: false }));
+            setGeneratingPromptStates(prev => ({ ...prev, [index]: false }));
         }
     }
 
@@ -404,7 +410,7 @@ export default function StudioPage() {
     async function generateImage(index: number) {
         if (!draft) return;
 
-        setGeneratingStates(prev => ({ ...prev, [index]: true }));
+        setGeneratingImageStates(prev => ({ ...prev, [index]: true }));
 
         const story = draft.stories[index];
         const storyText = `${story.title}\n\n${story.hookParagraph}\n\n${story.bulletPoints.join('\n')}`;
@@ -468,7 +474,7 @@ export default function StudioPage() {
             let msg = err instanceof Error ? err.message : 'Unknown error';
             alert(`Generation Error:\n${msg}`);
         } finally {
-            setGeneratingStates(prev => ({ ...prev, [index]: false }));
+            setGeneratingImageStates(prev => ({ ...prev, [index]: false }));
         }
     }
 
@@ -721,9 +727,9 @@ export default function StudioPage() {
                                         size="sm"
                                         className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white mb-3"
                                         onClick={() => generatePrompt(selectedStoryIndex)}
-                                        disabled={generatingStates[selectedStoryIndex]}
+                                        disabled={generatingPromptStates[selectedStoryIndex]}
                                     >
-                                        {generatingStates[selectedStoryIndex] ? (
+                                        {generatingPromptStates[selectedStoryIndex] ? (
                                             <>
                                                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                                                 Generating Prompt...
@@ -755,9 +761,9 @@ export default function StudioPage() {
                                             size="lg"
                                             className="w-full bg-purple-600 hover:bg-purple-500 text-white shadow-lg shadow-purple-900/20"
                                             onClick={() => generateImage(selectedStoryIndex)}
-                                            disabled={generatingStates[selectedStoryIndex]}
+                                            disabled={generatingImageStates[selectedStoryIndex]}
                                         >
-                                            {generatingStates[selectedStoryIndex] ? (
+                                            {generatingImageStates[selectedStoryIndex] ? (
                                                 <>
                                                     <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                                                     Generating Image...

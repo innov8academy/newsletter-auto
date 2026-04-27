@@ -1,6 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { calculateCost } from '@/lib/cost-tracker';
-import { searchRelevantImages, buildImageContext, fetchImageAsBase64 } from '@/lib/image-search';
+import { searchRelevantImages, buildImageContext } from '@/lib/image-search';
+
+const PROMPT_MODELS = [
+    'google/gemini-2.5-flash',
+    'google/gemini-3.1-pro-preview',
+] as const;
+
+function sanitizeContext(value: string, maxLength = 1200): string {
+    return value
+        .replace(/[\u0000-\u001F\u007F]/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .slice(0, maxLength);
+}
 
 export async function POST(request: NextRequest) {
     console.log('API: generate-image-prompt called');
@@ -38,9 +51,10 @@ export async function POST(request: NextRequest) {
         
         // If UI provided web references, use those
         if (webReferenceContext && webReferenceContext.trim()) {
+            const safeWebReferenceContext = sanitizeContext(webReferenceContext);
             webSearchContext = `
 **REAL-WORLD VISUAL REFERENCES (selected by user):**
-${webReferenceContext}
+${safeWebReferenceContext}
 
 Use these as inspiration for visual elements, composition, and style. The image should feel connected to actual news coverage, not generic stock art.`;
             console.log('[ImagePrompt] Using UI-provided web references');
@@ -176,38 +190,54 @@ TASK: Create an image prompt that places the meme character as the HERO, with th
             userMessageContent = textPrompt;
         }
 
-        // Use vision-capable model if we have images
-        const model = hasReferenceImages
-            ? 'google/gemini-2.0-flash-001' // Vision capable
-            : 'google/gemini-2.0-flash-001';
+        let generatedPrompt = '';
+        let model = '';
+        let lastError = '';
 
-        console.log('API: Sending to model', model, 'with', hasReferenceImages ? 'multimodal' : 'text-only', 'content');
+        for (const candidateModel of PROMPT_MODELS) {
+            model = candidateModel;
+            console.log('API: Sending to model', candidateModel, 'with', hasReferenceImages ? 'multimodal' : 'text-only', 'content');
 
-        const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${apiKey}`,
-                'HTTP-Referer': 'https://innov8-newsletter.local',
-                'X-Title': 'Innov8 Image Prompter',
-            },
-            body: JSON.stringify({
-                model,
-                messages: [
-                    { role: 'system', content: systemPrompt },
-                    { role: 'user', content: userMessageContent }
-                ],
-                temperature: 0.7,
-            }),
-        });
+            const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${apiKey}`,
+                    'HTTP-Referer': 'https://innov8-newsletter.local',
+                    'X-Title': 'Innov8 Image Prompter',
+                },
+                body: JSON.stringify({
+                    model: candidateModel,
+                    messages: [
+                        { role: 'system', content: systemPrompt },
+                        { role: 'user', content: userMessageContent }
+                    ],
+                    temperature: 0.7,
+                    max_tokens: 1200,
+                }),
+            });
 
-        if (!response.ok) {
-            const errorText = await response.text();
-            throw new Error(`OpenRouter API error: ${response.status} - ${errorText}`);
+            if (!response.ok) {
+                const errorText = await response.text();
+                lastError = `OpenRouter API error (${candidateModel}): ${response.status} - ${errorText.substring(0, 500)}`;
+                console.error('[ImagePrompt] Model failed:', lastError);
+                continue;
+            }
+
+            const data = await response.json();
+            generatedPrompt = data.choices?.[0]?.message?.content?.trim() || '';
+
+            if (generatedPrompt) {
+                break;
+            }
+
+            lastError = `Empty prompt returned from ${candidateModel}`;
+            console.error('[ImagePrompt] Empty response from model:', candidateModel);
         }
 
-        const data = await response.json();
-        const generatedPrompt = data.choices?.[0]?.message?.content?.trim();
+        if (!generatedPrompt) {
+            throw new Error(lastError || 'No prompt generated');
+        }
 
         // Estimate cost: more tokens for multimodal
         const inputTokens = hasReferenceImages ? 2000 : 500;
