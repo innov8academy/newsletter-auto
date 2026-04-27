@@ -292,10 +292,12 @@ interface GenerationStepProps {
     sectionType: 'title' | 'intro' | 'toc' | 'summary';
     content: string | string[] | { title: string; subtitle: string } | null;
     onSave: (content: GeneratedSectionContent) => void;
+    onConfirm?: (content: GeneratedSectionContent) => void;
+    nextLabel?: string;
     placeholder: string;
 }
 
-function GenerationStep({ title, sectionType, content, onSave, placeholder }: GenerationStepProps) {
+function GenerationStep({ title, sectionType, content, onSave, onConfirm, nextLabel = 'Confirm & Continue', placeholder }: GenerationStepProps) {
     const { selectedReports, prevStep, nextStep, isGenerating, setIsGenerating, setError, error } = useWizard();
     const [localContent, setLocalContent] = useState('');
     const [hasGenerated, setHasGenerated] = useState(false);
@@ -407,8 +409,16 @@ function GenerationStep({ title, sectionType, content, onSave, placeholder }: Ge
     }, [content, hasGenerated, isGenerating, selectedReports.length, generateContent]);
 
     const handleConfirm = () => {
-        saveCurrentContent(localContent);
-        nextStep();
+        if (!localContent.trim()) return;
+
+        const parsedContent = parseSectionContent(localContent);
+        onSave(parsedContent);
+
+        if (onConfirm) {
+            onConfirm(parsedContent);
+        } else {
+            nextStep();
+        }
     };
 
     const handleContentChange = (value: string) => {
@@ -494,7 +504,7 @@ function GenerationStep({ title, sectionType, content, onSave, placeholder }: Ge
 
             <WizardNavigation
                 onNext={handleConfirm}
-                nextLabel="Confirm & Continue"
+                nextLabel={nextLabel}
                 isNextLoading={isGenerating}
                 isNextDisabled={!localContent.trim()}
             />
@@ -1169,7 +1179,8 @@ function WizardContent() {
                         title="Generate Quick Summary"
                         sectionType="summary"
                         content={completed.summary}
-                        onSave={(value) => {
+                        onSave={(value) => saveSummary(value as string)}
+                        onConfirm={(value) => {
                             const summary = value as string;
                             saveSummary(summary);
 
@@ -1179,6 +1190,7 @@ function WizardContent() {
 
                             router.push('/studio');
                         }}
+                        nextLabel="Go to Studio"
                         placeholder="### 🚀 Quick L8R Summary..."
                     />
                 );
