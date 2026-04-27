@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { NewsletterDraft, StoryBlock } from '@/lib/draft-generator';
+import type { NewsletterDraft, StoryBlock } from '@/lib/draft-generator';
 import { getApiKey } from '@/lib/storage';
 import { addCost } from '@/lib/cost-tracker';
 import { CostTracker } from '@/components/CostTracker';
@@ -42,6 +42,37 @@ const IMAGE_MODELS = [
     { id: 'black-forest-labs/flux-pro-1.1', name: 'Flux Pro 1.1', description: 'Reliable Fallback' },
 ];
 
+const CURRENT_DRAFT_SCHEMA_VERSION = 2;
+
+function isArticleStyleStory(story: Partial<StoryBlock> | undefined): story is StoryBlock {
+    return Boolean(
+        story &&
+        typeof story.title === 'string' &&
+        story.title.trim() &&
+        typeof story.hookParagraph === 'string' &&
+        story.hookParagraph.trim() &&
+        Array.isArray(story.bulletPoints) &&
+        story.bulletPoints.length > 0 &&
+        typeof story.whyItMatters === 'string' &&
+        story.whyItMatters.trim() &&
+        typeof story.l8rsTake === 'string' &&
+        story.l8rsTake.trim()
+    );
+}
+
+function isCurrentDraftUsable(candidate: unknown): candidate is NewsletterDraft {
+    if (!candidate || typeof candidate !== 'object') return false;
+
+    const draft = candidate as Partial<NewsletterDraft>;
+    return (
+        draft.storageSchemaVersion === CURRENT_DRAFT_SCHEMA_VERSION &&
+        typeof draft.title === 'string' &&
+        Array.isArray(draft.stories) &&
+        draft.stories.length > 0 &&
+        draft.stories.every(isArticleStyleStory)
+    );
+}
+
 export default function StudioPage() {
     const router = useRouter();
     const [draft, setDraft] = useState<NewsletterDraft | null>(null);
@@ -72,7 +103,21 @@ export default function StudioPage() {
             return;
         }
 
-        setDraft(JSON.parse(storedDraft));
+        try {
+            const parsedDraft = JSON.parse(storedDraft);
+
+            if (!isCurrentDraftUsable(parsedDraft)) {
+                localStorage.removeItem('currentDraft');
+                router.push('/draft');
+                return;
+            }
+
+            setDraft(parsedDraft);
+        } catch {
+            localStorage.removeItem('currentDraft');
+            router.push('/draft');
+            return;
+        }
         setApiKey(key || '');
     }, [router]);
 

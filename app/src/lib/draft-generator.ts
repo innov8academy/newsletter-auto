@@ -23,6 +23,7 @@ export const DEFAULT_INTRO_MODEL: DraftModelId = 'anthropic/claude-sonnet-4.5';
 
 // Newsletter draft structure
 export interface NewsletterDraft {
+    storageSchemaVersion?: number;
     title: string;
     subtitle: string;
     date: string;

@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import { ResearchReport } from '@/lib/types';
-import { StoryBlock } from '@/lib/draft-generator';
+import type { StoryBlock } from '@/lib/draft-generator';
 import { loadResearchReports } from '@/lib/storage';
 
 // Wizard step definitions
@@ -84,6 +84,7 @@ interface WizardContextValue extends WizardState {
 }
 
 const STORAGE_KEY = 'newsletter-wizard-state';
+const STORAGE_SCHEMA_VERSION = 2;
 
 function createInitialCompletedSections(): CompletedSections {
     return {
@@ -98,6 +99,23 @@ function createInitialCompletedSections(): CompletedSections {
 
 function getReportSignature(reports: ResearchReport[]): string {
     return reports.map(report => report.story.id).join('|');
+}
+
+function isArticleStyleStory(story: unknown): story is StoryBlock {
+    if (!story || typeof story !== 'object') return false;
+    const candidate = story as Partial<StoryBlock>;
+    return (
+        typeof candidate.title === 'string' &&
+        typeof candidate.hookParagraph === 'string' &&
+        Array.isArray(candidate.bulletPoints) &&
+        typeof candidate.whyItMatters === 'string' &&
+        typeof candidate.l8rsTake === 'string'
+    );
+}
+
+function isArticleStyleCompleted(completed: Partial<CompletedSections> | undefined): boolean {
+    if (!completed?.stories || completed.stories.length === 0) return true;
+    return completed.stories.every(story => !story || isArticleStyleStory(story));
 }
 
 function clampStep(step: number): number {
@@ -153,8 +171,19 @@ export function WizardProvider({ children }: { children: ReactNode }) {
                     const parsed = JSON.parse(saved);
                     const savedReports: ResearchReport[] = parsed.selectedReports ?? [];
                     const savedSignature = parsed.reportSignature ?? getReportSignature(savedReports);
+                    const savedVersion = parsed.schemaVersion ?? 1;
+                    const hasOldStoryShape = !isArticleStyleCompleted(parsed.completed);
 
-                    if (currentReports.length > 0 && currentSignature !== savedSignature) {
+                    if (
+                        currentReports.length > 0 &&
+                        (
+                            currentSignature !== savedSignature ||
+                            savedVersion !== STORAGE_SCHEMA_VERSION ||
+                            hasOldStoryShape
+                        )
+                    ) {
+                        localStorage.removeItem(STORAGE_KEY);
+                        localStorage.removeItem('currentDraft');
                         setState({
                             ...initialState,
                             selectedReports: currentReports,
@@ -202,6 +231,7 @@ export function WizardProvider({ children }: { children: ReactNode }) {
                     currentStep: state.currentStep,
                     currentStoryIndex: state.currentStoryIndex,
                     selectedReports: state.selectedReports,
+                    schemaVersion: STORAGE_SCHEMA_VERSION,
                     reportSignature: getReportSignature(state.selectedReports),
                     completed: state.completed,
                 };
