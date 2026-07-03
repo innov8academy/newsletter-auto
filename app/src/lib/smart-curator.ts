@@ -47,6 +47,35 @@ function calculateSimilarity(text1: string, text2: string): number {
     return intersection.size / union.size;
 }
 
+const EXCLUDED_HEADLINE_SIMILARITY_THRESHOLD = 0.5;
+
+export function isExcludedStory(
+    story: Pick<CuratedStory, 'headline'>,
+    excludeHeadlines: string[],
+    threshold: number = EXCLUDED_HEADLINE_SIMILARITY_THRESHOLD
+): boolean {
+    if (excludeHeadlines.length === 0) return false;
+
+    return excludeHeadlines.some(excluded =>
+        calculateSimilarity(story.headline, excluded) > threshold
+    );
+}
+
+export function filterExcludedStories<T extends Pick<CuratedStory, 'headline'>>(
+    stories: T[],
+    excludeHeadlines: string[]
+): { stories: T[]; excludedCount: number } {
+    if (excludeHeadlines.length === 0) {
+        return { stories, excludedCount: 0 };
+    }
+
+    const filtered = stories.filter(story => !isExcludedStory(story, excludeHeadlines));
+    return {
+        stories: filtered,
+        excludedCount: stories.length - filtered.length,
+    };
+}
+
 // Fetch previously used story headlines from Supabase (last 30 days)
 async function fetchUsedStoryHeadlines(): Promise<string[]> {
     if (!isSupabaseConfigured()) {
@@ -431,6 +460,10 @@ export async function curateNews(
     });
     let result = allScored.filter(s => s.finalScore >= SCORING_CONFIG.minScoreToShow);
     let curationMode = 'normal';
+    let excludedCount = 0;
+    let usedStoryFilteredCount = 0;
+    let safetyNetRecoveredCount = 0;
+    const fallbackIgnoredExclusions = false;
 
     // Adaptive minimum guarantee: if below target, progressively relax threshold
     if (result.length < SCORING_CONFIG.targetMinStories) {
@@ -444,13 +477,9 @@ export async function curateNews(
 
     // Stage 4: Filter out excluded headlines (already shown in "Find More" flows)
     if (excludeHeadlines.length > 0) {
-        const beforeExclude = result.length;
-        result = result.filter(story => {
-            return !excludeHeadlines.some(excluded =>
-                calculateSimilarity(story.headline, excluded) > 0.5
-            );
-        });
-        const excludedCount = beforeExclude - result.length;
+        const filteredResult = filterExcludedStories(result, excludeHeadlines);
+        result = filteredResult.stories;
+        excludedCount = filteredResult.excludedCount;
         if (excludedCount > 0) {
             console.log(`[Find More] Excluded ${excludedCount} already-shown stories`);
         }
@@ -463,9 +492,9 @@ export async function curateNews(
     if (usedHeadlines.length > 0) {
         const beforeCount = result.length;
         result = result.filter(story => !isStoryUsed(story.headline, usedHeadlines));
-        const filtered = beforeCount - result.length;
-        if (filtered > 0) {
-            console.log(`[Duplicate Check] Filtered out ${filtered} previously used stories`);
+        usedStoryFilteredCount = beforeCount - result.length;
+        if (usedStoryFilteredCount > 0) {
+            console.log(`[Duplicate Check] Filtered out ${usedStoryFilteredCount} previously used stories`);
         }
     }
 
@@ -474,21 +503,25 @@ export async function curateNews(
         console.warn(`[Safety Net] 0 stories after filtering! allScored=${allScored.length}, relaxing dedup threshold...`);
 
         // Step 1: Re-apply used-story filter with stricter (higher) similarity threshold
-        const usedRelaxed = allScored
-            .filter(s => s.finalScore >= SCORING_CONFIG.hardFloorScore)
+        const fallbackCandidates = filterExcludedStories(
+            allScored.filter(s => s.finalScore >= SCORING_CONFIG.hardFloorScore),
+            excludeHeadlines
+        ).stories;
+
+        const usedRelaxed = fallbackCandidates
             .filter(story => !isStoryUsed(story.headline, usedHeadlines, 0.85)); // 85% instead of 70%
 
         if (usedRelaxed.length > 0) {
             result = usedRelaxed;
             curationMode = 'safety-net';
+            safetyNetRecoveredCount = result.length;
             console.log(`[Safety Net] Recovered ${result.length} stories with relaxed dedup (0.85 threshold)`);
         } else {
-            // Step 2: Skip dedup entirely — show whatever we have
-            result = allScored
-                .filter(s => s.finalScore >= SCORING_CONFIG.hardFloorScore)
-                .slice(0, SCORING_CONFIG.targetMinStories);
+            // Step 2: Skip used-story dedup, but still preserve current-run exclusions.
+            result = fallbackCandidates.slice(0, SCORING_CONFIG.targetMinStories);
             curationMode = 'emergency';
-            console.warn(`[Safety Net] Emergency mode: returning ${result.length} stories ignoring dedup`);
+            safetyNetRecoveredCount = result.length;
+            console.warn(`[Safety Net] Emergency mode: returning ${result.length} stories after preserving current exclusions`);
         }
     }
 
@@ -499,7 +532,12 @@ export async function curateNews(
         sourcesAnalyzed: allFeeds.length,
         totalArticlesFound: allNews.length,
         articlesProcessed: totalToProcess,
+        finalCount: result.length,
         curationMode,
+        excludedCount,
+        usedStoryFilteredCount,
+        safetyNetRecoveredCount,
+        fallbackIgnoredExclusions,
         feedHealth,
         breakdown: Object.entries(statsBreakdown).map(([name, counts]) => ({
             sourceName: name,

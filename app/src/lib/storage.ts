@@ -163,15 +163,22 @@ export async function saveSharedSelection(state: Pick<SharedSelectionState, 'cur
     }
 }
 
+interface ClearPersistedStateOptions {
+    includeShownHeadlines?: boolean;
+}
+
 /**
- * Clear all persisted state (for refresh)
+ * Clear persisted session state. API keys and custom feeds are intentionally kept.
  */
-export function clearPersistedState(): void {
+export function clearPersistedState(options: ClearPersistedStateOptions = {}): void {
     try {
         localStorage.removeItem(STORAGE_KEYS.CURATED_STORIES);
         localStorage.removeItem(STORAGE_KEYS.SELECTED_IDS);
         localStorage.removeItem(STORAGE_KEYS.RESEARCH_REPORTS);
         localStorage.removeItem(STORAGE_KEYS.LAST_UPDATED);
+        if (options.includeShownHeadlines) {
+            clearShownHeadlines();
+        }
     } catch (error) {
         console.error('Failed to clear persisted state:', error);
     }
@@ -236,6 +243,17 @@ export function saveShownHeadlines(headlines: string[]): void {
         localStorage.setItem(STORAGE_KEYS.SHOWN_HEADLINES, JSON.stringify(combined));
     } catch (error) {
         console.error('Failed to save shown headlines:', error);
+    }
+}
+
+/**
+ * Clear the hidden shown-headline memory used by "Find More".
+ */
+export function clearShownHeadlines(): void {
+    try {
+        localStorage.removeItem(STORAGE_KEYS.SHOWN_HEADLINES);
+    } catch (error) {
+        console.error('Failed to clear shown headlines:', error);
     }
 }
 

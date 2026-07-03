@@ -33,8 +33,6 @@ import {
   clearPersistedState,
   loadCustomFeeds,
   saveCustomFeeds,
-  saveShownHeadlines,
-  loadShownHeadlines,
   loadSharedSelection,
   saveSharedSelection,
 } from '@/lib/storage';
@@ -253,6 +251,8 @@ export default function Home() {
     setSelectedIds(new Set());
     setResearchReports([]);
     setStories([]);
+    setCurationStats(null);
+    setLastUpdated(null);
     // also clear "currentDraft" from localStorage if manually accessible, 
     // but clearPersistedState() should handle the bulk of it.
 
@@ -266,13 +266,10 @@ export default function Home() {
     setTimeout(() => setProgress('Scoring importance & impact...'), 4000);
 
     try {
-      // Load previously shown headlines to avoid repeating stories
-      const shownHeadlines = loadShownHeadlines().map(h => h.text);
-
       const response = await fetch('/api/curate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ apiKey, customFeeds, excludeShownHeadlines: shownHeadlines }),
+        body: JSON.stringify({ apiKey, customFeeds }),
       });
 
       const data = await response.json();
@@ -281,9 +278,6 @@ export default function Home() {
         setStories(data.stories);
         if (data.stats) setCurationStats(data.stats);
         setProgress(`Curated ${data.stories.length} high-impact stories`);
-
-        // Save shown headlines so they're excluded next time
-        saveShownHeadlines(data.stories.map((s: any) => s.headline));
 
         // Track cost
         if (data.cost) {
@@ -368,13 +362,15 @@ export default function Home() {
   }
 
   function handleClearAll() {
-    clearPersistedState();
+    clearPersistedState({ includeShownHeadlines: true });
     setStories([]);
     setSelectedIds(new Set());
     setResearchReports([]);
+    setCurationStats(null);
+    setLastUpdated(null);
     setHasSearched(false);
     setShowClearConfirm(false);
-    setCustomFeeds([]); // Also clear custom feeds? Maybe keep them? Let's clear for "Clear All" semantic.
+    void saveSharedSelection({ curatedStories: [], selectedIds: [] });
   }
 
   // Find MORE news without clearing existing selections
@@ -734,10 +730,30 @@ export default function Home() {
                 <DialogHeader>
                   <DialogTitle>Curation Source Breakdown</DialogTitle>
                   <DialogDescription>
-                    Total Articles Found: {curationStats?.totalArticlesFound} | Analyzed: {curationStats?.articlesProcessed}
+                    Found: {curationStats?.totalArticlesFound} | Analyzed: {curationStats?.articlesProcessed} | Returned: {curationStats?.finalCount ?? stories.length}
                   </DialogDescription>
                 </DialogHeader>
                 <div className="pt-4">
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
+                    <div className="rounded-lg border border-white/10 bg-white/5 px-3 py-2">
+                      <p className="text-[10px] uppercase tracking-wider text-white/35">Mode</p>
+                      <p className={`text-sm font-semibold ${curationStats?.curationMode === 'normal' ? 'text-green-400' : curationStats?.curationMode === 'relaxed' ? 'text-yellow-400' : 'text-amber-400'}`}>
+                        {curationStats?.curationMode || 'unknown'}
+                      </p>
+                    </div>
+                    <div className="rounded-lg border border-white/10 bg-white/5 px-3 py-2">
+                      <p className="text-[10px] uppercase tracking-wider text-white/35">Excluded</p>
+                      <p className="text-sm font-semibold text-coral-300">{curationStats?.excludedCount ?? 0}</p>
+                    </div>
+                    <div className="rounded-lg border border-white/10 bg-white/5 px-3 py-2">
+                      <p className="text-[10px] uppercase tracking-wider text-white/35">Used Filter</p>
+                      <p className="text-sm font-semibold text-white/70">{curationStats?.usedStoryFilteredCount ?? 0}</p>
+                    </div>
+                    <div className="rounded-lg border border-white/10 bg-white/5 px-3 py-2">
+                      <p className="text-[10px] uppercase tracking-wider text-white/35">Safety Net</p>
+                      <p className="text-sm font-semibold text-white/70">{curationStats?.safetyNetRecoveredCount ?? 0}</p>
+                    </div>
+                  </div>
                   <table className="w-full text-sm text-left">
                     <thead className="text-xs text-white/40 uppercase bg-white/5">
                       <tr>
@@ -803,7 +819,7 @@ export default function Home() {
                   {/* Curation Mode */}
                   {curationStats?.curationMode && (
                     <div className="mt-4 text-xs text-white/40">
-                      Curation mode: <span className={curationStats.curationMode === 'relaxed' ? 'text-yellow-400' : 'text-green-400'}>{curationStats.curationMode}</span>
+                      Fallback ignored exclusions: <span className={curationStats.fallbackIgnoredExclusions ? 'text-red-400' : 'text-green-400'}>{String(!!curationStats.fallbackIgnoredExclusions)}</span>
                     </div>
                   )}
                 </div>
