@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { ResearchReport } from '@/lib/types';
 import { NewsletterDraft, DRAFT_MODELS, DraftModelId, StoryBlock } from '@/lib/draft-generator';
+import { reconcileDraft } from '@/lib/studio/state';
 import { EditableSection, EditableBulletList } from '@/components/EditableSection';
 import { SectionGenerator, EmptySectionPlaceholder } from '@/components/SectionGenerator';
 import { Button } from '@/components/ui/button';
@@ -46,6 +47,7 @@ import {
     Trash2,
     MoreHorizontal,
     Maximize2,
+    Send,
 } from 'lucide-react';
 
 // Image models moved to Studio Page
@@ -61,6 +63,7 @@ export default function DraftPage() {
     const [draft, setDraft] = useState<NewsletterDraft | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [copied, setCopied] = useState(false);
+    const [creatingBeehiivDraft, setCreatingBeehiivDraft] = useState(false);
     const [selectedModel, setSelectedModel] = useState<DraftModelId>('google/gemini-3.1-pro-preview');
 
     // Story regeneration state
@@ -120,7 +123,9 @@ export default function DraftPage() {
     // Auto-save draft to localStorage for Studio access
     useEffect(() => {
         if (draft) {
-            localStorage.setItem('currentDraft', JSON.stringify(draft));
+            let previous: NewsletterDraft | null = null;
+            try { const raw = localStorage.getItem('currentDraft'); previous = raw ? JSON.parse(raw) : null; } catch {}
+            localStorage.setItem('currentDraft', JSON.stringify(reconcileDraft(draft, previous)));
         }
     }, [draft]);
 
@@ -141,7 +146,8 @@ export default function DraftPage() {
             memeIdeas: [],
             intro: '',
             toc: [],
-            stories: selectedReports.map((_, i) => ({
+            stories: selectedReports.map((report, i) => ({
+                sourceStoryId: report.story.id,
                 emoji: ['🧠', '💰', '🤖', '🔥'][i % 4],
                 title: '',
                 hookParagraph: '',
@@ -566,7 +572,7 @@ L8R's Take: ${story.l8rsTake || ''}
             const data = await response.json();
 
             if (data.success && data.draft) {
-                setDraft(data.draft);
+                setDraft({ ...data.draft, stories: data.draft.stories.map((story: StoryBlock, index: number) => ({ ...story, sourceStoryId: selectedReports[index]?.story.id })) });
 
                 // Track cost
                 if (data.cost) {
@@ -605,6 +611,31 @@ L8R's Take: ${story.l8rsTake || ''}
         a.download = `newsletter-${draft.date.replace(/,?\s+/g, '-').toLowerCase()}.md`;
         a.click();
         URL.revokeObjectURL(url);
+    }
+
+    async function createBeehiivDraft() {
+        if (!draft) return;
+
+        setCreatingBeehiivDraft(true);
+        setError(null);
+        try {
+            const response = await fetch('/api/beehiiv/draft', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ draft }),
+            });
+
+            const data = await response.json();
+            if (!response.ok || !data.success) {
+                throw new Error(data.error || 'Failed to create beehiiv draft');
+            }
+
+            alert(`beehiiv draft created${data.postId ? `: ${data.postId}` : ''}.`);
+        } catch (err) {
+            setError(err instanceof Error ? err.message : 'Failed to create beehiiv draft');
+        } finally {
+            setCreatingBeehiivDraft(false);
+        }
     }
 
     // Check if report is already selected
@@ -652,6 +683,19 @@ L8R's Take: ${story.l8rsTake || ''}
                                         <Copy className="w-4 h-4 mr-2" />
                                     )}
                                     {copied ? 'Copied!' : 'Copy'}
+                                </Button>
+                                <Button
+                                    size="sm"
+                                    onClick={createBeehiivDraft}
+                                    disabled={creatingBeehiivDraft}
+                                    className="bg-emerald-500 hover:bg-emerald-400 text-black"
+                                >
+                                    {creatingBeehiivDraft ? (
+                                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                    ) : (
+                                        <Send className="w-4 h-4 mr-2" />
+                                    )}
+                                    beehiiv Draft
                                 </Button>
                                 {/* Studio Button */}
                                 <Button

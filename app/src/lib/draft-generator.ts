@@ -23,6 +23,8 @@ export const DEFAULT_INTRO_MODEL: DraftModelId = 'anthropic/claude-sonnet-4.5';
 
 // Newsletter draft structure
 export interface NewsletterDraft {
+    studioDraftId?: string;
+    studioServerRevision?: number;
     storageSchemaVersion?: number;
     title: string;
     subtitle: string;
@@ -44,6 +46,8 @@ export interface MemeIdea {
 }
 
 export interface StoryBlock {
+    studioStoryId?: string;
+    sourceStoryId?: string;
     emoji: string;
     title: string;
     hookParagraph: string;

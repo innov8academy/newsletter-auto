@@ -20,6 +20,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { loadResearchReports } from '@/lib/storage';
+import { reconcileDraft } from '@/lib/studio/state';
 import { addCost } from '@/lib/cost-tracker';
 import {
     Sparkles,
@@ -55,6 +56,8 @@ function normalizeStoryForStudio(story: StoryBlock | undefined, report: Research
     const fallbackBullet = fallbackSummary.replace(/\s+/g, ' ').trim().slice(0, 220);
 
     return {
+        studioStoryId: story?.studioStoryId,
+        sourceStoryId: story?.sourceStoryId || report?.story.id,
         emoji: story?.emoji || ['🧠', '💰', '🤖', '🔥', '⚡', '🎯'][index % 6],
         title: story?.title?.trim() || report?.story.headline || `Story ${index + 1}`,
         hookParagraph: story?.hookParagraph?.trim() || fallbackBullet || report?.story.headline || '',
@@ -90,7 +93,15 @@ function saveWizardStateToCurrentDraft(completed: {
         rawMarkdown: '',
         storageSchemaVersion: CURRENT_DRAFT_SCHEMA_VERSION,
     };
-    localStorage.setItem('currentDraft', JSON.stringify(draft));
+    let previous: NewsletterDraft | null = null;
+    try {
+        const stored = localStorage.getItem('currentDraft');
+        previous = stored ? JSON.parse(stored) : null;
+    } catch {
+        const invalid = localStorage.getItem('currentDraft');
+        if (invalid) localStorage.setItem('studio_invalid_draft_backup', invalid);
+    }
+    localStorage.setItem('currentDraft', JSON.stringify(reconcileDraft(draft, previous)));
 }
 
 // Skip to Studio button component with context access

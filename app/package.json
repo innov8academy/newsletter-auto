@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test:studio": "node --conditions=react-server --import tsx --test tests/studio-*.test.ts",
+    "studio:preflight": "node --conditions=react-server --import tsx scripts/studio-preflight.ts"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.1.15",
@@ -27,6 +29,8 @@
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "react-konva": "^19.2.2",
+    "server-only": "0.0.1",
+    "sharp": "0.34.5",
     "tailwind-merge": "^3.4.0",
     "tailwindcss-animate": "^1.0.7",
     "twitter-api-v2": "^1.29.0",

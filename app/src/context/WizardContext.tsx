@@ -184,7 +184,9 @@ export function WizardProvider({ children }: { children: ReactNode }) {
                         )
                     ) {
                         localStorage.removeItem(STORAGE_KEY);
-                        localStorage.removeItem('currentDraft');
+                        // A new research selection must not erase the saved Studio draft.
+                        const previousDraft = localStorage.getItem('currentDraft');
+                        if (previousDraft) localStorage.setItem('studio_previous_draft_backup', previousDraft);
                         setState({
                             ...initialState,
                             selectedReports: currentReports,
