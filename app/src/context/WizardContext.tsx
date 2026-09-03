@@ -70,6 +70,7 @@ interface WizardContextValue extends WizardState {
     saveIntro: (intro: string) => void;
     saveToc: (toc: string[]) => void;
     saveStory: (storyIndex: number, story: StoryBlock) => void;
+    saveStoryBySource: (sourceId: string, story: StoryBlock) => void;
     saveSummary: (summary: string) => void;
     saveMemeIdeas: (ideas: CompletedSections['memeIdeas']) => void;
 
@@ -403,6 +404,16 @@ export function WizardProvider({ children }: { children: ReactNode }) {
         localStorage.removeItem(STORAGE_KEY);
     }, []);
 
+    const saveStoryBySource = useCallback((sourceId: string, story: StoryBlock) => {
+        setState(prev => {
+            const index = prev.selectedReports.findIndex(report => report.story.id === sourceId);
+            if (index < 0) return prev;
+            const stories = [...prev.completed.stories];
+            stories[index] = { ...story, sourceStoryId: sourceId };
+            return { ...prev, completed: { ...prev.completed, stories } };
+        });
+    }, []);
+
     const getProgress = useCallback(() => {
         const totalSteps = WIZARD_STEPS.length;
         const storiesTotal = state.selectedReports.length;
@@ -465,6 +476,7 @@ export function WizardProvider({ children }: { children: ReactNode }) {
         saveIntro,
         saveToc,
         saveStory,
+        saveStoryBySource,
         saveSummary,
         saveMemeIdeas,
         setIsGenerating,

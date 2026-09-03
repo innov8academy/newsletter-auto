@@ -74,6 +74,7 @@ async function fixture() {
     .png()
     .toBuffer();
   let renders = 0;
+  let searches = 0;
   const plannerRefs: BufferedReference[][] = [];
   const renderedRefs: BufferedReference[][] = [];
   const directions: string[] = [];
@@ -112,6 +113,23 @@ async function fixture() {
       cost: receipt(),
     }),
     downloadPublicImage: async () => pixels,
+    findNewsReferences: async () => {
+      searches++;
+      return {
+        images: [
+          {
+            url: 'https://images.example/camera.png',
+            thumbnail: '',
+            title: 'Official camera',
+            source: 'Example',
+            sourcePageUrl: 'https://example.com/camera',
+          },
+        ],
+        queries: ['camera', 'camera release'],
+        cost: receipt(),
+        warning: null,
+      };
+    },
   });
   const storyId = draft.stories[0].studioStoryId;
   const { work } = await service.context(draft.studioDraftId, storyId);
@@ -126,8 +144,95 @@ async function fixture() {
     renderedRefs,
     directions,
     renders: () => renders,
+    searches: () => searches,
   };
 }
+
+test('one-click missing images searches once, sends real references, and attaches the first output', async () => {
+  const f = await fixture();
+  const args = { draftId: f.draft.studioDraftId, storyId: f.storyId };
+  const results = await Promise.all([
+    f.service.generateMissing(args),
+    f.service.generateMissing(args),
+  ]);
+  const complete = results.find((run) => run.status === 'complete')!;
+  assert.ok(complete);
+  assert.equal(f.searches(), 1);
+  assert.equal(f.renders(), 1);
+  assert.equal(f.plannerRefs[0][0].role, 'news');
+  assert.ok(f.plannerRefs[0][0].bytes.length);
+  assert.deepEqual(f.plannerRefs[0], f.renderedRefs[0]);
+  assert.equal(
+    (await f.service.context(args.draftId, args.storyId)).work
+      .selectedGenerationId,
+    complete.id,
+  );
+  const changed = {
+    ...f.draft,
+    stories: [{ ...f.draft.stories[0], hookParagraph: 'Edited body text' }],
+  };
+  await f.repo.saveDraft(changed, 1);
+  assert.equal((await f.service.generateMissing(args)).id, complete.id);
+  assert.equal(f.renders(), 1, 'body edits or reload must not regenerate');
+});
+
+test('missing-image failures retain body content and need an explicit retry', async () => {
+  const f = await fixture();
+  const broken = new StudioService(f.repo, {
+    findNewsReferences: async () => {
+      throw new Error('search failed');
+    },
+  });
+  const args = { draftId: f.draft.studioDraftId, storyId: f.storyId };
+  const failed = await broken.generateMissing(args);
+  assert.equal(failed.status, 'failed');
+  assert.deepEqual((await f.repo.getDraft(args.draftId))?.payload, f.draft);
+  assert.equal((await f.service.generateMissing(args)).id, failed.id);
+  assert.equal(f.renders(), 0);
+  assert.equal(
+    (await f.service.generateMissing({ ...args, retryId: crypto.randomUUID() }))
+      .status,
+    'complete',
+  );
+  assert.equal(f.renders(), 1);
+});
+
+test('automatic image search skips rejected candidates and reports an empty reference set without rendering', async () => {
+  const f = await fixture();
+  const broken = new StudioService(f.repo, {
+    findNewsReferences: async () => ({
+      images: [
+        {
+          url: 'https://example.com/bad',
+          thumbnail: '',
+          title: 'Camera',
+          source: '',
+          sourcePageUrl: null,
+        },
+      ],
+      queries: [],
+      cost: receipt(),
+      warning: null,
+    }),
+    downloadPublicImage: async () => {
+      throw new Error('invalid image');
+    },
+    renderImage: async () => {
+      throw new Error('must not render');
+    },
+  });
+  const run = await broken.generateMissing({
+    draftId: f.draft.studioDraftId,
+    storyId: f.storyId,
+  });
+  assert.equal(run.status, 'failed');
+  assert.match(run.error!, /reference/i);
+  assert.equal(
+    run.costs.length,
+    1,
+    'record query planning charges even when references fail',
+  );
+});
 async function asset(
   f: Awaited<ReturnType<typeof fixture>>,
   role: 'news' | 'subject' | 'style',

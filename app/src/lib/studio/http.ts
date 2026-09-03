@@ -106,6 +106,55 @@ export async function studioRoute(
             }),
           ),
         });
+      if (
+        segments[0] === 'drafts' &&
+        segments.length === 3 &&
+        segments[2] === 'images'
+      ) {
+        const draft = await repo.getDraft(uuid(segments[1]));
+        if (!draft)
+          throw new StudioError(
+            'draft_not_found',
+            'This draft has not been saved for images yet.',
+            404,
+          );
+        const stories = await Promise.all(
+          draft.payload.stories.map(async (story) => {
+            const work = await repo.getWorkspace(draft.id, story.studioStoryId);
+            const generations = (
+              await repo.listGenerations(draft.id, story.studioStoryId)
+            ).map((run) => recoverStatus(run));
+            const selected =
+              generations.find(
+                (run) => run.id === work?.selectedGenerationId,
+              ) || null;
+            const latest =
+              generations.sort((a, b) =>
+                b.startedAt.localeCompare(a.startedAt),
+              )[0] || null;
+            return {
+              storyId: story.studioStoryId,
+              selected,
+              latest,
+              revision: work?.revision ?? null,
+            };
+          }),
+        );
+        const assetIds = [
+          ...new Set(
+            stories
+              .flatMap(({ selected, latest }) => [
+                selected?.deliveryAssetId,
+                latest?.deliveryAssetId,
+              ])
+              .filter((id): id is string => Boolean(id)),
+          ),
+        ];
+        return success({
+          stories,
+          assets: await service.previewAssets(await repo.getAssets(assetIds)),
+        });
+      }
       if (segments[0] === 'drafts' && segments.length === 2) {
         const draft = await repo.getDraft(uuid(segments[1]));
         if (!draft)
@@ -224,8 +273,12 @@ export async function studioRoute(
           ),
         });
       }
-      if (route === 'generations') {
-        const preset = presetId(body.presetId);
+      if (route === 'generations' || route === 'generations/missing') {
+        const automatic = route === 'generations/missing';
+        const preset = automatic
+          ? (await service.context(uuid(body.draftId), uuid(body.storyId))).work
+              .presetId
+          : presetId(body.presetId);
         if (
           !process.env[PRESETS[preset].key] ||
           !process.env.OPENROUTER_API_KEY
@@ -236,15 +289,23 @@ export async function studioRoute(
             503,
           );
         if (preset === 'nano-pro-2k') await verifyNanoCapabilities(10);
-        const run = await service.generate({
-          draftId: uuid(body.draftId),
-          storyId: uuid(body.storyId),
-          requestId: uuid(body.requestId),
-          presetId: preset,
-          operation: body.operation,
-          editSourceId: body.editSourceId ? uuid(body.editSourceId) : undefined,
-          editInstruction: body.editInstruction,
-        });
+        const run = automatic
+          ? await service.generateMissing({
+              draftId: uuid(body.draftId),
+              storyId: uuid(body.storyId),
+              retryId: body.retryId ? uuid(body.retryId) : undefined,
+            })
+          : await service.generate({
+              draftId: uuid(body.draftId),
+              storyId: uuid(body.storyId),
+              requestId: uuid(body.requestId),
+              presetId: preset,
+              operation: body.operation,
+              editSourceId: body.editSourceId
+                ? uuid(body.editSourceId)
+                : undefined,
+              editInstruction: body.editInstruction,
+            });
         return success({
           run,
           assets: await service.previewAssets(

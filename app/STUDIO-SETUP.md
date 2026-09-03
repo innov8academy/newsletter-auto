@@ -13,6 +13,10 @@ The default preset is Nano Banana Pro 2K through OpenRouter. GPT Image 2 uses th
 
 ## Storage and workflow
 
+- In the newsletter wizard, **Generate body + images** writes the pending stories and starts one image per story as its body finishes. Image search, reference selection, prompt preparation, saving, and first-image attachment are automatic. Continue writing the summary while images finish.
+- Existing body content has one **Generate missing images** action. Opening a page, editing text, or regenerating existing body text never starts a replacement image. Failed attempts require an explicit retry; ambiguous outcomes warn about possible earlier charges.
+- Each story has a compact preview and **Change image** field. A revision stays separate until **Use this version** is clicked; **Keep current** preserves the selected original. Prompts, uploads, model settings, and reference overrides remain in the optional advanced image editor.
+- The summary ends at **Review newsletter**, with content, selected images, and the explicit Beehiiv draft export together. Going through Studio is no longer required.
 - Drafts use stable UUIDs and revision checks. Version-2 drafts are imported without clearing their original content. Local drafts that conflict are retained as `studio_unsynced_draft` and can be imported as a separate copy.
 - Studio assets are private. Display URLs expire after one hour and can be refreshed from each preview. The database stores object paths, never those expiring URLs.
 - Original output and the 2048×1152 JPEG delivery image are saved before a generation is reported complete. The supplied seed examples are reference material, not generated output.
@@ -26,6 +30,8 @@ The default preset is Nano Banana Pro 2K through OpenRouter. GPT Image 2 uses th
 Run `npm run test:studio`, `npx tsc --noEmit --incremental false`, and `npm run build`. Focused tests exercise the actual Studio service and image processing against a memory repository; no provider credentials are required and no paid calls occur.
 
 For a full UI check without touching live data, run `node --conditions=react-server --import tsx scripts/studio-browser-fixture.ts`. It runs the app on port 3001 with a local Supabase-compatible fixture service on 4319. It overrides provider keys with empty values and uses supplied reference images as clearly labelled fixture output. Do not treat fixture screenshots as creative-quality evidence.
+
+Add `--draft` to test the combined writing flow at `http://127.0.0.1:3001/fixture`. Its local proxy uses deterministic provider doubles with the real generation service and storage adapter; the Next app runs on 3002. The fixture page offers unwritten or existing body scenarios. `/fixture/counts` reports fake provider call counts so reloads and edits can be checked for duplicate work. This harness is never imported by the deployed application.
 
 The user will test live image quality. Use the following five briefs, with identical selected references on both presets, two attempts each (20 outputs):
 

@@ -7,6 +7,7 @@ import {
 } from 'node:http';
 import { spawn, execFileSync, type ChildProcess } from 'node:child_process';
 import path from 'node:path';
+import { startDraftFixture } from './studio-draft-fixture';
 import { MemoryStudioRepository } from '../tests/helpers/studio-memory';
 import { installSeedStyle } from '../src/lib/studio/seed-style';
 import {
@@ -25,6 +26,7 @@ type Row = Record<string, unknown>;
 const tables: Record<string, Row[]> = {};
 const repo = new MemoryStudioRepository();
 let child: ChildProcess | null = null;
+let front: ReturnType<typeof createServer> | null = null;
 function stop() {
   if (child?.pid) {
     try {
@@ -37,6 +39,7 @@ function stop() {
     } catch {}
   }
   server.close();
+  front?.close();
   setTimeout(() => process.exit(0), 100);
 }
 function json(res: ServerResponse, value: unknown, status = 200) {
@@ -369,13 +372,20 @@ async function main() {
     server.once('error', reject);
     server.listen(4319, '127.0.0.1', resolve);
   });
+  const draftMode = process.argv.includes('--draft');
+  if (draftMode)
+    front = await startDraftFixture(
+      draft,
+      plan,
+      await repo.getObject(source.originalPath),
+    );
   child = spawn(
     process.execPath,
     [
       path.join(process.cwd(), 'node_modules/next/dist/bin/next'),
       'dev',
       '--port',
-      '3001',
+      draftMode ? '3002' : '3001',
       '--hostname',
       '127.0.0.1',
     ],
@@ -402,7 +412,9 @@ async function main() {
   );
   console.log(
     JSON.stringify({
-      fixtureUrl: 'http://127.0.0.1:3001/studio',
+      fixtureUrl: draftMode
+        ? 'http://127.0.0.1:3001/fixture'
+        : 'http://127.0.0.1:3001/studio',
       shutdownUrl: 'http://127.0.0.1:4319/shutdown',
       appPid: child.pid,
       fixturePid: process.pid,

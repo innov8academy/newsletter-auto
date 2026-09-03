@@ -17,6 +17,7 @@ import {
   planImage,
 } from './prompts';
 import { renderImage } from './providers';
+import { findNewsReferences, importNewsReferences } from './search';
 import {
   downloadPublicImage,
   MAX_UPLOAD_BYTES,
@@ -90,16 +91,22 @@ export function selectStyleAnchors(
     .slice(0, 3);
 }
 
+const defaultDependencies = {
+  planImage,
+  renderImage,
+  inspectImage,
+  downloadPublicImage,
+  findNewsReferences,
+};
+
 export class StudioService {
+  private deps: typeof defaultDependencies;
   constructor(
     public repo: StudioRepository,
-    private deps = {
-      planImage,
-      renderImage,
-      inspectImage,
-      downloadPublicImage,
-    },
-  ) {}
+    deps: Partial<typeof defaultDependencies> = {},
+  ) {
+    this.deps = { ...defaultDependencies, ...deps };
+  }
   async context(draftId: string, storyId: string) {
     const draft = await this.repo.getDraft(uuid(draftId));
     const story = draft?.payload.stories.find(
@@ -376,6 +383,7 @@ export class StudioService {
     operation?: unknown;
     editSourceId?: string;
     editInstruction?: unknown;
+    automatic?: boolean;
   }) {
     const requestStartedAt = Date.now();
     const draftId = uuid(input.draftId);
@@ -407,7 +415,8 @@ export class StudioService {
       return recoverStatus(existing);
     }
     const context = await this.context(draftId, storyId);
-    const { story, work } = context;
+    const { story } = context;
+    let { work } = context;
     if (work.manualPrompt !== null && !work.manualPrompt.trim())
       throw new StudioError(
         'empty_prompt',
@@ -420,11 +429,10 @@ export class StudioService {
         409,
       );
     const chosen = presetId(input.presetId || work.presetId || DEFAULT_PRESET);
-    const { refs, style } = await this.references(
+    let { refs, style } = await this.references(
       context,
       operation === 'edit' ? input.editSourceId : undefined,
     );
-    const signature = inputSignature(story, work);
     const inputSnapshot = {
       story,
       direction: work.direction,
@@ -449,7 +457,7 @@ export class StudioService {
       presetId: chosen,
       operation,
       status: 'running',
-      stage: 'planning',
+      stage: input.automatic ? 'references' : 'planning',
       inputSnapshot,
       prompt: '',
       plan: work.plan,
@@ -470,6 +478,48 @@ export class StudioService {
     if (!claim.claimed) return recoverStatus(claim.run);
     let providerFinished = false;
     try {
+      if (
+        input.automatic &&
+        !work.references.some((ref) => ref.role === 'news')
+      ) {
+        const search = await this.deps.findNewsReferences(
+          story,
+          work.direction,
+        );
+        run.costs.push(search.cost);
+        await this.repo.saveGeneration(run);
+        await this.repo.recordCost(
+          draftId,
+          storyId,
+          'search-queries',
+          search.cost,
+        );
+        const { selected, rejected } = await importNewsReferences(
+          search.images,
+          (candidate) => this.importNews(draftId, candidate),
+          requestStartedAt + 90_000,
+        );
+        if (!selected.length)
+          throw new StudioError(
+            'no_usable_references',
+            'No usable news reference was found. Your body text is saved. Retry the image or choose a reference in the advanced editor.',
+            422,
+          );
+        work = await this.repo.saveWorkspace(
+          { ...work, references: [...work.references, ...selected] },
+          work.revision,
+        );
+        ({ refs, style } = await this.references({ ...context, work }));
+        run.references = manifest(refs);
+        run.inputSnapshot = { ...inputSnapshot, references: manifest(refs) };
+        if (rejected.length)
+          run.warnings = [
+            `Skipped ${rejected.length} unavailable web reference(s).`,
+          ];
+      }
+      const signature = inputSignature(story, work);
+      run.stage = 'planning';
+      await this.repo.saveGeneration(run);
       let renderPlan = work.plan;
       const needsPlan =
         operation === 'edit' ||
@@ -604,6 +654,7 @@ export class StudioService {
         finishedAt: new Date().toISOString(),
       };
       await retrySave(() => this.repo.saveGeneration(run));
+      if (input.automatic) await this.attachFirstImage(run);
       if (Date.now() - requestStartedAt < 240_000) {
         try {
           run.quality = await this.deps.inspectImage(
@@ -650,6 +701,63 @@ export class StudioService {
       await this.repo.saveGeneration(run).catch(() => undefined);
       return run;
     }
+  }
+  async generateMissing(input: {
+    draftId: string;
+    storyId: string;
+    retryId?: string;
+  }) {
+    const { work } = await this.context(input.draftId, input.storyId);
+    if (work.selectedGenerationId) {
+      const selected = await this.repo.getGeneration(work.selectedGenerationId);
+      if (selected) return recoverStatus(selected);
+    }
+    const history = (
+      await this.repo.listGenerations(work.draftId, work.storyId)
+    ).sort((a, b) => b.startedAt.localeCompare(a.startedAt));
+    const completed = history.find((run) => run.status === 'complete');
+    if (completed) {
+      await this.attachFirstImage(completed);
+      return completed;
+    }
+    const running = history.find(
+      (run) => recoverStatus(run).status === 'running',
+    );
+    if (running) return running;
+    if (history.length && !input.retryId) return recoverStatus(history[0]);
+    return this.generate({
+      draftId: work.draftId,
+      storyId: work.storyId,
+      requestId: input.retryId
+        ? uuid(input.retryId)
+        : stableId(`first-image:${work.draftId}:${work.storyId}`),
+      presetId: work.presetId,
+      automatic: true,
+    });
+  }
+  private async attachFirstImage(run: GenerationRun) {
+    if (run.status !== 'complete' || !run.deliveryAssetId) return;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const work = await this.repo.getWorkspace(run.draftId, run.storyId);
+      if (!work || work.selectedGenerationId) return;
+      try {
+        await this.repo.saveWorkspace(
+          { ...work, selectedGenerationId: run.id },
+          work.revision,
+        );
+        return;
+      } catch (error) {
+        if (
+          !(error instanceof StudioError) ||
+          error.code !== 'revision_conflict'
+        )
+          break;
+      }
+    }
+    run.warnings = [
+      ...(run.warnings || []),
+      'Image saved. Choose “Use this image” to attach it.',
+    ];
   }
   async selectImage(
     draftId: string,

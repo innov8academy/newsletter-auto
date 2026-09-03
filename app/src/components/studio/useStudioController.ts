@@ -172,7 +172,14 @@ export function useStudioController() {
     draftRef.current = record;
     setDraft(record);
     cache(record);
-    await loadStory(record, record.payload.stories[0].studioStoryId);
+    const requested = new URLSearchParams(window.location.search).get(
+      'storyId',
+    );
+    await loadStory(
+      record,
+      record.payload.stories.find((story) => story.studioStoryId === requested)
+        ?.studioStoryId || record.payload.stories[0].studioStoryId,
+    );
   }
   async function initialize() {
     const available = await studioApi<Caps>('capabilities');
@@ -191,6 +198,21 @@ export function useStudioController() {
     if (parsed) setLocalDraft(parsed);
     if (!available.storage.ready) return;
     const list = await loadLists();
+    const requestedDraft = new URLSearchParams(window.location.search).get(
+      'draftId',
+    );
+    if (requestedDraft && requestedDraft !== parsed?.studioDraftId) {
+      if (parsed)
+        localStorage.setItem('studio_unsynced_draft', JSON.stringify(parsed));
+      await openDraft(
+        (
+          await studioApi<{ draft: DraftRecord }>(
+            `drafts/${encodeURIComponent(requestedDraft)}`,
+          )
+        ).draft,
+      );
+      return;
+    }
     if (parsed?.stories?.length) {
       try {
         const migrated = upgradeDraft(parsed);

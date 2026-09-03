@@ -1,7 +1,38 @@
 import 'server-only';
 import { structuredCall } from './providers';
 import { StudioError } from './errors';
-import type { SearchCandidate, StudioStory } from './types';
+import type {
+  ReferenceSelection,
+  SearchCandidate,
+  StudioAsset,
+  StudioStory,
+} from './types';
+
+// Keep story-query relevance order, but condition only on validated, distinct
+// image bytes. Bound failed downloads so rendering still has time to finish.
+export async function importNewsReferences(
+  candidates: SearchCandidate[],
+  importer: (candidate: SearchCandidate) => Promise<StudioAsset>,
+  deadline: number,
+) {
+  const selected: ReferenceSelection[] = [];
+  const rejected: string[] = [];
+  for (const candidate of candidates.slice(0, 4)) {
+    if (selected.length === 2 || Date.now() > deadline) break;
+    try {
+      const asset = await importer(candidate);
+      if (!selected.some((ref) => ref.assetId === asset.id))
+        selected.push({
+          assetId: asset.id,
+          role: 'news',
+          note: candidate.title,
+        });
+    } catch {
+      rejected.push(candidate.title || 'Web image');
+    }
+  }
+  return { selected, rejected };
+}
 
 export function deduplicateCandidates(
   images: SearchCandidate[],

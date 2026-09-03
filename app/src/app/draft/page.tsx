@@ -1,13 +1,12 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { ResearchReport } from '@/lib/types';
 import { DRAFT_MODELS, DraftModelId } from '@/lib/draft-generator';
-import type { NewsletterDraft, StoryBlock } from '@/lib/draft-generator';
-import { WizardProvider, useWizard, WIZARD_STEPS, getCurrentDateContext } from '@/context/WizardContext';
+import type { StoryBlock } from '@/lib/draft-generator';
+import { WizardProvider, useWizard, getCurrentDateContext } from '@/context/WizardContext';
 import { StepIndicator, WizardNavigation } from '@/components/StepIndicator';
-import { EditableSection, EditableBulletList } from '@/components/EditableSection';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -20,7 +19,11 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { loadResearchReports } from '@/lib/storage';
-import { reconcileDraft } from '@/lib/studio/state';
+import { saveWizardDraft, type WizardSections } from '@/lib/studio/wizard-draft';
+import { DEFAULT_PRESET, PRESETS } from '@/lib/studio/models';
+import { DraftImagesProvider, useDraftImages } from '@/components/studio/DraftImagesProvider';
+import { DraftImageCard, DraftImagesToolbar } from '@/components/studio/DraftImageCard';
+import DraftReview from '@/components/studio/DraftReview';
 import { addCost } from '@/lib/cost-tracker';
 import {
     Sparkles,
@@ -32,7 +35,6 @@ import {
     RefreshCw,
     ChevronRight,
     Newspaper,
-    Settings2,
     Image as ImageIcon,
     X,
     ChevronUp,
@@ -43,65 +45,8 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 
-// Helper function to convert wizard state to NewsletterDraft and save to localStorage
-const CURRENT_DRAFT_SCHEMA_VERSION = 2;
-
-function normalizeStoryForStudio(story: StoryBlock | undefined, report: ResearchReport | undefined, index: number): StoryBlock | null {
-    if (!story && !report) return null;
-
-    const bulletPoints = Array.isArray(story?.bulletPoints)
-        ? story.bulletPoints.filter(point => typeof point === 'string' && point.trim())
-        : [];
-    const fallbackSummary = report?.deepResearch || report?.story.summary || '';
-    const fallbackBullet = fallbackSummary.replace(/\s+/g, ' ').trim().slice(0, 220);
-
-    return {
-        studioStoryId: story?.studioStoryId,
-        sourceStoryId: story?.sourceStoryId || report?.story.id,
-        emoji: story?.emoji || ['🧠', '💰', '🤖', '🔥', '⚡', '🎯'][index % 6],
-        title: story?.title?.trim() || report?.story.headline || `Story ${index + 1}`,
-        hookParagraph: story?.hookParagraph?.trim() || fallbackBullet || report?.story.headline || '',
-        bulletPoints: bulletPoints.length > 0 ? bulletPoints : fallbackBullet ? [fallbackBullet] : [],
-        whyItMatters: story?.whyItMatters?.trim() || '',
-        l8rsTake: story?.l8rsTake?.trim() || '',
-        imageUrl: story?.imageUrl,
-    };
-}
-
-function saveWizardStateToCurrentDraft(completed: {
-    hook: { title: string; subtitle: string } | null;
-    intro: string | null;
-    toc: string[] | null;
-    stories: StoryBlock[];
-    summary: string | null;
-    memeIdeas: Array<{ templateName: string; topText: string; bottomText: string; angle: string }>;
-}, selectedReports: ResearchReport[] = []) {
-    const storyCount = Math.max(completed.stories.length, selectedReports.length);
-    const stories = Array.from({ length: storyCount }, (_, index) =>
-        normalizeStoryForStudio(completed.stories[index], selectedReports[index], index)
-    ).filter((story): story is StoryBlock => Boolean(story));
-
-    const draft: NewsletterDraft = {
-        title: completed.hook?.title || 'Newsletter Draft',
-        subtitle: completed.hook?.subtitle || '',
-        date: getCurrentDateContext(),
-        memeIdeas: completed.memeIdeas || [],
-        intro: completed.intro || '',
-        toc: completed.toc || [],
-        stories,
-        quickSummary: completed.summary || '',
-        rawMarkdown: '',
-        storageSchemaVersion: CURRENT_DRAFT_SCHEMA_VERSION,
-    };
-    let previous: NewsletterDraft | null = null;
-    try {
-        const stored = localStorage.getItem('currentDraft');
-        previous = stored ? JSON.parse(stored) : null;
-    } catch {
-        const invalid = localStorage.getItem('currentDraft');
-        if (invalid) localStorage.setItem('studio_invalid_draft_backup', invalid);
-    }
-    localStorage.setItem('currentDraft', JSON.stringify(reconcileDraft(draft, previous)));
+function saveWizardStateToCurrentDraft(completed: WizardSections, selectedReports: ResearchReport[] = []) {
+    return saveWizardDraft(completed, selectedReports, getCurrentDateContext());
 }
 
 // Skip to Studio button component with context access
@@ -123,7 +68,7 @@ function SkipToStudioButton() {
             className="text-purple-300 hover:text-purple-200"
         >
             <ImageIcon className="w-4 h-4 mr-2" />
-            Skip to Studio
+            Advanced images
         </Button>
     );
 }
@@ -530,6 +475,7 @@ function StoryStep() {
         currentStoryIndex,
         completed,
         saveStory,
+        saveStoryBySource,
         nextStory,
         prevStory,
         nextStep,
@@ -545,7 +491,9 @@ function StoryStep() {
     const [copied, setCopied] = useState(false);
     const [customInput, setCustomInput] = useState('');
     const [showRegenOptions, setShowRegenOptions] = useState(false);
-    const [hasAutoGenerated, setHasAutoGenerated] = useState<Record<number, boolean>>({});
+    const { generatedBody } = useDraftImages();
+    const [includeImages, setIncludeImages] = useState(true);
+    const generationLocks = useRef(new Set<string>());
     // Parallel generation state - tracks which stories are being generated
     const [generatingStories, setGeneratingStories] = useState<Record<number, boolean>>({});
     const [isGeneratingAll, setIsGeneratingAll] = useState(false);
@@ -572,24 +520,19 @@ ${(localStory.bulletPoints || []).map(p => `• ${p}`).join('\n')}
         setTimeout(() => setCopied(false), 2000);
     };
 
-    // Restore story from saved state when switching stories
+    // Opening a story is read-only. Paid body/image generation starts on a click.
     useEffect(() => {
-        if (savedStory && savedStory.title) {
-            setLocalStory(savedStory);
-        } else {
-            setLocalStory(null);
-            // Only generate if we haven't already tried AND this story isn't currently generating
-            if (!hasAutoGenerated[currentStoryIndex] && selectedReports.length > 0 && !generatingStories[currentStoryIndex]) {
-                setHasAutoGenerated(prev => ({ ...prev, [currentStoryIndex]: true }));
-                generateStory();
-            }
-        }
-    }, [currentStoryIndex, savedStory, generatingStories]);
+        setLocalStory(savedStory?.title ? savedStory : null);
+    }, [savedStory]);
 
     // Generate a single story - supports parallel generation
-    const generateStory = useCallback(async (userInstructions?: string, storyIdx?: number) => {
+    const generateStory = async (userInstructions?: string, storyIdx?: number) => {
         // Use provided index or current index (capture at call time for parallel support)
         const targetIndex = storyIdx ?? currentStoryIndex;
+        const sourceId = selectedReports[targetIndex]?.story.id;
+        if (!sourceId || generationLocks.current.has(sourceId)) return;
+        generationLocks.current.add(sourceId);
+        const createImage = includeImages && !completed.stories[targetIndex]?.title;
         
         // Mark THIS story as generating (not global)
         setGeneratingStories(prev => ({ ...prev, [targetIndex]: true }));
@@ -615,13 +558,8 @@ ${(localStory.bulletPoints || []).map(p => `• ${p}`).join('\n')}
                 const parsed = hydrateStoryBlock(data.story, targetIndex)
                     ?? parseStoryContent(data.content, targetIndex);
                 
-                // Update local state only if still viewing this story
-                if (targetIndex === currentStoryIndex) {
-                    setLocalStory(parsed);
-                }
-                
-                // Always save to wizard context
-                saveStory(targetIndex, parsed);
+                saveStoryBySource(sourceId, parsed);
+                if (createImage) generatedBody(sourceId, parsed);
                 setCustomInput('');
 
                 if (data.cost) {
@@ -638,13 +576,14 @@ ${(localStory.bulletPoints || []).map(p => `• ${p}`).join('\n')}
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Network error');
         } finally {
+            generationLocks.current.delete(sourceId);
             // Mark THIS story as done generating
             setGeneratingStories(prev => ({ ...prev, [targetIndex]: false }));
         }
-    }, [currentStoryIndex, selectedReports, selectedModel, customInput, setError, saveStory]);
+    };
 
     // Generate all pending stories in parallel
-    const generateAllStories = useCallback(async () => {
+    const generateAllStories = async () => {
         setIsGeneratingAll(true);
         setError(null);
 
@@ -656,63 +595,9 @@ ${(localStory.bulletPoints || []).map(p => `• ${p}`).join('\n')}
             return;
         }
 
-        // Mark all as generating
-        const initialGenerating: Record<number, boolean> = {};
-        pendingIndices.forEach(i => { initialGenerating[i] = true; });
-        setGeneratingStories(initialGenerating);
-
-        // Fire all requests in parallel
-        const promises = pendingIndices.map(async (storyIndex) => {
-            try {
-                const response = await fetch('/api/generate-section', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        sectionType: 'story',
-                        storyIndex,
-                        researchReports: selectedReports,
-                        modelId: selectedModel,
-                    }),
-                });
-
-                const data = await response.json();
-
-                if (data.success) {
-                    const parsed = hydrateStoryBlock(data.story, storyIndex)
-                        ?? parseStoryContent(data.content, storyIndex);
-                    saveStory(storyIndex, parsed);
-
-                    // If this is the current story, update local state
-                    if (storyIndex === currentStoryIndex) {
-                        setLocalStory(parsed);
-                    }
-
-                    if (data.cost) {
-                        addCost({
-                            source: 'section-story-batch',
-                            model: data.model || selectedModel,
-                            cost: data.cost,
-                            description: `Generated story ${storyIndex + 1} (batch)`,
-                        });
-                    }
-                }
-
-                return { storyIndex, success: data.success };
-            } catch (err) {
-                return { storyIndex, success: false };
-            } finally {
-                setGeneratingStories(prev => ({ ...prev, [storyIndex]: false }));
-            }
-        });
-
-        await Promise.all(promises);
+        await Promise.all(pendingIndices.map((index) => generateStory(undefined, index)));
         setIsGeneratingAll(false);
-        setHasAutoGenerated(prev => {
-            const updated = { ...prev };
-            pendingIndices.forEach(i => { updated[i] = true; });
-            return updated;
-        });
-    }, [selectedReports, selectedModel, completed.stories, currentStoryIndex, saveStory, setError]);
+    };
 
     const storyEmojis = ['🧠', '💰', '🤖', '🔥', '⚡', '🎯'];
 
@@ -886,7 +771,7 @@ ${(localStory.bulletPoints || []).map(p => `• ${p}`).join('\n')}
     return (
         <div className="bg-surface/80 backdrop-blur-xl border border-white/10 rounded-2xl p-6 h-full flex flex-col">
             {/* Header */}
-            <div className="flex items-center justify-between mb-4">
+            <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
                 <div>
                     <h2 className="font-display text-xl text-white/90">
                         Story {currentStoryIndex + 1} of {totalStories}
@@ -895,7 +780,7 @@ ${(localStory.bulletPoints || []).map(p => `• ${p}`).join('\n')}
                         {currentReport?.story.headline?.substring(0, 60)}...
                     </p>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                     {/* Story navigation pills - show loading state */}
                     <div className="flex gap-1">
                         {selectedReports.map((_, i) => (
@@ -920,7 +805,6 @@ ${(localStory.bulletPoints || []).map(p => `• ${p}`).join('\n')}
                     {/* Generate All / Generate Remaining button */}
                     {(() => {
                         const pendingCount = selectedReports.filter((_, i) => !completed.stories[i]?.title && !generatingStories[i]).length;
-                        const anyGenerating = Object.values(generatingStories).some(v => v) || isGeneratingAll;
                         
                         // Show button if: any pending stories that aren't currently generating
                         const showButton = pendingCount > 0 && !isGeneratingAll;
@@ -932,7 +816,7 @@ ${(localStory.bulletPoints || []).map(p => `• ${p}`).join('\n')}
                                 className="bg-gradient-to-r from-teal-500 to-emerald-500 text-black text-xs"
                             >
                                 <Sparkles className="w-3 h-3 mr-1" />
-                                {pendingCount === 1 ? 'Generate' : `Gen All (${pendingCount})`}
+                                {includeImages ? `Generate body + images (${pendingCount})` : `Generate body (${pendingCount})`}
                             </Button>
                         ) : isGeneratingAll ? (
                             <Button size="sm" disabled className="bg-teal-500/20 text-teal-300 text-xs">
@@ -1022,6 +906,11 @@ ${(localStory.bulletPoints || []).map(p => `• ${p}`).join('\n')}
                 )
             }
 
+            <div className="mb-4 space-y-3">
+                <label className="flex items-center gap-2 text-sm text-white/75"><input type="checkbox" checked={includeImages} onChange={(event) => setIncludeImages(event.target.checked)} />Include images for newly written stories</label>
+                <p className="text-xs text-white/50">Default image output: about ${PRESETS[DEFAULT_PRESET].outputEstimateUsd.toFixed(2)} each, plus reference and planning costs. Regenerating text keeps the existing image.</p>
+                <DraftImagesToolbar />
+            </div>
             {/* Story content */}
             <ScrollArea className="flex-1 -mr-2 pr-2">
                 {generatingStories[currentStoryIndex] && !localStory ? (
@@ -1030,7 +919,8 @@ ${(localStory.bulletPoints || []).map(p => `• ${p}`).join('\n')}
                         <p>Generating story {currentStoryIndex + 1}...</p>
                     </div>
                 ) : localStory ? (
-                    <div className="space-y-6">
+                    <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_300px]">
+                    <div className="min-w-0 space-y-6">
                         {/* Title */}
                         <div>
                             <label className="text-xs text-white/40 uppercase tracking-wider mb-2 block">
@@ -1105,7 +995,9 @@ ${(localStory.bulletPoints || []).map(p => `• ${p}`).join('\n')}
                             />
                         </div>
                     </div>
-                ) : null}
+                    <DraftImageCard key={currentReport.story.id} sourceId={currentReport.story.id} />
+                    </div>
+                ) : <div className="flex min-h-48 flex-col items-center justify-center gap-3 text-center"><p className="max-w-md text-sm text-white/60">Generate this story’s body. Its image will be prepared automatically while you keep writing.</p><Button onClick={() => void generateStory()} disabled={Boolean(generatingStories[currentStoryIndex])}>{includeImages ? 'Generate body + image' : 'Generate body'}</Button></div>}
             </ScrollArea>
 
             {/* Navigation */}
@@ -1142,9 +1034,10 @@ ${(localStory.bulletPoints || []).map(p => `• ${p}`).join('\n')}
 
 // Main content component that renders based on current step
 function WizardContent() {
-    const router = useRouter();
+    const [reviewing, setReviewing] = useState(false);
     const { currentStep, selectedReports, completed, saveHook, saveIntro, saveToc, saveSummary } = useWizard();
 
+    if (reviewing) return <DraftReview onBack={() => setReviewing(false)} />;
     const renderStep = () => {
         switch (currentStep) {
             case 0:
@@ -1199,9 +1092,9 @@ function WizardContent() {
                             const updatedCompleted = { ...completed, summary };
                             saveWizardStateToCurrentDraft(updatedCompleted, selectedReports);
 
-                            router.push('/studio');
+                            setReviewing(true);
                         }}
-                        nextLabel="Go to Studio"
+                        nextLabel="Review newsletter"
                         placeholder="### 🚀 Quick L8R Summary..."
                     />
                 );
@@ -1228,7 +1121,7 @@ function WizardDraftPage() {
             {/* Header */}
             <header className="sticky top-0 z-50 backdrop-blur-xl bg-[#0B0B0F]/80 border-b border-white/5">
                 <div className="max-w-[1400px] mx-auto px-6 py-4">
-                    <div className="flex items-center justify-between mb-4">
+                    <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
                         <div className="flex items-center gap-4">
                             <Button
                                 variant="ghost"
@@ -1265,7 +1158,7 @@ function WizardDraftPage() {
             </header>
 
             {/* Main content */}
-            <main className="max-w-[1400px] mx-auto px-6 py-6 h-[calc(100vh-160px)]">
+            <main className="max-w-[1400px] mx-auto px-4 sm:px-6 py-6 min-h-[calc(100vh-160px)]">
                 <WizardContent />
             </main>
         </div>
@@ -1276,7 +1169,9 @@ function WizardDraftPage() {
 export default function DraftPage() {
     return (
         <WizardProvider>
+            <DraftImagesProvider>
             <WizardDraftPage />
+            </DraftImagesProvider>
         </WizardProvider>
     );
 }

@@ -139,7 +139,8 @@ export interface GenerationRun {
   status: 'running' | 'complete' | 'failed' | 'interrupted' | 'save_failed';
   prompt: string;
   plan: ImagePlan | null;
-  stage?: 'planning' | 'rendering' | 'saving' | 'quality';
+  stage?: 'references' | 'planning' | 'rendering' | 'saving' | 'quality';
+  warnings?: string[];
   inputSnapshot?: Record<string, unknown>;
   references: ReferenceManifestEntry[];
   originalAssetId: string | null;
