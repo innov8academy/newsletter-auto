@@ -18,6 +18,7 @@ import {
   upgradeDraft,
 } from '@/lib/studio/state';
 import { StudioClientError, studioApi, uploadReference } from './client-api';
+import { IMAGE_PROMPT_VERSION } from '@/lib/studio/editorial-style';
 
 type Caps = {
   storage: { ready: boolean; error: string };
@@ -47,6 +48,7 @@ type StoryResponse = {
 const editable = (work: StoryWorkspace) => ({
   direction: work.direction,
   stylePackId: work.stylePackId,
+  styleDisabled: work.styleDisabled === true,
   references: work.references,
   manualPrompt: work.manualPrompt,
   presetId: work.presetId,
@@ -544,7 +546,8 @@ export function useStudioController() {
     story &&
       work &&
       work.plan &&
-      work.plan.inputSignature !== inputSignature(story, work),
+      (work.plan.systemVersion !== IMAGE_PROMPT_VERSION ||
+        work.plan.inputSignature !== inputSignature(story, work)),
   );
   const manualStale = Boolean(
     story && work && isManualPromptStale(story, work),
@@ -573,6 +576,7 @@ export function useStudioController() {
   );
   const canGenerate = Boolean(
     caps?.planner.configured &&
+      (work?.stylePackId || work?.styleDisabled === true) &&
       caps.presets.find((p) => p.id === work?.presetId)?.configured &&
       !manualStale &&
       !conflict,

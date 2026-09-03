@@ -89,16 +89,19 @@ export function DraftImagesProvider({ children }: { children: ReactNode }) {
       storage: { ready: boolean; error: string };
       planner: { configured: boolean };
       search: { configured: boolean };
+      style: { configured: boolean };
     }>('capabilities')
       .then((caps) =>
         setSetupError(
           !caps.storage.ready
             ? caps.storage.error
-            : !caps.planner.configured
-              ? 'Configure OpenRouter to generate images. Body writing is still available.'
-              : !caps.search.configured
-                ? 'Configure image search to find news references. Body writing is still available.'
-                : '',
+            : !caps.style?.configured
+              ? 'Activate the L8R editorial style before generating images. Body writing is still available.'
+              : !caps.planner.configured
+                ? 'Configure OpenRouter to generate images. Body writing is still available.'
+                : !caps.search.configured
+                  ? 'Configure image search to find news references. Body writing is still available.'
+                  : '',
         ),
       )
       .catch((cause) =>

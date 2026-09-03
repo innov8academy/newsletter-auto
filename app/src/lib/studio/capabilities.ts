@@ -10,12 +10,27 @@ export async function capabilities(
 ) {
   let ready = false;
   let storageError = 'Configure Supabase to save Studio work.';
+  let activeStyle: {
+    id: string;
+    name: string;
+    version: number;
+    references: number;
+  } | null = null;
   if (repo)
     try {
       await repo.checkReady();
       ready = true;
       storageError = '';
+      const pack = (await repo.listStyles()).find((style) => style.active);
+      if (pack)
+        activeStyle = {
+          id: pack.id,
+          name: pack.name,
+          version: pack.version,
+          references: pack.anchorIds.length,
+        };
     } catch (error) {
+      ready = false;
       storageError =
         error instanceof StudioError
           ? error.message
@@ -24,6 +39,7 @@ export async function capabilities(
   return {
     registryVersion: REGISTRY_VERSION,
     storage: { ready, error: storageError },
+    style: { configured: Boolean(activeStyle), active: activeStyle },
     sessionReady: sessionConfigured(env) || localDevelopment(env),
     planner: {
       model: PLANNER_MODEL,

@@ -242,7 +242,7 @@ export default function StyleLibrary({
               Analyze these examples
             </button>
             <span className="text-xs text-white/50">
-              {anchors.length}/5 candidate anchors · at most 3 used per image
+              {anchors.length}/3 style references · choose 2 or 3
             </span>
           </div>
           {profile && (
@@ -341,7 +341,7 @@ export default function StyleLibrary({
                     disabled={
                       !!busy ||
                       !asset.eligibleForConditioning ||
-                      (!anchors.includes(asset.id) && anchors.length >= 5)
+                      (!anchors.includes(asset.id) && anchors.length >= 3)
                     }
                     onChange={() =>
                       setAnchors((old) =>
@@ -359,7 +359,12 @@ export default function StyleLibrary({
           {profile && (
             <button
               className={`${primaryClass} mt-4`}
-              disabled={!!busy || !name.trim() || !anchors.length}
+              disabled={
+                !!busy ||
+                !name.trim() ||
+                anchors.length < 2 ||
+                anchors.length > 3
+              }
               onClick={() => void save()}
             >
               Save new version and activate

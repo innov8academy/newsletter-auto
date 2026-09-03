@@ -6,7 +6,7 @@ config({ quiet: true });
 async function main() {
   if (!process.argv.includes('--confirm'))
     throw new Error(
-      'This imports the supplied images into private Supabase storage. Pass --confirm to run.',
+      'This uploads only the three selected style references into private Supabase storage. Pass --confirm to run.',
     );
   const repo = new SupabaseStudioRepository();
   await repo.checkReady();

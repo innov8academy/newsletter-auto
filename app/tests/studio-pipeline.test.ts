@@ -2,11 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import sharp from 'sharp';
 import { MemoryStudioRepository } from './helpers/studio-memory';
-import {
-  StudioService,
-  recoverStatus,
-  selectStyleAnchors,
-} from '../src/lib/studio/service';
+import { StudioService, recoverStatus } from '../src/lib/studio/service';
 import { upgradeDraft, inputSignature } from '../src/lib/studio/state';
 import {
   buildRenderPrompt,
@@ -14,8 +10,16 @@ import {
   hash,
   manifest,
   validatePlan,
+  inspectImage,
 } from '../src/lib/studio/prompts';
-import { structuredCall } from '../src/lib/studio/providers';
+import { buildImageRequest, structuredCall } from '../src/lib/studio/providers';
+import {
+  IMAGE_PROMPT_VERSION,
+  PLANNER_SYSTEM,
+  selectStyleAnchors,
+} from '../src/lib/studio/editorial-style';
+import { capabilities } from '../src/lib/studio/capabilities';
+import { importNewsReferences } from '../src/lib/studio/search';
 import type {
   BufferedReference,
   StudioAsset,
@@ -54,7 +58,9 @@ const receipt = () => ({
   pricingDate: 'test',
   usage: { cost: 0.14 },
 });
-async function fixture() {
+async function fixture(
+  options: { withStyle?: boolean; unconfigured?: boolean } = {},
+) {
   const repo = new MemoryStudioRepository();
   const draft = upgradeDraft({
     title: 'L8R',
@@ -68,6 +74,7 @@ async function fixture() {
     rawMarkdown: '',
   });
   await repo.saveDraft(draft, null);
+  if (options.withStyle) await installSeedStyle(repo);
   const pixels = await sharp({
     create: { width: 2048, height: 1152, channels: 3, background: '#2444cc' },
   })
@@ -132,7 +139,15 @@ async function fixture() {
     },
   });
   const storyId = draft.stories[0].studioStoryId;
-  const { work } = await service.context(draft.studioDraftId, storyId);
+  let { work } = await service.context(draft.studioDraftId, storyId);
+  // Most unit cases deliberately exercise the supported None mode. An absent
+  // default style is a different state and has its own fail-closed regression.
+  if (!options.withStyle && !options.unconfigured)
+    work = await service.saveWork(draft.studioDraftId, storyId, {
+      revision: work.revision,
+      stylePackId: null,
+      styleDisabled: true,
+    });
   return {
     repo,
     draft,
@@ -149,7 +164,7 @@ async function fixture() {
 }
 
 test('one-click missing images searches once, sends real references, and attaches the first output', async () => {
-  const f = await fixture();
+  const f = await fixture({ withStyle: true });
   const args = { draftId: f.draft.studioDraftId, storyId: f.storyId };
   const results = await Promise.all([
     f.service.generateMissing(args),
@@ -159,7 +174,10 @@ test('one-click missing images searches once, sends real references, and attache
   assert.ok(complete);
   assert.equal(f.searches(), 1);
   assert.equal(f.renders(), 1);
-  assert.equal(f.plannerRefs[0][0].role, 'news');
+  assert.deepEqual(
+    f.plannerRefs[0].map((ref) => ref.role),
+    ['style', 'style', 'style', 'news'],
+  );
   assert.ok(f.plannerRefs[0][0].bytes.length);
   assert.deepEqual(f.plannerRefs[0], f.renderedRefs[0]);
   assert.equal(
@@ -509,22 +527,217 @@ test('planner requests use Gemini 3.7 with schema and actual image parts', async
   assert.match(JSON.stringify(body.messages), /പുതിയ/);
 });
 
-test('the seed catalog has forty examples, five eligible anchors, and a deterministic three-image selection', async () => {
+test('all forty examples inform one style but exactly three fixed anchors condition every story', async () => {
   const repo = new MemoryStudioRepository();
   const pack = await installSeedStyle(repo);
   const assets = await repo.getAssets(pack.assetIds);
-  assert.equal(assets.length, 40);
-  assert.equal(assets.filter((a) => a.eligibleForConditioning).length, 5);
-  assert.equal(pack.anchorIds.length, 5);
-  assert.equal(selectStyleAnchors(pack, assets, 'financial coins').length, 3);
-  assert.ok(
-    selectStyleAnchors(pack, assets, 'financial coins')[0].tags.includes(
-      'coins',
-    ),
+  assert.equal(assets.length, 3);
+  assert.equal(
+    repo.assets.size,
+    3,
+    'the other 37 examples must never be uploaded',
   );
+  assert.equal(assets.filter((a) => a.eligibleForConditioning).length, 3);
+  assert.equal(pack.anchorIds.length, 3);
+  assert.equal(selectStyleAnchors(pack, assets).length, 3);
+  const selected = selectStyleAnchors(pack, assets);
+  assert.deepEqual(
+    selected.map((a) => a.id),
+    pack.anchorIds,
+  );
+  assert.deepEqual(
+    selectStyleAnchors(pack, [...assets].reverse()).map((a) => a.id),
+    pack.anchorIds,
+  );
+  assert.ok(selected[0].name.includes('aa9fc889'));
+  assert.ok(selected[1].name.includes('d12fdb3d'));
+  assert.ok(selected[2].name.includes('bdc42d57'));
   const again = await installSeedStyle(repo);
   assert.equal(again.id, pack.id);
   assert.equal(repo.styles.size, 1);
+  // Postgres JSONB may return object keys in a different order.
+  const reordered = {
+    avoid: pack.profile.avoid,
+    composition: pack.profile.composition,
+    texture: pack.profile.texture,
+    palette: pack.profile.palette,
+    description: pack.profile.description,
+  };
+  repo.styles.set(pack.id, { ...pack, profile: reordered, active: false });
+  assert.equal((await installSeedStyle(repo)).active, true);
+});
+
+test('missing default style stops both planning and automatic rendering before paid calls', async () => {
+  const f = await fixture({ unconfigured: true });
+  await assert.rejects(
+    f.service.preparePlan(f.draft.studioDraftId, f.storyId),
+    { code: 'style_required' },
+  );
+  await assert.rejects(
+    f.service.generateMissing({
+      draftId: f.draft.studioDraftId,
+      storyId: f.storyId,
+    }),
+    { code: 'style_required' },
+  );
+  assert.equal(f.searches(), 0);
+  assert.equal(f.plannerRefs.length, 0);
+  assert.equal(f.renders(), 0);
+  const status = await capabilities(f.repo, {
+    NODE_ENV: 'test',
+    OPENROUTER_API_KEY: 'offline',
+  });
+  assert.equal(status.style.configured, false);
+});
+
+test('only the three reviewed style files and two news images reach both native rendering APIs', async () => {
+  const f = await fixture({ withStyle: true });
+  const news = await Promise.all([asset(f, 'news'), asset(f, 'news')]);
+  await f.service.saveWork(f.draft.studioDraftId, f.storyId, {
+    revision: f.work.revision,
+    references: news.map((a) => ({
+      assetId: a.id,
+      role: 'news',
+      note: 'Product appearance only',
+    })),
+  });
+  const work = await f.service.preparePlan(f.draft.studioDraftId, f.storyId);
+  const { refs, style } = await f.service.references(
+    await f.service.context(f.draft.studioDraftId, f.storyId),
+  );
+  assert.deepEqual(
+    refs.map((ref) => ref.role),
+    ['style', 'style', 'style', 'news', 'news'],
+  );
+  assert.deepEqual(
+    refs.slice(0, 3).map((ref) => ref.id),
+    style!.anchorIds,
+  );
+  assert.deepEqual(
+    f.plannerRefs[0].map((ref) => ref.id),
+    refs.map((ref) => ref.id),
+  );
+  const prompt = buildRenderPrompt(work.plan!, style, manifest(refs));
+  assert.match(prompt, /VISUAL AUTHORITY/);
+  assert.match(prompt, /NEWS references supply factual subjects only/);
+  assert.match(prompt, /print collage/);
+  const nano = JSON.parse(
+    buildImageRequest('nano-pro-2k', prompt, refs, 'offline').init
+      .body as string,
+  );
+  assert.equal(nano.input_references.length, 5);
+  assert.ok(
+    nano.input_references.every((ref: { image_url: { url: string } }) =>
+      ref.image_url.url.startsWith('data:image/'),
+    ),
+  );
+  const gpt = buildImageRequest('gpt-image-2-high', prompt, refs, 'offline')
+    .init.body as FormData;
+  const inputs = gpt.getAll('image[]') as File[];
+  assert.equal(inputs.length, 5);
+  for (let i = 0; i < inputs.length; i++)
+    assert.deepEqual(Buffer.from(await inputs[i].arrayBuffer()), refs[i].bytes);
+});
+
+test('old machine plans are regenerated after the system prompt changes without deleting history', async () => {
+  const f = await fixture();
+  const work = await f.service.preparePlan(f.draft.studioDraftId, f.storyId);
+  await f.repo.saveWorkspace(
+    {
+      ...work,
+      plan: {
+        ...work.plan!,
+        systemVersion: 'old-system',
+        renderPrompt: 'Old floating glass sculpture',
+      },
+    },
+    work.revision,
+  );
+  const run = await f.service.generate({
+    draftId: f.draft.studioDraftId,
+    storyId: f.storyId,
+    requestId: crypto.randomUUID(),
+  });
+  assert.equal(run.plan?.systemVersion, IMAGE_PROMPT_VERSION);
+  assert.equal(f.plannerRefs.length, 2);
+  assert.doesNotMatch(run.prompt, /Old floating glass sculpture/);
+  assert.equal(f.repo.runs.size, 1);
+});
+
+test('automatic reference selection rejects sign-in and brand-gallery results before downloading', async () => {
+  const f = await fixture();
+  const downloaded: string[] = [];
+  const names = [
+    'Sign in - Claude',
+    'Home \\ Anthropic',
+    'Gemini New Logo Revealed',
+    'Brand Identity Design',
+    'A product in use',
+  ];
+  const candidates = names.map((title, i) => ({
+    title,
+    url: `https://example.com/${i}.png`,
+    thumbnail: '',
+    source: '',
+    sourcePageUrl: null,
+  }));
+  const result = await importNewsReferences(
+    candidates,
+    async (candidate) => {
+      downloaded.push(candidate.title);
+      return asset(f, 'news');
+    },
+    Date.now() + 5000,
+  );
+  assert.deepEqual(downloaded, ['A product in use']);
+  assert.equal(result.selected.length, 1);
+  assert.equal(result.rejected.length, 4);
+});
+
+test('the visual check receives the independent style target and does not grade a missing style', async () => {
+  const f = await fixture({ withStyle: true });
+  const work = await f.service.preparePlan(f.draft.studioDraftId, f.storyId);
+  const { refs, style } = await f.service.references(
+    await f.service.context(f.draft.studioDraftId, f.storyId),
+  );
+  assert.equal(
+    (await inspectImage(f.pixels, work.plan!, refs, null)).status,
+    'unavailable',
+  );
+  const previousFetch = globalThis.fetch;
+  const previousKey = process.env.OPENROUTER_API_KEY;
+  let submitted = '';
+  process.env.OPENROUTER_API_KEY = 'offline-test';
+  globalThis.fetch = async (_url, init) => {
+    submitted = String(init?.body);
+    return new Response(
+      JSON.stringify({
+        choices: [
+          {
+            message: {
+              content: JSON.stringify({
+                scores: { style: 1, fidelity: 2, relevance: 3, readability: 4 },
+                findings: ['Wrong target style'],
+                suggestedEdit: 'Use print collage.',
+              }),
+            },
+          },
+        ],
+        usage: { cost: 0 },
+      }),
+      { status: 200 },
+    );
+  };
+  try {
+    await inspectImage(f.pixels, work.plan!, refs, style);
+    assert.match(submitted, /expectedStyle/);
+    assert.match(submitted, /generated plan is not an independent standard/);
+    assert.match(PLANNER_SYSTEM, /must not provide the overall palette/);
+  } finally {
+    globalThis.fetch = previousFetch;
+    if (previousKey === undefined) delete process.env.OPENROUTER_API_KEY;
+    else process.env.OPENROUTER_API_KEY = previousKey;
+  }
 });
 
 test('refinement sends the original to both the planner and renderer and retains the first output', async () => {

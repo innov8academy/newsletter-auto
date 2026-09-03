@@ -78,9 +78,21 @@ export default function StudioPromptPanel({
           Visual style
           <select
             className={`${fieldClass} mt-2`}
-            value={work.stylePackId || ''}
-            onChange={(e) => edit({ stylePackId: e.target.value || null })}
+            value={
+              work.stylePackId || (work.styleDisabled ? '' : 'unconfigured')
+            }
+            onChange={(e) =>
+              edit({
+                stylePackId: e.target.value || null,
+                styleDisabled: !e.target.value,
+              })
+            }
           >
+            {!work.stylePackId && !work.styleDisabled && (
+              <option value="unconfigured" disabled>
+                Style not configured
+              </option>
+            )}
             <option value="">None — no style conditioning</option>
             {styles.map((style) => (
               <option key={style.id} value={style.id}>
@@ -102,16 +114,15 @@ export default function StudioPromptPanel({
       {work.stylePackId && (
         <div className="mb-4">
           <p className="mb-2 text-xs text-white/45">
-            Style candidates · up to three are selected for this scene
+            Selected style references · sent in this order
           </p>
           <div className="grid grid-cols-3 gap-2">
-            {styleAssets
-              .filter((asset) =>
-                styles
-                  .find((p) => p.id === work.stylePackId)
-                  ?.anchorIds.includes(asset.id),
-              )
-              .slice(0, 5)
+            {(styles.find((p) => p.id === work.stylePackId)?.anchorIds || [])
+              .flatMap((id) => {
+                const asset = styleAssets.find((item) => item.id === id);
+                return asset ? [asset] : [];
+              })
+              .slice(0, 3)
               .map((asset) => (
                 <AssetPreview
                   key={asset.id}

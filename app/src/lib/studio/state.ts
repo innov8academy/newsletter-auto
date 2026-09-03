@@ -118,6 +118,7 @@ export function emptyWorkspace(
     revision: 1,
     direction: '',
     stylePackId,
+    styleDisabled: false,
     references: [],
     plan: null,
     manualPrompt: null,
@@ -151,6 +152,7 @@ export function inputSignature(
     },
     direction: work.direction,
     stylePackId: work.stylePackId,
+    styleDisabled: work.styleDisabled === true,
     references: work.references.map((ref) => ({
       assetId: ref.assetId,
       role: ref.role,

@@ -17,6 +17,7 @@ import {
   planImage,
 } from './prompts';
 import { renderImage } from './providers';
+import { IMAGE_PROMPT_VERSION, selectStyleAnchors } from './editorial-style';
 import { findNewsReferences, importNewsReferences } from './search';
 import {
   downloadPublicImage,
@@ -30,7 +31,6 @@ import type {
   GenerationRun,
   ReferenceSelection,
   StudioAsset,
-  StylePack,
 } from './types';
 import type { NewsletterDraft } from '../draft-generator';
 
@@ -62,35 +62,6 @@ async function retrySave(action: () => Promise<void>) {
     }
   }
 }
-export function selectStyleAnchors(
-  pack: StylePack,
-  assets: StudioAsset[],
-  direction: string,
-): StudioAsset[] {
-  const words = direction.toLowerCase();
-  const seen = new Set<string>();
-  return pack.anchorIds
-    .map((id, order) => ({ asset: assets.find((a) => a.id === id), order }))
-    .filter((item): item is { asset: StudioAsset; order: number } =>
-      Boolean(
-        item.asset?.status === 'ready' && item.asset.eligibleForConditioning,
-      ),
-    )
-    .sort(
-      (a, b) =>
-        b.asset.tags.filter((tag) => words.includes(tag.toLowerCase())).length -
-          a.asset.tags.filter((tag) => words.includes(tag.toLowerCase()))
-            .length || a.order - b.order,
-    )
-    .map((item) => item.asset)
-    .filter((asset) => {
-      if (seen.has(asset.checksum)) return false;
-      seen.add(asset.checksum);
-      return true;
-    })
-    .slice(0, 3);
-}
-
 const defaultDependencies = {
   planImage,
   renderImage,
@@ -179,11 +150,20 @@ export class StudioService {
     if (patch.clear === true)
       return this.repo.saveWorkspace(clearWorkspace(work), work.revision);
     const next = { ...work };
+    if ('styleDisabled' in patch) {
+      if (typeof patch.styleDisabled !== 'boolean')
+        throw new StudioError(
+          'invalid_style',
+          'Choose a style or explicitly select None.',
+        );
+      next.styleDisabled = patch.styleDisabled;
+    }
     if ('direction' in patch)
       next.direction = string(patch.direction, 'Direction', 5000);
     if ('stylePackId' in patch) {
       next.stylePackId =
         patch.stylePackId === null ? null : uuid(patch.stylePackId);
+      if (next.stylePackId) next.styleDisabled = false;
       if (
         next.stylePackId &&
         !(await this.repo.listStyles()).some(
@@ -264,8 +244,14 @@ export class StudioService {
     context: Awaited<ReturnType<StudioService['context']>>,
     editSourceId?: string,
   ) {
-    const { story, work } = context;
+    const { work } = context;
     const { draftId, storyId } = work;
+    if (!work.stylePackId && work.styleDisabled !== true)
+      throw new StudioError(
+        'style_required',
+        'L8R style is not configured for this story. Activate the editorial style before generating, or explicitly select None in the advanced editor.',
+        409,
+      );
     const style = work.stylePackId
       ? (await this.repo.listStyles()).find(
           (pack) => pack.id === work.stylePackId,
@@ -291,15 +277,14 @@ export class StudioService {
           'style_reference_unavailable',
           'A style anchor is missing. Repair this style version before generating.',
         );
-      const selected = selectStyleAnchors(
-        style,
-        assets,
-        `${story.title} ${work.direction}`,
-      );
-      if (!selected.length)
+      const selected = selectStyleAnchors(style, assets);
+      if (
+        !selected.length ||
+        selected.length !== Math.min(3, style.anchorIds.length)
+      )
         throw new StudioError(
           'style_reference_unavailable',
-          'This style needs at least one high-resolution anchor.',
+          'Every selected style reference must be unique, ready and large enough for conditioning.',
         );
       for (const asset of selected)
         buffered.push({
@@ -368,7 +353,10 @@ export class StudioService {
     const context = await this.context(draftId, storyId);
     const { story, work } = context;
     const { refs, style } = await this.references(context);
-    const plan = await this.deps.planImage(story, work, style, refs);
+    const plan = {
+      ...(await this.deps.planImage(story, work, style, refs)),
+      systemVersion: IMAGE_PROMPT_VERSION,
+    };
     await this.repo.recordCost(draftId, storyId, 'plan', plan.cost);
     return this.repo.saveWorkspace(
       { ...work, plan, manualPrompt: null, manualApprovedSignature: null },
@@ -437,6 +425,8 @@ export class StudioService {
       story,
       direction: work.direction,
       stylePackId: work.stylePackId,
+      styleDisabled: work.styleDisabled === true,
+      systemVersion: IMAGE_PROMPT_VERSION,
       references: manifest(refs),
       manualPrompt: work.manualPrompt,
       editSourceId: input.editSourceId || null,
@@ -498,6 +488,9 @@ export class StudioService {
           search.images,
           (candidate) => this.importNews(draftId, candidate),
           requestStartedAt + 90_000,
+          /\b(?:logo|rebrand|branding|brand identity)\b/i.test(
+            `${story.title} ${work.direction}`,
+          ),
         );
         if (!selected.length)
           throw new StudioError(
@@ -524,6 +517,7 @@ export class StudioService {
       const needsPlan =
         operation === 'edit' ||
         !renderPlan ||
+        renderPlan.systemVersion !== IMAGE_PROMPT_VERSION ||
         renderPlan.inputSignature !== signature;
       if (needsPlan) {
         const direction = [
@@ -548,6 +542,7 @@ export class StudioService {
         );
         renderPlan = {
           ...renderPlan,
+          systemVersion: IMAGE_PROMPT_VERSION,
           inputSignature: signature,
           inputHash: hash(signature),
         };
@@ -661,6 +656,7 @@ export class StudioService {
             output.original,
             { ...renderPlan, renderPrompt: prompt },
             refs,
+            style,
           );
           if (run.quality.cost) {
             run.costs.push(run.quality.cost);

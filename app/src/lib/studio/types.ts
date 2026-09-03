@@ -84,6 +84,7 @@ export interface StylePack {
   createdAt: string;
 }
 export interface ImagePlan {
+  systemVersion?: string;
   storyThesis: string;
   entities: string[];
   scene: string;
@@ -110,6 +111,7 @@ export interface StoryWorkspace {
   revision: number;
   direction: string;
   stylePackId: string | null;
+  styleDisabled?: boolean;
   references: ReferenceSelection[];
   plan: ImagePlan | null;
   manualPrompt: string | null;

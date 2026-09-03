@@ -14,10 +14,27 @@ export async function importNewsReferences(
   candidates: SearchCandidate[],
   importer: (candidate: SearchCandidate) => Promise<StudioAsset>,
   deadline: number,
+  allowBrandReferences = false,
 ) {
   const selected: ReferenceSelection[] = [];
   const rejected: string[] = [];
-  for (const candidate of candidates.slice(0, 4)) {
+  const substantive = candidates.filter((candidate) => {
+    const title = candidate.title.trim();
+    const generic =
+      /^(?:sign[ -]?in|log[ -]?in)\b|^(?:home|homepage)\s*[\\|/–—-]/i.test(
+        title,
+      );
+    const branding =
+      /\b(?:logo|logotype|brand identity|brand guidelines|identity design)\b/i.test(
+        title,
+      );
+    if (generic || (branding && !allowBrandReferences)) {
+      rejected.push(title);
+      return false;
+    }
+    return true;
+  });
+  for (const candidate of substantive.slice(0, 4)) {
     if (selected.length === 2 || Date.now() > deadline) break;
     try {
       const asset = await importer(candidate);
@@ -119,7 +136,7 @@ export async function findNewsReferences(
   const queryPlan = await structuredCall<{ queries: string[] }>(
     {
       system:
-        'Create exactly two concise image-search queries for the supplied news story and creative direction. Focus on the real named person, product, company or place. Prefer official imagery. Preserve Unicode and proper names; use English aliases only when supported by the story. Return JSON only.',
+        'Create exactly two concise image-search queries for factual subjects in this story and creative direction: the actual person, product, hardware, product screenshot or real setting. Prefer useful official/news imagery. Avoid login pages, generic homepages, brand-guideline galleries and logo-only results unless the story is explicitly about a logo or rebrand. These references identify subjects, not the editorial palette or style. Preserve Unicode and proper names; use English aliases only when supported by the story. Return JSON only.',
       schemaName: 'l8r_image_queries',
       schema: {
         type: 'object',
