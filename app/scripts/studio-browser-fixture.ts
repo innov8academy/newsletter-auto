@@ -131,6 +131,11 @@ const server = createServer(async (req, res) => {
           json(res, { error: 'Not found' }, 404);
           return;
         }
+        if (url.searchParams.has('download')) {
+          const filename = (url.searchParams.get('download') || 'image.jpg')
+            .replace(/[^a-zA-Z0-9._-]/g, '_');
+          res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+        }
         res.writeHead(200, {
           'Content-Type': key.endsWith('.jpg') ? 'image/jpeg' : 'image/png',
         });

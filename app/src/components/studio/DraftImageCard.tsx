@@ -3,13 +3,18 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useDraftImages } from './DraftImagesProvider';
 import AssetPreview from './AssetPreview';
-import { buttonClass, fieldClass } from './client-api';
+import { buttonClass, downloadStudioAsset, fieldClass } from './client-api';
 
 export function DraftImageCard({ sourceId }: { sourceId: string }) {
   const images = useDraftImages();
   const [editing, setEditing] = useState(false);
   const [instruction, setInstruction] = useState('');
   const [dismissed, setDismissed] = useState<string | null>(null);
+  const [downloading, setDownloading] = useState(false);
+  const [downloadError, setDownloadError] = useState<{
+    assetId: string;
+    message: string;
+  } | null>(null);
   const story = images.draft?.stories.find(
     (item) => item.sourceStoryId === sourceId,
   );
@@ -59,6 +64,24 @@ export function DraftImageCard({ sourceId }: { sourceId: string }) {
     )
       return;
     images.generate(story!.studioStoryId, Boolean(latest));
+  }
+  async function download() {
+    if (!asset || asset.status !== 'ready' || downloading) return;
+    setDownloading(true);
+    setDownloadError(null);
+    try {
+      await downloadStudioAsset(asset.id);
+    } catch (error) {
+      setDownloadError({
+        assetId: asset.id,
+        message:
+          error instanceof Error
+            ? error.message
+            : 'Could not download the image. Please try again.',
+      });
+    } finally {
+      setDownloading(false);
+    }
   }
   return (
     <section
@@ -131,14 +154,31 @@ export function DraftImageCard({ sourceId }: { sourceId: string }) {
               : 'Generate image'}
         </button>
       )}
-      {selected && !editing && (
+      <div className="mt-3 flex flex-wrap gap-2">
         <button
-          className={`${buttonClass} mt-3`}
-          disabled={pending}
-          onClick={() => setEditing(true)}
+          type="button"
+          className={buttonClass}
+          disabled={asset?.status !== 'ready' || downloading}
+          aria-busy={downloading}
+          onClick={() => void download()}
         >
-          Change image
+          {downloading ? 'Downloading…' : 'Download'}
         </button>
+        {selected && !editing && (
+          <button
+            type="button"
+            className={buttonClass}
+            disabled={pending}
+            onClick={() => setEditing(true)}
+          >
+            Change image
+          </button>
+        )}
+      </div>
+      {downloadError && downloadError.assetId === asset?.id && (
+        <p role="alert" className="mt-2 break-words text-sm text-coral-300">
+          {downloadError.message}
+        </p>
       )}
       {editing && selected && (
         <form

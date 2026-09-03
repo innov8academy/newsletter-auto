@@ -35,6 +35,24 @@ export async function studioApi<T>(
     );
   return data as T;
 }
+export async function downloadStudioAsset(assetId: string): Promise<void> {
+  // Request a fresh attachment URL; the displayed preview may have expired.
+  const { asset } = await studioApi<{ asset: StudioAsset }>(
+    `assets/${encodeURIComponent(assetId)}?download=1`,
+  );
+  let url: URL;
+  try {
+    url = new URL(asset?.previewUrl || '');
+    if (!['https:', 'http:'].includes(url.protocol)) throw new Error();
+  } catch {
+    throw new Error('The image download link is unavailable. Please try again.');
+  }
+  const anchor = document.createElement('a');
+  anchor.href = url.href;
+  anchor.download = `${asset.id}.${asset.mimeType === 'image/png' ? 'png' : 'jpg'}`;
+  anchor.referrerPolicy = 'no-referrer';
+  anchor.click();
+}
 export async function uploadReference(
   file: File,
   role: 'subject' | 'style',
