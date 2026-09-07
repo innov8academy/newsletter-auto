@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "test:studio": "node --conditions=react-server --import tsx --test tests/studio-*.test.ts",
+    "test:news": "node --import tsx --test tests/news-*.test.ts",
     "studio:preflight": "node --conditions=react-server --import tsx scripts/studio-preflight.ts"
   },
   "dependencies": {

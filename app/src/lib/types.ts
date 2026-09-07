@@ -28,6 +28,7 @@ export interface CuratedStory {
   publishedAt: string;
   crossSourceCount: number;
   boosts: string[]; // Reasons for score boosts
+  dateBasis?: 'source' | 'event' | 'linked-article';
 }
 
 export interface NewsletterConfig {
@@ -43,6 +44,8 @@ export interface RSSFeed {
   url: string;
   category: string;
   tier?: number;
+  format?: 'rss' | 'anthropic-news';
+  fallbackUrl?: string;
 }
 
 export interface ResearchReport {
@@ -90,6 +93,7 @@ export interface FeedHealth {
   itemCount: number;
   latencyMs: number;
   error?: string;
+  fallbackUsed?: boolean;
 }
 
 // Curation progress for UI

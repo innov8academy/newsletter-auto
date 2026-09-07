@@ -3,7 +3,9 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
-import { CuratedStory, ResearchReport } from '@/lib/types';
+import { CuratedStory, ResearchReport, FeedHealth } from '@/lib/types';
+import { currentNews, isFreshNews } from '@/lib/news-freshness';
+import { newsSimilarity, canonicalNewsUrl } from '@/lib/news-identity';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -106,7 +108,7 @@ export default function Home() {
 
     if (savedKey) setApiKey(savedKey);
     if (savedStories.length > 0) {
-      setStories(savedStories);
+      setStories(currentNews(savedStories, savedIds));
       setHasSearched(true);
     }
     if (savedIds.length > 0) setSelectedIds(new Set(savedIds));
@@ -131,12 +133,12 @@ export default function Home() {
         const hasSharedState = shared.curatedStories.length > 0 || shared.selectedIds.length > 0;
         if (!hasSharedState) return;
 
-        setStories(shared.curatedStories);
+        setStories(currentNews(shared.curatedStories, shared.selectedIds));
         setSelectedIds(new Set(shared.selectedIds));
         setHasSearched(shared.curatedStories.length > 0);
         if (shared.updatedAt) setLastUpdated(new Date(shared.updatedAt));
 
-        saveCuratedStories(shared.curatedStories);
+        saveCuratedStories(currentNews(shared.curatedStories, shared.selectedIds));
         saveSelectedIds(shared.selectedIds);
       })
       .finally(() => setSharedSelectionLoaded(true));
@@ -400,15 +402,18 @@ export default function Home() {
           const existingHeadlines = stories.map(s => s.headline.toLowerCase());
           const trulyNew = newStories.filter((s: CuratedStory) => {
             const normalized = s.headline.toLowerCase();
+            const url = canonicalNewsUrl(s.originalUrl);
+            if (url && stories.some(existing => canonicalNewsUrl(existing.originalUrl) === url)) return false;
             return !existingHeadlines.some(h => {
               const similarity = calculateHeadlineSimilarity(normalized, h);
               return similarity > 0.6;
             });
           });
 
-          setStories(prev => [...prev, ...trulyNew]);
+          setStories(prev => currentNews([...prev, ...trulyNew], Array.from(selectedIds)));
           setProgress(`Found ${trulyNew.length} new stories`);
         } else {
+          setStories(prev => currentNews(prev, Array.from(selectedIds)));
           setProgress('No new stories found');
         }
 
@@ -425,12 +430,7 @@ export default function Home() {
 
   // Simple headline similarity check
   function calculateHeadlineSimilarity(a: string, b: string): number {
-    const wordsA = new Set(a.split(/\s+/).filter(w => w.length > 3));
-    const wordsB = new Set(b.split(/\s+/).filter(w => w.length > 3));
-    if (wordsA.size === 0 || wordsB.size === 0) return 0;
-    const intersection = [...wordsA].filter(w => wordsB.has(w)).length;
-    const union = new Set([...wordsA, ...wordsB]).size;
-    return intersection / union;
+    return newsSimilarity(a, b);
   }
 
   const selectedItems = stories.filter(s => selectedIds.has(s.id));
@@ -786,9 +786,13 @@ export default function Home() {
                       (() => {
                         const failed = curationStats.feedHealth.filter((f: any) => f.status === 'failed');
                         const empty = curationStats.feedHealth.filter((f: any) => f.status === 'empty');
-                        const hasIssues = failed.length > 0 || empty.length > 0;
+                        const fallback = curationStats.feedHealth.filter((f: FeedHealth) => f.fallbackUsed);
+                        const hasIssues = failed.length > 0 || empty.length > 0 || fallback.length > 0;
                         return hasIssues ? (
                           <div className="space-y-2">
+                            {fallback.map((f: FeedHealth, i: number) => (
+                              <div key={`fallback-${i}`} className="text-xs text-amber-300">{f.name}: {f.error}</div>
+                            ))}
                             {failed.map((f: any, i: number) => (
                               <div key={`f-${i}`} className="flex items-center gap-2 text-sm">
                                 <span className="w-2 h-2 rounded-full bg-red-500 shrink-0" />
@@ -800,7 +804,7 @@ export default function Home() {
                               <div key={`e-${i}`} className="flex items-center gap-2 text-sm">
                                 <span className="w-2 h-2 rounded-full bg-yellow-500 shrink-0" />
                                 <span className="text-yellow-400">{f.name}</span>
-                                <span className="text-white/30 text-xs ml-auto">Empty (0 items)</span>
+                                <span className="text-white/30 text-xs ml-auto">No recent dated items</span>
                               </div>
                             ))}
                           </div>
@@ -997,6 +1001,10 @@ export default function Home() {
                         {stories.length} items
                       </span>
                     </h2>
+                    <p className="text-xs text-white/40 mt-2">News from the last 24 hours, extending to 36 hours when quiet. Older selected stories stay in your queue.</p>
+                    {curationStats?.feedHealth?.some((feed: { status: string; fallbackUsed?: boolean }) => feed.status === 'failed' || feed.fallbackUsed) && (
+                      <p className="text-xs text-amber-300 mt-2">Some sources are unavailable or using an index fallback. See Source Stats for coverage.</p>
+                    )}
                   </div>
                   <div className="flex gap-4 text-xs text-white/40">
                     <span className="flex items-center gap-1.5 cursor-help hover:text-white transition-colors">
@@ -1064,12 +1072,12 @@ export default function Home() {
                                 </div>
                               )}
 
-                              {story.boosts.includes('+1 (recent)') && (
-                                <div className="flex items-center gap-1.5 text-xs text-teal-400/80">
+                              <div className="flex items-center gap-1.5 text-xs text-white/50">
                                   <Clock className="w-3 h-3" />
-                                  Fresh
-                                </div>
-                              )}
+                                  {Number.isFinite(Date.parse(story.publishedAt)) ? new Date(story.publishedAt).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'Date unknown'}
+                                  {story.dateBasis === 'source' ? ' · Source date' : story.dateBasis === 'linked-article' ? ' · Linked article date' : story.dateBasis === 'event' ? ' · Event date' : ' · Saved date'}
+                                  {!isFreshNews(story.publishedAt) && ' · Older selected story'}
+                              </div>
                             </div>
 
                             {selectedIds.has(story.id) && (

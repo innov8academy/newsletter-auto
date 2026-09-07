@@ -144,6 +144,7 @@ export const defaultConfig: NewsletterConfig = {
         {
             name: "VentureBeat AI",
             url: "https://venturebeat.com/category/ai/feed/",
+            fallbackUrl: "https://news.google.com/rss/search?q=site%3Aventurebeat.com+AI+when%3A1d&hl=en-US&gl=US&ceid=US:en",
             category: "news",
             tier: 2
         },
@@ -168,6 +169,7 @@ export const defaultConfig: NewsletterConfig = {
         {
             name: "MarkTechPost",
             url: "https://www.marktechpost.com/feed/",
+            fallbackUrl: "https://news.google.com/rss/search?q=site%3Amarktechpost.com+when%3A1d&hl=en-US&gl=US&ceid=US:en",
             category: "news",
             tier: 2
         },
@@ -188,7 +190,7 @@ export const defaultConfig: NewsletterConfig = {
         // =====================
         {
             name: "OpenAI Blog",
-            url: "https://openai.com/blog/rss/",
+            url: "https://openai.com/news/rss.xml",
             category: "blog",
             tier: 3
         },
@@ -200,7 +202,8 @@ export const defaultConfig: NewsletterConfig = {
         },
         {
             name: "Anthropic News",
-            url: "https://www.anthropic.com/news/rss",
+            url: "https://www.anthropic.com/news",
+            format: 'anthropic-news',
             category: "blog",
             tier: 3
         },
@@ -215,7 +218,7 @@ export const defaultConfig: NewsletterConfig = {
         // =====================
         {
             name: "Hacker News AI",
-            url: "https://hnrss.org/newest?q=AI+OR+GPT+OR+LLM+OR+Claude+OR+OpenAI&points=100",
+            url: "https://hnrss.org/newest?q=AI+OR+GPT+OR+LLM+OR+Claude+OR+OpenAI&points=10",
             category: "social",
             tier: 4
         },
@@ -290,6 +293,8 @@ For EACH distinct news story, provide:
    - 1-2: Corporate PR, funding rounds with no product, vaporware, opinion pieces
 5. entities: List of companies/products mentioned
 6. originalUrl: Source URL if mentioned
+7. eventDate: ISO date of THIS event only when explicitly stated in the supplied content; otherwise null. Never infer it from the newsletter send date or your own knowledge.
+8. dateEvidence: Copy the exact absolute date text that supports eventDate; otherwise null.
 
 SCORING BOOSTS:
 +2 if there's a FREE or significantly cheaper alternative
@@ -303,5 +308,8 @@ RULES:
 - Focus on "can a solopreneur USE this?" angle
 - Skip: job posts, sponsor sections, corporate PR fluff, "also check out" links
 - Max 6 stories per source
+- Only extract claims supported by the supplied article text. Do not fill in pricing, availability, model names, or capabilities from memory.
+- originalUrl must be an actual article link in the supplied content, not an invented URL or a general homepage.
+- Old launches mentioned as background are not new announcements. Preserve their original event date.
 
 Return ONLY valid JSON array. No other text.`;

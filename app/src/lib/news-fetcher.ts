@@ -1,5 +1,7 @@
 import { NewsItem, RSSFeed, FeedHealth } from './types';
 import { XMLParser } from 'fast-xml-parser';
+import * as cheerio from 'cheerio';
+import { isFreshNews, normalizeNewsDate } from './news-freshness';
 
 const parser = new XMLParser({
     ignoreAttributes: false,
@@ -16,127 +18,6 @@ function generateId(title: string, url: string): string {
         hash = hash & hash;
     }
     return Math.abs(hash).toString(36);
-}
-
-// Check if a URL is a Reddit feed
-function isRedditFeed(url: string): boolean {
-    return url.includes('reddit.com') || url.includes('/r/');
-}
-
-// Fetch Reddit posts via direct RSS first, fall back to Jina
-async function fetchRedditPosts(feed: RSSFeed): Promise<NewsItem[]> {
-    // Try direct RSS first (works server-side with proper User-Agent)
-    try {
-        console.log(`[Reddit RSS] Trying direct RSS for ${feed.name}`);
-        const response = await fetch(feed.url, {
-            headers: {
-                'User-Agent': 'Mozilla/5.0 (compatible; NewsBot/1.0; +https://innov8ai.com)',
-            },
-        });
-
-        if (response.ok) {
-            const text = await response.text();
-            // Verify we got XML, not an HTML block page
-            if (!text.includes('<!DOCTYPE html>') && !text.includes('<html') && (text.includes('<feed') || text.includes('<rss'))) {
-                const parsed = parser.parse(text);
-                const entries = parsed.feed?.entry || parsed.rss?.channel?.item || [];
-                const entriesArray = Array.isArray(entries) ? entries : [entries];
-
-                const posts: NewsItem[] = entriesArray.slice(0, 10).map((entry: any) => {
-                    const title = entry.title?.['#text'] || entry.title || 'Untitled';
-                    const url = entry.link?.['@_href'] || entry.link || '';
-                    const pubDate = entry.published || entry.updated || entry.pubDate || new Date().toISOString();
-                    const content = entry.content?.['#text'] || entry.content || entry.description || '';
-
-                    return {
-                        id: generateId(title, url),
-                        title: cleanText(title),
-                        url: typeof url === 'string' ? url : '',
-                        source: feed.url,
-                        sourceName: feed.name,
-                        publishedAt: new Date(pubDate).toISOString(),
-                        summary: cleanText(content).substring(0, 500),
-                        imageUrl: '',
-                        author: entry.author?.name || '',
-                        content: cleanText(content),
-                    };
-                });
-
-                console.log(`[Reddit RSS] Got ${posts.length} posts from ${feed.name} (direct RSS)`);
-                return posts;
-            }
-        }
-        console.log(`[Reddit RSS] Direct RSS failed/blocked for ${feed.name}, trying Jina fallback`);
-    } catch (e) {
-        console.log(`[Reddit RSS] Direct RSS error for ${feed.name}, trying Jina fallback`);
-    }
-
-    // Fallback: Jina scraper
-    try {
-        const redditUrl = feed.url.replace('/.rss', '').replace('.rss', '').replace(/\?.*$/, '');
-        const jinaResponse = await fetch(`https://r.jina.ai/${redditUrl}`, {
-            headers: { 'Accept': 'text/plain' },
-        });
-
-        if (!jinaResponse.ok) {
-            console.error(`[Reddit Jina] Failed for ${feed.name}: ${jinaResponse.status}`);
-            return [];
-        }
-
-        const markdown = await jinaResponse.text();
-        const posts: NewsItem[] = [];
-        const lines = markdown.split('\n');
-
-        let currentTitle = '';
-        let currentUrl = '';
-        let currentContent = '';
-
-        for (const line of lines) {
-            const linkMatch = line.match(/^\[(.+?)\]\((https:\/\/(?:www\.)?reddit\.com\/r\/[^\)]+)\)/);
-            if (linkMatch) {
-                if (currentTitle && currentUrl) {
-                    posts.push({
-                        id: generateId(currentTitle, currentUrl),
-                        title: currentTitle,
-                        url: currentUrl,
-                        source: feed.url,
-                        sourceName: feed.name,
-                        publishedAt: new Date().toISOString(), // Jina doesn't provide timestamps
-                        summary: cleanText(currentContent).substring(0, 500),
-                        imageUrl: '',
-                        author: '',
-                        content: cleanText(currentContent),
-                    });
-                }
-                currentTitle = linkMatch[1];
-                currentUrl = linkMatch[2];
-                currentContent = '';
-            } else if (currentTitle && line.trim()) {
-                currentContent += ' ' + line;
-            }
-        }
-
-        if (currentTitle && currentUrl) {
-            posts.push({
-                id: generateId(currentTitle, currentUrl),
-                title: currentTitle,
-                url: currentUrl,
-                source: feed.url,
-                sourceName: feed.name,
-                publishedAt: new Date().toISOString(),
-                summary: cleanText(currentContent).substring(0, 500),
-                imageUrl: '',
-                author: '',
-                content: cleanText(currentContent),
-            });
-        }
-
-        console.log(`[Reddit Jina] Got ${posts.length} posts from ${feed.name} (Jina fallback)`);
-        return posts.slice(0, 10);
-    } catch (error) {
-        console.error(`[Reddit] All methods failed for ${feed.name}:`, error);
-        return [];
-    }
 }
 
 // Parse RSS feed and extract news items
@@ -163,47 +44,65 @@ function isGoogleNewsFeed(url: string): boolean {
     return url.includes('news.google.com');
 }
 
+async function fetchAnthropicNews(feed: RSSFeed): Promise<NewsItem[]> {
+    const response = await fetch(feed.url, { signal: AbortSignal.timeout(10000), cache: 'no-store' });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const $ = cheerio.load(await response.text());
+    const items: NewsItem[] = [];
+    const seen = new Set<string>();
+    $('a[href]').each((_, element) => {
+        const anchor = $(element);
+        const time = anchor.find('time').first();
+        const publishedAt = normalizeNewsDate(time.attr('datetime') || time.text());
+        if (!publishedAt) return;
+        const url = new URL(anchor.attr('href')!, feed.url).href;
+        if (new URL(url).hostname !== 'www.anthropic.com' || seen.has(url)) return;
+        const title = anchor.find('h2,h3,h4,[class*="title"]').first().text().trim();
+        if (!title) return;
+        seen.add(url);
+        items.push({ id: generateId(title, url), title, url, source: feed.url,
+            sourceName: feed.name, publishedAt, summary: anchor.find('p').text().trim() });
+    });
+    if (!items.length) throw new Error('No dated news entries found; source markup may have changed');
+    return items.filter(item => isFreshNews(item.publishedAt))
+        .sort((a, b) => Date.parse(b.publishedAt) - Date.parse(a.publishedAt)).slice(0, 20);
+}
+
 async function parseRSSFeed(feed: RSSFeed): Promise<NewsItem[]> {
-    // Reddit feeds: try direct RSS first, fall back to Jina
-    if (isRedditFeed(feed.url)) {
-        return fetchRedditPosts(feed);
-    }
+    if (feed.format === 'anthropic-news') return fetchAnthropicNews(feed);
 
     try {
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 10000); // 10s timeout per feed
+
         const response = await fetch(feed.url, {
             headers: {
                 'User-Agent': 'Mozilla/5.0 (compatible; NewsBot/1.0)',
             },
-            signal: controller.signal,
-            next: { revalidate: 300 } // Cache for 5 minutes
+            signal: AbortSignal.timeout(10000),
+            cache: 'no-store'
         });
-        clearTimeout(timeout);
 
         if (!response.ok) {
-            console.error(`Failed to fetch ${feed.name}: ${response.status}`);
-            return [];
+            throw new Error(`HTTP ${response.status}`);
         }
 
         const text = await response.text();
 
-        // Check if response is actually XML (not HTML error page)
-        if (text.includes('<!DOCTYPE html>') || text.includes('<html') || text.includes("You've been blocked")) {
-            console.error(`[RSS Blocked] ${feed.name} returned HTML instead of RSS`);
-            return [];
-        }
-
         const parsed = parser.parse(text);
+        if (!(parsed.rss && 'channel' in parsed.rss) && !('feed' in parsed)) {
+            throw new Error('Source returned non-feed content (blocked or invalid XML)');
+        }
 
         // Handle both RSS 2.0 and Atom formats
         const items = parsed.rss?.channel?.item || parsed.feed?.entry || [];
         const itemsArray = Array.isArray(items) ? items : [items];
 
-        const rawItems = itemsArray.slice(0, 10).map((item: any) => {
+        const rawItems = itemsArray.map((item: any) => {
             const title = item.title?.['#text'] || item.title || 'Untitled';
-            const url = item.link?.['@_href'] || item.link || '';
-            const pubDate = item.pubDate || item.published || item.updated || new Date().toISOString();
+            const links = (Array.isArray(item.link) ? item.link : [item.link]) as Array<string | Record<string, string>>;
+            const link = links.find(l => typeof l !== 'string' && l?.['@_rel'] === 'alternate') ||
+                links.find(l => typeof l === 'string' || !l?.['@_rel']) || links[0];
+            const url = typeof link === 'string' ? link : link?.['@_href'] || link?.['#text'] || '';
+            const pubDate = item.pubDate || item.published || item.updated || '';
 
             // Extract image from content or media
             let imageUrl = '';
@@ -217,6 +116,7 @@ async function parseRSSFeed(feed: RSSFeed): Promise<NewsItem[]> {
             const contentEncoded = item['content:encoded'] || '';
             const summary = item.description?.['#text'] ||
                 item.description ||
+                item.content?.['#text'] || item.content ||
                 item.summary?.['#text'] ||
                 item.summary ||
                 '';
@@ -230,7 +130,7 @@ async function parseRSSFeed(feed: RSSFeed): Promise<NewsItem[]> {
                 url: typeof url === 'string' ? url : url?.['#text'] || '',
                 source: feed.url,
                 sourceName: feed.name,
-                publishedAt: new Date(pubDate).toISOString(),
+                publishedAt: normalizeNewsDate(pubDate),
                 summary: cleanText(bestContent).substring(0, 500),
                 imageUrl,
                 author: item.author || item['dc:creator'] || '',
@@ -238,10 +138,14 @@ async function parseRSSFeed(feed: RSSFeed): Promise<NewsItem[]> {
             };
         });
 
+        // Filter before the per-source cap; a malformed item must not lose the whole feed.
+        const eligibleItems = rawItems.filter(item => isFreshNews(item.publishedAt))
+            .sort((a, b) => Date.parse(b.publishedAt) - Date.parse(a.publishedAt)).slice(0, 20);
+
         // Resolve Google News redirect URLs to real article URLs (in parallel)
         if (isGoogleNewsFeed(feed.url)) {
             const resolved = await Promise.allSettled(
-                rawItems.map(async (item) => {
+                eligibleItems.map(async (item) => {
                     const realUrl = await resolveGoogleNewsUrl(item.url);
                     if (realUrl !== item.url) {
                         console.log(`[Google News] Resolved: ${item.title.substring(0, 40)}... → ${new URL(realUrl).hostname}`);
@@ -254,17 +158,17 @@ async function parseRSSFeed(feed: RSSFeed): Promise<NewsItem[]> {
                 .map(r => (r as PromiseFulfilledResult<typeof rawItems[number]>).value);
         }
 
-        return rawItems;
+        return eligibleItems;
     } catch (error) {
-        console.error(`Error parsing ${feed.name}:`, error);
-        return [];
+        throw error;
     }
 }
 
 // Clean HTML tags and decode entities
 function cleanText(text: string): string {
-    if (!text) return '';
+    if (typeof text !== 'string' || !text) return '';
     return text
+        .replace(/<a\b[^>]*href=["'](https?:\/\/[^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi, '$2 ($1)')
         .replace(/<[^>]*>/g, '')
         .replace(/&amp;/g, '&')
         .replace(/&lt;/g, '<')
@@ -333,6 +237,15 @@ export async function fetchAllNews(feeds: RSSFeed[]): Promise<{ items: NewsItem[
             });
             return items;
         } catch (error) {
+            if (feed.fallbackUrl) {
+                try {
+                    const items = await parseRSSFeed({ ...feed, url: feed.fallbackUrl, format: 'rss', fallbackUrl: undefined });
+                    feedHealth.push({ name: feed.name, status: items.length ? 'ok' : 'empty',
+                        itemCount: items.length, latencyMs: Date.now() - start, fallbackUsed: true,
+                        error: `Direct feed: ${error instanceof Error ? error.message : 'unavailable'}; using Google News index` });
+                    return items.map(item => ({ ...item, source: feed.url }));
+                } catch { /* Record the direct source failure below. */ }
+            }
             const latencyMs = Date.now() - start;
             feedHealth.push({
                 name: feed.name,
@@ -377,8 +290,7 @@ export async function fetchAllNews(feeds: RSSFeed[]): Promise<{ items: NewsItem[
     const filterByDate = (items: typeof deduplicated, cutoff: Date) =>
         items.filter(item => {
             const pubDate = new Date(item.publishedAt);
-            if (isNaN(pubDate.getTime())) return true;
-            if (pubDate > new Date()) return true;
+            if (!isFreshNews(item.publishedAt)) return false;
             return pubDate >= cutoff;
         });
 

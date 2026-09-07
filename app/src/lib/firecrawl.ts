@@ -1,8 +1,10 @@
 import * as cheerio from 'cheerio';
+import { normalizeNewsDate } from './news-freshness';
 
 interface ScrapeResult {
     content: string;
     method: 'fetch' | 'jina' | 'firecrawl';
+    publishedAt?: string;
 }
 
 /**
@@ -12,67 +14,76 @@ interface ScrapeResult {
  * 2. If text is too short (likely JS-blocked), use Jina.ai (Free, High quality).
  * 3. Firecrawl is reserved for future upgrade if needed (API key required).
  */
-export async function scrapeUrl(url: string): Promise<ScrapeResult> {
+export async function scrapeUrl(url: string, directFetch = true): Promise<ScrapeResult> {
     // Skip scraping for empty/invalid URLs
     if (!url || url.length < 10) return { content: '', method: 'fetch' };
 
-    try {
-        // Method 1: Basic Fetch (Fastest, Free)
-        // Works for: TechCrunch, VentureBeat, most blogs
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 8000); // 8s timeout
-        const response = await fetch(url, {
-            headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8'
-            },
-            signal: controller.signal,
-            next: { revalidate: 3600 } // Cache for 1 hour
-        });
-        clearTimeout(timeout);
+    if (directFetch) {
+        try {
+            // Method 1: Basic Fetch (Fastest, Free)
+            // Works for: TechCrunch, VentureBeat, most blogs
+            const controller = new AbortController();
+            const timeout = setTimeout(() => controller.abort(), 8000); // 8s timeout
+            const response = await fetch(url, {
+                headers: {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8'
+                },
+                signal: controller.signal,
+                next: { revalidate: 3600 } // Cache for 1 hour
+            });
+            clearTimeout(timeout);
 
-        if (response.ok) {
-            const html = await response.text();
-            const $ = cheerio.load(html);
+            if (response.ok) {
+                const html = await response.text();
+                const $ = cheerio.load(html);
+                const publishedAt = articlePublishedAt(html);
 
-            // Remove clutter
-            $('script, style, nav, footer, iframe, form').remove();
+                // Remove clutter
+                $('script, style, nav, footer, iframe, form').remove();
+                // Preserve outbound evidence links when converting newsletter HTML to text.
+                $('a[href]').each((_, element) => {
+                    const anchor = $(element);
+                    const href = anchor.attr('href') || '';
+                    if (/^https?:\/\//i.test(href)) anchor.append(` (${href})`);
+                });
 
-            // Try to find the "meat" of the article
-            // Common selectors for article body
-            const selectors = [
-                'article',
-                '[role="main"]',
-                '.post-content',
-                '.article-body',
-                '.entry-content',
-                'main'
-            ];
+                // Try to find the "meat" of the article
+                // Common selectors for article body
+                const selectors = [
+                    'article',
+                    '[role="main"]',
+                    '.post-content',
+                    '.article-body',
+                    '.entry-content',
+                    'main'
+                ];
 
-            let text = '';
-            for (const selector of selectors) {
-                const element = $(selector);
-                if (element.length > 0) {
-                    text = element.text();
-                    break;
+                let text = '';
+                for (const selector of selectors) {
+                    const element = $(selector);
+                    if (element.length > 0) {
+                        text = element.text();
+                        break;
+                    }
                 }
-            }
 
-            // Fallback to body if no selector matched
-            if (!text || text.length < 500) {
-                text = $('body').text();
-            }
+                // Fallback to body if no selector matched
+                if (!text || text.length < 500) {
+                    text = $('body').text();
+                }
 
-            const cleanText = cleanTextContent(text);
+                const cleanText = cleanTextContent(text);
 
-            // Validation: If text is substantial, we are good.
-            if (cleanText.length > 600) {
-                return { content: cleanText.substring(0, 15000), method: 'fetch' };
+                // Validation: If text is substantial, we are good.
+                if (cleanText.length > 600) {
+                    return { content: cleanText.substring(0, 15000), method: 'fetch', publishedAt };
+                }
+                // If text is short, it's likely a JS app or paywall -> Fallthrough to Jina
             }
-            // If text is short, it's likely a JS app or paywall -> Fallthrough to Jina
+        } catch (e) {
+            console.warn(`[Fast Fetch Failed] for ${url}:`, e);
         }
-    } catch (e) {
-        console.warn(`[Fast Fetch Failed] for ${url}:`, e);
     }
 
     // Method 2: Jina.ai (Free, Handles heavy JS/SPA)
@@ -93,7 +104,8 @@ export async function scrapeUrl(url: string): Promise<ScrapeResult> {
         if (jinaResponse.ok) {
             const text = await jinaResponse.text();
             // Jina returns Markdown
-            return { content: text.substring(0, 15000), method: 'jina' };
+            return { content: text.substring(0, 15000), method: 'jina',
+                publishedAt: normalizeNewsDate(text.match(/^Published Time:\s*(.+)$/m)?.[1]) };
         }
     } catch (e) {
         console.error(`[Jina Failed] for ${url}:`, e);
@@ -107,4 +119,26 @@ function cleanTextContent(text: string): string {
         .replace(/\s+/g, ' ') // Collins' rule: collapse whitespace
         .replace(/\n+/g, '\n')
         .trim();
+}
+
+// dateModified is deliberately excluded: editing an old article does not make it new.
+export function articlePublishedAt(html: string): string {
+    const $ = cheerio.load(html);
+    const meta = $('meta[property="article:published_time"],meta[name="datePublished"]').first().attr('content');
+    if (normalizeNewsDate(meta)) return normalizeNewsDate(meta);
+    let publishedAt = '';
+    const visit = (value: unknown): void => {
+        if (!value || typeof value !== 'object' || publishedAt) return;
+        if (Array.isArray(value)) { value.forEach(visit); return; }
+        const entry = value as Record<string, unknown>;
+        const types = Array.isArray(entry['@type']) ? entry['@type'] : [entry['@type']];
+        if (types.some(type => typeof type === 'string' && /^(NewsArticle|Article|BlogPosting|TechArticle)$/.test(type))) {
+            publishedAt = normalizeNewsDate(entry.datePublished);
+        }
+        if (!publishedAt) visit(entry['@graph']);
+    };
+    $('script[type="application/ld+json"]').each((_, element) => {
+        try { visit(JSON.parse($(element).text())); } catch { /* malformed metadata */ }
+    });
+    return publishedAt;
 }

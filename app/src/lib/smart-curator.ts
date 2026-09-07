@@ -1,8 +1,10 @@
-import { NewsItem, CuratedStory, CurationProgress, FeedHealth } from './types';
+import { NewsItem, CuratedStory, CurationProgress } from './types';
 import { defaultConfig, SCORING_CONFIG, SMART_CURATION_PROMPT } from './config';
-import { fetchAllNews, filterByDate } from './news-fetcher';
+import { fetchAllNews } from './news-fetcher';
 import { supabaseAdmin, isSupabaseConfigured } from './supabase';
 import { callGemini } from './gemini-client';
+import { isFreshNews, normalizeNewsDate, selectNewsCandidates } from './news-freshness';
+import { newsSimilarity, canonicalNewsUrl } from './news-identity';
 
 interface RawExtractedStory {
     headline: string;
@@ -11,6 +13,10 @@ interface RawExtractedStory {
     baseScore: number;
     entities: string[];
     originalUrl: string | null;
+    eventDate?: string | null;
+    dateEvidence?: string | null;
+    publishedAt?: string;
+    dateBasis?: CuratedStory['dateBasis'];
 }
 
 // Generate unique ID
@@ -25,26 +31,9 @@ function generateId(text: string): string {
     return Math.abs(hash).toString(36);
 }
 
-// Normalize text for comparison
-function normalizeText(text: string): string {
-    return text
-        .toLowerCase()
-        .replace(/[^a-z0-9\s]/g, '')
-        .replace(/\s+/g, ' ')
-        .trim();
-}
-
 // Calculate similarity between two strings (Jaccard similarity)
 function calculateSimilarity(text1: string, text2: string): number {
-    const words1 = new Set(normalizeText(text1).split(' ').filter(w => w.length > 3));
-    const words2 = new Set(normalizeText(text2).split(' ').filter(w => w.length > 3));
-
-    if (words1.size === 0 || words2.size === 0) return 0;
-
-    const intersection = new Set([...words1].filter(w => words2.has(w)));
-    const union = new Set([...words1, ...words2]);
-
-    return intersection.size / union.size;
+    return newsSimilarity(text1, text2);
 }
 
 const EXCLUDED_HEADLINE_SIMILARITY_THRESHOLD = 0.5;
@@ -120,12 +109,47 @@ function isStoryUsed(headline: string, usedHeadlines: string[], threshold: numbe
 
 import { scrapeUrl } from './firecrawl';
 
+async function verifyStoryDates(
+    candidates: RawExtractedStory[], item: NewsItem, content: string, isNewsletter: boolean
+): Promise<RawExtractedStory[]> {
+    const verified = await Promise.all(candidates.slice(0, 6).map(async raw => {
+        if (!raw || typeof raw.headline !== 'string' || typeof raw.summary !== 'string') return null;
+        let publishedAt = isNewsletter ? '' : item.publishedAt;
+        let dateBasis: CuratedStory['dateBasis'] = 'source';
+        const evidence = typeof raw.dateEvidence === 'string' ? raw.dateEvidence.trim() : '';
+        const eventDate = normalizeNewsDate(raw.eventDate);
+        // Only accept an absolute date that actually appears in the supplied text.
+        if (eventDate && evidence && content.includes(evidence) && normalizeNewsDate(evidence) === eventDate) {
+            publishedAt = eventDate;
+            dateBasis = 'event';
+        }
+        const originalUrl = typeof raw.originalUrl === 'string' && canonicalNewsUrl(raw.originalUrl) &&
+            !(isNewsletter && raw.originalUrl === item.url) &&
+            (content.includes(raw.originalUrl) || raw.originalUrl === item.url) ? raw.originalUrl : null;
+        if (isNewsletter && !publishedAt && originalUrl && originalUrl !== item.url) {
+            const url = new URL(originalUrl);
+            // The URL must come from the source, never from model invention.
+            if (url.protocol === 'https:' && !url.username && !url.password &&
+                /[a-z]\.[a-z]{2,}$/i.test(url.hostname) && !/\.(local|internal|localhost)$/i.test(url.hostname)) {
+                // Resolve model-selected links through the reader service, not this server's network.
+                const article = await scrapeUrl(originalUrl, false);
+                publishedAt = article.publishedAt || '';
+                dateBasis = 'linked-article';
+            }
+        }
+        if (!isFreshNews(publishedAt)) return null;
+        return { ...raw, originalUrl: originalUrl || (isNewsletter ? null : item.url), publishedAt, dateBasis };
+    }));
+    return verified.filter((story): story is NonNullable<typeof story> => story !== null);
+}
+
 // [Deleted internal scrapeContent function]
 
 // Extract stories from a single news item using AI
 async function extractStories(
     item: NewsItem,
-    apiKey: string
+    apiKey: string,
+    isNewsletter = false
 ): Promise<RawExtractedStory[]> {
     let content = item.content || item.summary || '';
 
@@ -175,29 +199,26 @@ async function extractStories(
     // 600 chars is roughly 2 paragraphs. If less, we likely just have a teaser.
     if (!content || content.length < 600 && item.url) {
         const scrapeResult = await scrapeUrl(item.url);
+        if (!isNewsletter && scrapeResult.publishedAt &&
+            Date.parse(scrapeResult.publishedAt) < Date.parse(item.publishedAt)) {
+            item = { ...item, publishedAt: scrapeResult.publishedAt };
+            if (!isFreshNews(item.publishedAt)) return [];
+        }
         if (scrapeResult.content && scrapeResult.content.length > 500) {
             content = `[Full Content Retrieved via ${scrapeResult.method}]\n\n${scrapeResult.content}`;
         }
     }
 
-    // If still no content, return as single story (fallback)
-    // Threshold is 40 chars (not 100) — even a short title+source is enough for Gemini to categorize
-    if (!content || content.length < 40) {
-        return [{
-            headline: item.title,
-            summary: item.summary || item.title,
-            category: 'other',
-            baseScore: 5,
-            entities: [],
-            originalUrl: item.url,
-        }];
-    }
+    // A thin feed is still classified, never assigned a default news score.
+    if (!content || content.length < 40) content = item.title;
 
     const prompt = `${SMART_CURATION_PROMPT}
 
 SOURCE: ${item.sourceName}
 TITLE: ${item.title}
 DATE: ${item.publishedAt}
+SOURCE URL: ${item.url}
+SOURCE TYPE: ${isNewsletter ? 'newsletter/roundup: the send date is NOT the date of each event' : 'individual article'}
 
 CONTENT:
 ${content.substring(0, 15000)}
@@ -218,15 +239,16 @@ Return JSON array only.`;
             .trim();
 
         const parsed = JSON.parse(cleanContent);
-        if (Array.isArray(parsed)) return parsed;
+        if (Array.isArray(parsed)) return verifyStoryDates(parsed, item, content, isNewsletter);
         // Gemini sometimes wraps in an object like {stories: [...]} — unwrap it
         if (parsed && typeof parsed === 'object') {
             const arrValue = Object.values(parsed).find(v => Array.isArray(v));
-            if (arrValue) return arrValue as RawExtractedStory[];
+            if (arrValue) return verifyStoryDates(arrValue as RawExtractedStory[], item, content, isNewsletter);
             // Single story object — wrap in array
-            if (parsed.headline) return [parsed as RawExtractedStory];
+            if (parsed.headline) return verifyStoryDates([parsed as RawExtractedStory], item, content, isNewsletter);
         }
         console.warn(`[Extract] Unexpected Gemini response format for "${item.title.substring(0, 40)}...", using fallback`);
+        if (isNewsletter) return [];
         return [{
             headline: item.title,
             summary: item.summary || '',
@@ -238,6 +260,7 @@ Return JSON array only.`;
     } catch (error) {
         console.error(`[Extract] Failed for "${item.title.substring(0, 50)}..." [${item.sourceName}]:`,
             error instanceof Error ? error.message : error);
+        if (isNewsletter) return [];
         return [{
             headline: item.title,
             summary: item.summary || '',
@@ -285,7 +308,7 @@ export async function curateNews(
     const SOFT_CAP = 80;
 
     const seenUrls = new Set<string>();
-    const candidateItems: NewsItem[] = allNews
+    const candidateItems = selectNewsCandidates(allNews
         .filter(item => {
             // Skip X items (handled separately in their own panel)
             if (item.sourceName.startsWith('X: @') || item.sourceName === 'X/Twitter AI') return false;
@@ -293,9 +316,7 @@ export async function curateNews(
             if (seenUrls.has(item.url)) return false;
             seenUrls.add(item.url);
             return true;
-        })
-        .sort((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime())
-        .slice(0, SOFT_CAP);
+        }), SOFT_CAP);
 
     console.log(`[News] ${allNews.length} fresh items → ${candidateItems.length} candidates for extraction`);
 
@@ -319,7 +340,7 @@ export async function curateNews(
                 if (statsBreakdown[item.sourceName]) {
                     statsBreakdown[item.sourceName].kept++;
                 }
-                const extracted = await extractStories(item, apiKey);
+                const extracted = await extractStories(item, apiKey, allFeeds.some(f => f.name === item.sourceName && f.category === 'newsletter'));
                 return { item, extracted };
             })
         );
@@ -327,12 +348,16 @@ export async function curateNews(
         // Process extracted stories (sequential to handle dedup correctly)
         for (const { item, extracted } of batchResults) {
             for (const raw of extracted) {
+                const publishedAt = raw.publishedAt || item.publishedAt;
+                if (!isFreshNews(publishedAt)) continue;
                 // Find if similar story exists (deduplication)
                 let matchedKey: string | null = null;
                 let maxSimilarity = 0;
 
                 for (const [key, existing] of stories) {
-                    const similarity = calculateSimilarity(raw.headline, existing.headline);
+                    const rawUrl = canonicalNewsUrl(raw.originalUrl);
+                    const sameUrl = rawUrl && rawUrl === canonicalNewsUrl(existing.originalUrl);
+                    const similarity = sameUrl ? 1 : calculateSimilarity(raw.headline, existing.headline);
                     if (similarity > 0.5 && similarity > maxSimilarity) {
                         matchedKey = key;
                         maxSimilarity = similarity;
@@ -353,6 +378,11 @@ export async function curateNews(
                         existing.headline = raw.headline;
                         existing.summary = raw.summary;
                     }
+                    // A newer recap must not reset an event's age.
+                    if (Date.parse(publishedAt) < Date.parse(existing.publishedAt)) {
+                        existing.publishedAt = publishedAt;
+                        existing.dateBasis = raw.dateBasis || 'source';
+                    }
                 } else {
                     // New story
                     const id = generateId(raw.headline);
@@ -366,7 +396,8 @@ export async function curateNews(
                         entities: raw.entities || [],
                         originalUrl: raw.originalUrl,
                         sources: [item.sourceName],
-                        publishedAt: item.publishedAt,
+                        publishedAt,
+                        dateBasis: raw.dateBasis || 'source',
                         crossSourceCount: 1,
                         boosts: [],
                     });
@@ -462,7 +493,7 @@ export async function curateNews(
     let curationMode = 'normal';
     let excludedCount = 0;
     let usedStoryFilteredCount = 0;
-    let safetyNetRecoveredCount = 0;
+    const safetyNetRecoveredCount = 0;
     const fallbackIgnoredExclusions = false;
 
     // Adaptive minimum guarantee: if below target, progressively relax threshold
@@ -498,32 +529,7 @@ export async function curateNews(
         }
     }
 
-    // SAFETY NET: If aggressive filtering left us with 0 stories, progressively relax
-    if (result.length === 0 && allScored.length > 0) {
-        console.warn(`[Safety Net] 0 stories after filtering! allScored=${allScored.length}, relaxing dedup threshold...`);
-
-        // Step 1: Re-apply used-story filter with stricter (higher) similarity threshold
-        const fallbackCandidates = filterExcludedStories(
-            allScored.filter(s => s.finalScore >= SCORING_CONFIG.hardFloorScore),
-            excludeHeadlines
-        ).stories;
-
-        const usedRelaxed = fallbackCandidates
-            .filter(story => !isStoryUsed(story.headline, usedHeadlines, 0.85)); // 85% instead of 70%
-
-        if (usedRelaxed.length > 0) {
-            result = usedRelaxed;
-            curationMode = 'safety-net';
-            safetyNetRecoveredCount = result.length;
-            console.log(`[Safety Net] Recovered ${result.length} stories with relaxed dedup (0.85 threshold)`);
-        } else {
-            // Step 2: Skip used-story dedup, but still preserve current-run exclusions.
-            result = fallbackCandidates.slice(0, SCORING_CONFIG.targetMinStories);
-            curationMode = 'emergency';
-            safetyNetRecoveredCount = result.length;
-            console.warn(`[Safety Net] Emergency mode: returning ${result.length} stories after preserving current exclusions`);
-        }
-    }
+    // Never bring used stories back just to fill the list. A quiet news day may return zero.
 
     console.log(`[News] Final: ${result.length} stories (mode: ${curationMode})`);
     onProgress?.({ stage: 'done', current: 1, total: 1, message: `Found ${result.length} curated stories` });
