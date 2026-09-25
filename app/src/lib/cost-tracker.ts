@@ -1,6 +1,8 @@
 // Cost Tracking Utility
 // Tracks API costs across the newsletter workflow with localStorage persistence
 
+import { browserStorage as localStorage } from './browser-storage';
+
 const STORAGE_KEY = 'newsletter_session_costs';
 
 // Cost entry structure

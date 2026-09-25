@@ -1,6 +1,8 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
 import type { NewsletterDraft } from '@/lib/draft-generator';
+import { browserStorage as localStorage } from '@/lib/browser-storage';
+import { createUuid } from '@/lib/uuid';
 import type {
   CostReceipt,
   DraftRecord,
@@ -362,7 +364,7 @@ export function useStudioController() {
   async function generate(operation: 'generate' | 'edit') {
     await flush();
     const current = workRef.current!;
-    const id = crypto.randomUUID();
+    const id = createUuid();
     const pendingKey = `studio_pending_${current.draftId}_${current.storyId}`;
     localStorage.setItem(pendingKey, id);
     setPendingId(id);
@@ -522,10 +524,10 @@ export function useStudioController() {
     if (!localDraft) return;
     const value: StudioDraft = upgradeDraft(localDraft);
     if (copy) {
-      value.studioDraftId = crypto.randomUUID();
+      value.studioDraftId = createUuid();
       value.stories = value.stories.map((story) => ({
         ...story,
-        studioStoryId: crypto.randomUUID(),
+        studioStoryId: createUuid(),
       }));
       delete value.studioServerRevision;
     }

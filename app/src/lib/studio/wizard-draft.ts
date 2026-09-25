@@ -1,6 +1,7 @@
 import type { NewsletterDraft, StoryBlock } from '../draft-generator';
 import type { ResearchReport } from '../types';
 import { reconcileDraft } from './state';
+import { browserStorage as localStorage } from '../browser-storage';
 
 export interface WizardSections {
   hook: { title: string; subtitle: string } | null;

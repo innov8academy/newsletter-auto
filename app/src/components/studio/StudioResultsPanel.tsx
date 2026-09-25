@@ -2,6 +2,7 @@
 /* Private signed URLs intentionally bypass Next's public image optimizer. */
 /* eslint-disable @next/next/no-img-element */
 import { Image as ImageIcon, Loader2, Check, Download } from 'lucide-react';
+import { browserStorage as localStorage } from '@/lib/browser-storage';
 import { PRESETS } from '@/lib/studio/models';
 import type { StudioController } from './useStudioController';
 import AssetPreview from './AssetPreview';

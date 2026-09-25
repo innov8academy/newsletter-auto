@@ -2,6 +2,7 @@
 // Persists curated stories, selections, and research reports to localStorage
 
 import { CuratedStory, ResearchReport } from './types';
+import { browserStorage as localStorage } from './browser-storage';
 
 const STORAGE_KEYS = {
     CURATED_STORIES: 'innov8_curated_stories',

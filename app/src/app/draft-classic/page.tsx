@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { ResearchReport } from '@/lib/types';
 import { NewsletterDraft, DRAFT_MODELS, DraftModelId, StoryBlock } from '@/lib/draft-generator';
 import { reconcileDraft } from '@/lib/studio/state';
+import { browserStorage as localStorage } from '@/lib/browser-storage';
 import { EditableSection, EditableBulletList } from '@/components/EditableSection';
 import { SectionGenerator, EmptySectionPlaceholder } from '@/components/SectionGenerator';
 import { Button } from '@/components/ui/button';

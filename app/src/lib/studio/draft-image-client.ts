@@ -4,6 +4,7 @@ import type {
   StudioAsset,
   StudioDraft,
 } from './types';
+import { createUuid } from '../uuid';
 
 export interface DraftImageSummary {
   storyId: string;
@@ -88,7 +89,7 @@ export class DraftImageClient {
       this.api<{ run: GenerationRun }>('generations', 'POST', {
         draftId,
         storyId,
-        requestId: crypto.randomUUID(),
+        requestId: createUuid(),
         presetId: source.presetId,
         operation: 'edit',
         editSourceId: source.id,

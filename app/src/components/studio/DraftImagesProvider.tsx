@@ -9,6 +9,7 @@ import {
   type ReactNode,
 } from 'react';
 import { getCurrentDateContext, useWizard } from '@/context/WizardContext';
+import { browserStorage as localStorage } from '@/lib/browser-storage';
 import type { StoryBlock } from '@/lib/draft-generator';
 import type { GenerationRun, StudioDraft } from '@/lib/studio/types';
 import {
@@ -17,6 +18,7 @@ import {
 } from '@/lib/studio/draft-image-client';
 import { saveWizardDraft } from '@/lib/studio/wizard-draft';
 import { studioApi, StudioClientError } from './client-api';
+import { createUuid } from '@/lib/uuid';
 
 interface ImageContext extends DraftImageStatus {
   draft: StudioDraft | null;
@@ -178,7 +180,7 @@ export function DraftImagesProvider({ children }: { children: ReactNode }) {
   const generate = useCallback(
     (storyId: string, retry = false) => {
       perform(storyId, (session) =>
-        session.generate(storyId, retry ? crypto.randomUUID() : undefined),
+        session.generate(storyId, retry ? createUuid() : undefined),
       );
     },
     [perform],

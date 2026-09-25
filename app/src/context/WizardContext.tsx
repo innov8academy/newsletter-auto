@@ -4,6 +4,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback, Rea
 import { ResearchReport } from '@/lib/types';
 import type { StoryBlock } from '@/lib/draft-generator';
 import { loadResearchReports } from '@/lib/storage';
+import { browserStorage as localStorage } from '@/lib/browser-storage';
 
 // Wizard step definitions
 export const WIZARD_STEPS = [

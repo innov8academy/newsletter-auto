@@ -2,6 +2,7 @@ import type { NewsletterDraft } from '../draft-generator';
 import type { StoryWorkspace, StudioDraft, StudioStory } from './types';
 import { DEFAULT_PRESET } from './models';
 import { StudioError } from './errors';
+import { createUuid } from '../uuid';
 
 function validId(value: unknown): value is string {
   return (
@@ -37,8 +38,8 @@ export function upgradeDraft(input: NewsletterDraft): StudioDraft {
       );
     let id = validId(story.studioStoryId)
       ? story.studioStoryId
-      : crypto.randomUUID();
-    if (ids.has(id)) id = crypto.randomUUID();
+      : createUuid();
+    if (ids.has(id)) id = createUuid();
     ids.add(id);
     return {
       ...story,
@@ -51,7 +52,7 @@ export function upgradeDraft(input: NewsletterDraft): StudioDraft {
     ...input,
     studioDraftId: validId(input.studioDraftId)
       ? input.studioDraftId
-      : crypto.randomUUID(),
+      : createUuid(),
     storageSchemaVersion: 3,
     stories,
   };
