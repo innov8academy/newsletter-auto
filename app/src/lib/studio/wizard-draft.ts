@@ -1,6 +1,6 @@
 import type { NewsletterDraft, StoryBlock } from '../draft-generator';
 import type { ResearchReport } from '../types';
-import { reconcileDraft } from './state';
+import { MAX_STUDIO_STORIES, reconcileDraft } from './state';
 import { browserStorage as localStorage } from '../browser-storage';
 
 export interface WizardSections {
@@ -11,21 +11,68 @@ export interface WizardSections {
   summary: string | null;
   memeIdeas: NewsletterDraft['memeIdeas'];
 }
+
+function isSavedStory(value: unknown): value is StoryBlock {
+  if (!value || typeof value !== 'object') return false;
+  const story = value as Partial<StoryBlock>;
+  return (
+    typeof story.title === 'string' &&
+    typeof story.hookParagraph === 'string' &&
+    Array.isArray(story.bulletPoints) &&
+    story.bulletPoints.every((point) => typeof point === 'string')
+  );
+}
+
+function hasWrittenBody(story: StoryBlock): boolean {
+  return Boolean(
+    story.title.trim() ||
+    story.hookParagraph.trim() ||
+    story.bulletPoints.some((point) => point.trim()) ||
+    story.whyItMatters?.trim() ||
+    story.l8rsTake?.trim(),
+  );
+}
+
 export function saveWizardDraft(
   completed: WizardSections,
   reports: ResearchReport[],
   date: string,
   storage: Pick<Storage, 'getItem' | 'setItem'> = localStorage,
 ) {
+  if (reports.length > MAX_STUDIO_STORIES)
+    throw new Error(
+      `Studio supports up to ${MAX_STUDIO_STORIES} stories. Remove stories from the selection before opening this draft.`,
+    );
   let previous: NewsletterDraft | null = null;
   const raw = storage.getItem('currentDraft');
   try {
-    previous = raw ? JSON.parse(raw) : null;
+    const parsed: unknown = raw ? JSON.parse(raw) : null;
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+      const saved = parsed as Partial<NewsletterDraft>;
+      const savedStories = Array.isArray(saved.stories) ? saved.stories : [];
+      const validStories = savedStories.filter(isSavedStory);
+      if (!Array.isArray(saved.stories) || validStories.length !== savedStories.length)
+        storage.setItem('studio_invalid_draft_backup', raw!);
+      previous = { ...saved, stories: validStories } as NewsletterDraft;
+    } else if (raw) {
+      storage.setItem('studio_invalid_draft_backup', raw);
+    }
   } catch {
     if (raw) storage.setItem('studio_invalid_draft_backup', raw);
   }
   const stories = reports.map((report, index): StoryBlock => {
-    const story = completed.stories[index];
+    const atIndex = completed.stories[index];
+    const completedStory =
+      atIndex && (!atIndex.sourceStoryId || atIndex.sourceStoryId === report.story.id)
+        ? atIndex
+        : completed.stories.find((story) => story?.sourceStoryId === report.story.id);
+    const savedStory = previous?.stories.find(
+      (story) => story.sourceStoryId === report.story.id,
+    );
+    const story =
+      isSavedStory(completedStory) && hasWrittenBody(completedStory)
+        ? completedStory
+        : savedStory;
     const fallback = (report.deepResearch || report.story.summary || '')
       .replace(/\s+/g, ' ')
       .trim()
@@ -48,7 +95,7 @@ export function saveWizardDraft(
       subtitle: completed.hook?.subtitle || '',
       date: previous?.stories.some((story) =>
         reports.some((report) => report.story.id === story.sourceStoryId),
-      )
+      ) && typeof previous.date === 'string'
         ? previous.date
         : date,
       stories,

@@ -21,6 +21,7 @@ import {
 } from '@/lib/studio/state';
 import { StudioClientError, studioApi, uploadReference } from './client-api';
 import { IMAGE_PROMPT_VERSION } from '@/lib/studio/editorial-style';
+import { useSharedSession } from '@/components/SharedSessionProvider';
 
 type Caps = {
   storage: { ready: boolean; error: string };
@@ -57,6 +58,7 @@ const editable = (work: StoryWorkspace) => ({
 });
 
 export function useStudioController() {
+  const { client: sharedClient, snapshot: sharedSnapshot } = useSharedSession();
   const [caps, setCaps] = useState<Caps | null>(null);
   const [drafts, setDrafts] = useState<DraftSummary[]>([]);
   const [styles, setStyles] = useState<StylePack[]>([]);
@@ -85,6 +87,19 @@ export function useStudioController() {
   const saveRef = useRef<Promise<StoryWorkspace | null> | null>(null);
   const draftRef = useRef<DraftRecord | null>(null);
   const storyRef = useRef('');
+  useEffect(() => {
+    const shared = sharedSnapshot.state;
+    if (!shared || !draft || shared.currentDraft?.studioDraftId !== draft.id ||
+        draft.revision <= (shared.currentDraft.studioServerRevision ?? -1)) return;
+    try {
+      sharedClient.mutate({ currentDraft: {
+        ...shared.currentDraft,
+        studioServerRevision: draft.revision,
+      } });
+    } catch {
+      setNotice('Studio saved, but the shared newsletter could not be updated. Resolve the shared-session warning before opening this draft on another device.');
+    }
+  }, [draft, sharedClient, sharedSnapshot.state]);
   function installWork(value: StoryWorkspace) {
     workRef.current = value;
     setWork(value);
@@ -186,6 +201,10 @@ export function useStudioController() {
     );
   }
   async function initialize() {
+    // Direct Studio visits must see the server session before reading the
+    // browser cache, which may belong to an older newsletter.
+    await sharedClient.load();
+    const sharedReady = sharedClient.getSnapshot().phase === 'ready';
     const available = await studioApi<Caps>('capabilities');
     setCaps(available);
     let parsed: NewsletterDraft | null = null;
@@ -200,6 +219,13 @@ export function useStudioController() {
       );
     }
     if (parsed) setLocalDraft(parsed);
+    if (!sharedReady) {
+      if (parsed) setNotice('The shared newsletter is unavailable. The local draft is retained; open a saved Studio draft or retry the shared session before importing it.');
+      parsed = null;
+    } else if (parsed && parsed.studioDraftId !== sharedClient.getSnapshot().state?.currentDraft?.studioDraftId) {
+      setNotice('This browser has a draft from another newsletter. It was retained separately; choose a saved Studio draft or import the local version deliberately.');
+      parsed = null;
+    }
     if (!available.storage.ready) return;
     const list = await loadLists();
     const requestedDraft = new URLSearchParams(window.location.search).get(

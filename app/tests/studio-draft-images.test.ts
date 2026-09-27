@@ -39,6 +39,38 @@ function storage() {
   };
 }
 
+function report(id: string): ResearchReport {
+  return {
+    story: {
+      id,
+      headline: `Story ${id}`,
+      summary: 'Research summary',
+      category: 'AI',
+      baseScore: 1,
+      finalScore: 1,
+      entities: [],
+      originalUrl: null,
+      sources: [],
+      publishedAt: '',
+      crossSourceCount: 1,
+      boosts: [],
+    },
+    deepResearch: '',
+    keyPoints: [],
+    implications: '',
+    sources: [],
+  };
+}
+
+const emptySections = {
+  hook: { title: 'Newsletter', subtitle: '' },
+  intro: '',
+  toc: [],
+  stories: [],
+  summary: '',
+  memeIdeas: [],
+};
+
 test('reading draft image status never starts a paid generation; concurrent clicks share one request', async () => {
   const local = storage();
   const calls: string[] = [];
@@ -157,4 +189,109 @@ test('wizard autosave preserves draft and story identities across dates', () => 
     previous.stories[0].studioStoryId,
   );
   assert.equal(next.date, previous.date);
+});
+
+test('wizard autosave recovers a cached draft without stories and keeps a backup', () => {
+  const local = storage();
+  const malformed = JSON.stringify({ title: 'Old saved draft' });
+  local.setItem('currentDraft', malformed);
+
+  const draft = saveWizardDraft(emptySections, [report('news-1')], '2026-09-27', local);
+
+  assert.equal(draft.stories.length, 1);
+  assert.equal(draft.stories[0].sourceStoryId, 'news-1');
+  assert.equal(local.getItem('studio_invalid_draft_backup'), malformed);
+});
+
+test('wizard autosave recovers a null cached story and preserves the valid saved story', () => {
+  const local = storage();
+  const saved = initial();
+  saved.stories[0].imageUrl = '/saved-image.png';
+  const malformed = JSON.stringify({
+    ...saved,
+    stories: [null, saved.stories[0]],
+  });
+  local.setItem('currentDraft', malformed);
+
+  const draft = saveWizardDraft(
+    emptySections,
+    [report('news-0'), report('news-1')],
+    '2026-09-27',
+    local,
+  );
+
+  assert.equal(draft.studioDraftId, saved.studioDraftId);
+  assert.equal(draft.stories[1].studioStoryId, saved.stories[0].studioStoryId);
+  assert.equal(draft.stories[1].hookParagraph, 'Saved body');
+  assert.equal(draft.stories[1].imageUrl, '/saved-image.png');
+  assert.equal(local.getItem('studio_invalid_draft_backup'), malformed);
+});
+
+test('wizard autosave follows source IDs after a reorder and keeps saved image identity', () => {
+  const local = storage();
+  const saved = initial();
+  saved.stories[0].imageUrl = '/saved-image.png';
+  local.setItem('currentDraft', JSON.stringify(saved));
+  const written = {
+    ...saved.stories[0],
+    hookParagraph: 'Updated body',
+    imageUrl: undefined,
+  };
+  const sections = {
+    ...emptySections,
+    stories: [written],
+  };
+
+  const draft = saveWizardDraft(
+    sections,
+    [report('news-0'), report('news-1')],
+    '2026-09-27',
+    local,
+  );
+
+  assert.equal(draft.stories[0].sourceStoryId, 'news-0');
+  assert.notEqual(draft.stories[0].hookParagraph, 'Updated body');
+  assert.equal(draft.stories[1].hookParagraph, 'Updated body');
+  assert.equal(draft.stories[1].studioStoryId, saved.stories[0].studioStoryId);
+  assert.equal(draft.stories[1].imageUrl, '/saved-image.png');
+});
+
+test('an empty wizard placeholder does not replace the saved body', () => {
+  const local = storage();
+  const saved = initial();
+  local.setItem('currentDraft', JSON.stringify(saved));
+  const draft = saveWizardDraft(
+    {
+      ...emptySections,
+      stories: [{
+        ...saved.stories[0],
+        title: '',
+        hookParagraph: '',
+        bulletPoints: [],
+      }],
+    },
+    [report('news-1')],
+    '2026-09-27',
+    local,
+  );
+
+  assert.equal(draft.stories[0].hookParagraph, 'Saved body');
+  assert.equal(draft.stories[0].studioStoryId, saved.stories[0].studioStoryId);
+});
+
+test('wizard autosave rejects 31 stories without changing an existing draft', () => {
+  const local = storage();
+  const before = local.getItem('currentDraft');
+
+  assert.throws(
+    () =>
+      saveWizardDraft(
+        emptySections,
+        Array.from({ length: 31 }, (_, index) => report(`news-${index}`)),
+        '2026-09-27',
+        local,
+      ),
+    /up to 30 stories/i,
+  );
+  assert.equal(local.getItem('currentDraft'), before);
 });

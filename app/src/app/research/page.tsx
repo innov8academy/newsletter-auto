@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Input } from '@/components/ui/input';
+import { useSharedSession } from '@/components/SharedSessionProvider';
 import {
     Select,
     SelectContent,
@@ -16,16 +17,10 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import {
-    loadCuratedStories,
-    loadSelectedIds,
-    loadResearchReports,
-    loadSharedSelection,
-    saveCuratedStories,
-    saveSelectedIds,
-    saveResearchReports,
     getApiKey,
-    getLastUpdated,
+    MAX_NEWSLETTER_STORIES,
 } from '@/lib/storage';
+import { browserStorage } from '@/lib/browser-storage';
 import { addCost } from '@/lib/cost-tracker';
 import {
     Sparkles,
@@ -65,6 +60,7 @@ interface CustomTopic {
 
 export default function ResearchPage() {
     const router = useRouter();
+    const { client: sharedClient, snapshot: sharedSnapshot } = useSharedSession();
 
     // State
     const [stories, setStories] = useState<CuratedStory[]>([]);
@@ -86,66 +82,37 @@ export default function ResearchPage() {
 
     // Client-side only flag to prevent hydration mismatch
     const [isMounted, setIsMounted] = useState(false);
+    const [sessionMessage, setSessionMessage] = useState('');
 
-    // Load persisted state on mount
+    // The shared session is loaded before this page mounts, including direct visits.
     useEffect(() => {
-        let cancelled = false;
-
-        async function restoreState() {
-            let loadedStories = loadCuratedStories();
-            let loadedIds = loadSelectedIds();
-            const loadedReports = loadResearchReports();
-            const loadedKey = getApiKey();
-            let loadedTime = getLastUpdated();
-
-            if (loadedIds.length === 0 && loadedReports.length === 0) {
-                const shared = await loadSharedSelection();
-                if (cancelled) return;
-
-                if (shared && (shared.curatedStories.length > 0 || shared.selectedIds.length > 0)) {
-                    loadedStories = shared.curatedStories;
-                    loadedIds = shared.selectedIds;
-                    loadedTime = shared.updatedAt ? new Date(shared.updatedAt) : loadedTime;
-
-                    saveCuratedStories(shared.curatedStories);
-                    saveSelectedIds(shared.selectedIds);
-                }
-            }
-
-            // Flow protection: redirect to Home if no selected stories
-            if (loadedIds.length === 0 && loadedReports.length === 0) {
-                router.push('/');
-                return;
-            }
-
-            setStories(loadedStories);
-            setSelectedIds(new Set(loadedIds));
-            setResearchReports(loadedReports);
-            setApiKey(loadedKey);
-            setLastUpdated(loadedTime);
-
-            // Initialize research states from saved reports
-            const initialStates: Record<string, StoryResearchState> = {};
-            loadedReports.forEach(report => {
-                initialStates[report.story.id] = { status: 'success', report };
-            });
-            setResearchStates(initialStates);
-
-            // Auto-select first report if available
-            if (loadedReports.length > 0) {
-                setActiveReportId(loadedReports[0].story.id);
-            }
-
-            // Mark as mounted for client-side only rendering
-            setIsMounted(true);
+        setApiKey(getApiKey());
+    }, []);
+    useEffect(() => {
+        const shared = sharedSnapshot.state;
+        if (!shared) return;
+        if (!shared.selectedIds.length && !shared.researchReports.length) {
+            router.push('/');
+            return;
         }
-
-        restoreState();
-
-        return () => {
-            cancelled = true;
-        };
-    }, [router]);
+        setStories(shared.curatedStories);
+        setSelectedIds(new Set(shared.selectedIds));
+        setResearchReports(shared.researchReports);
+        setLastUpdated(shared.updatedAt ? new Date(shared.updatedAt) : null);
+        const initialStates: Record<string, StoryResearchState> = {};
+        shared.researchReports.forEach(report => {
+            initialStates[report.story.id] = { status: 'success', report };
+        });
+        setResearchStates(initialStates);
+        const custom = shared.researchReports.filter(report => report.story.category === 'custom');
+        setCustomTopics(custom.map(report => ({
+            id: report.story.id,
+            topic: report.story.headline,
+            createdAt: new Date(report.story.publishedAt || Date.now()),
+        })));
+        setActiveReportId(previous => previous && initialStates[previous] ? previous : shared.researchReports[0]?.story.id ?? null);
+        setIsMounted(true);
+    }, [sharedSnapshot.state, router]);
 
     // Get selected stories
     const selectedStories = stories.filter(s => selectedIds.has(s.id));
@@ -161,6 +128,7 @@ export default function ResearchPage() {
 
     // Research a single story
     async function researchStory(story: CuratedStory) {
+        const startedSessionId = sharedClient.getSnapshot().state?.sessionId;
         setResearchStates(prev => ({
             ...prev,
             [story.id]: { status: 'loading' }
@@ -176,20 +144,33 @@ export default function ResearchPage() {
             const data = await response.json();
 
             if (data.success && data.report) {
-                const newReport = data.report;
+                const newReport = data.report as ResearchReport;
+                const current = sharedClient.getSnapshot().state;
+                if (!current || current.sessionId !== startedSessionId) {
+                    browserStorage.setItem(`newsletter_recovery_${Date.now()}`, JSON.stringify(newReport));
+                    setResearchStates(prev => ({ ...prev, [story.id]: {
+                        status: 'error', error: 'The shared newsletter changed while research was running. The report was saved as a local recovery copy.',
+                    } }));
+                    return;
+                }
+                const updated = current.researchReports.some(report => report.story.id === story.id)
+                    ? current.researchReports.map(report => report.story.id === story.id ? newReport : report)
+                    : [...current.researchReports, newReport];
+                try {
+                    sharedClient.mutate({ researchReports: updated });
+                } catch (error) {
+                    browserStorage.setItem(`newsletter_recovery_${Date.now()}`, JSON.stringify(newReport));
+                    setResearchStates(prev => ({ ...prev, [story.id]: {
+                        status: 'error', error: error instanceof Error ? error.message : 'Could not save research. A local recovery copy was kept.',
+                    } }));
+                    return;
+                }
                 setResearchStates(prev => ({
                     ...prev,
                     [story.id]: { status: 'success', report: newReport }
                 }));
 
-                // Update reports list and persist
-                setResearchReports(prev => {
-                    const updated = prev.find(r => r.story.id === story.id)
-                        ? prev.map(r => r.story.id === story.id ? newReport : r)
-                        : [...prev, newReport];
-                    saveResearchReports(updated);
-                    return updated;
-                });
+                setResearchReports(updated);
 
                 setActiveReportId(story.id);
 
@@ -222,6 +203,10 @@ export default function ResearchPage() {
     // Research custom topic
     async function researchCustomTopic() {
         if (!customTopic.trim()) return;
+        if ((sharedClient.getSnapshot().state?.researchReports.length ?? 0) >= MAX_NEWSLETTER_STORIES) {
+            setSessionMessage(`A newsletter can contain at most ${MAX_NEWSLETTER_STORIES} researched stories.`);
+            return;
+        }
 
         let enhancedSummary = `User-requested research on: ${customTopic}`;
 
@@ -354,7 +339,11 @@ export default function ResearchPage() {
 
                         {completedCount > 0 && (
                             <Button
-                                onClick={() => router.push('/draft')}
+                                onClick={async () => {
+                                    const saved = await sharedClient.waitForSaved();
+                                    if (saved) router.push('/draft');
+                                    else setSessionMessage('Save the shared newsletter or resolve its warning before continuing.');
+                                }}
                                 className="bg-gradient-to-r from-teal-500 to-teal-600 hover:from-teal-400 hover:to-teal-500 text-[#0B0B0F] h-9 px-4 font-semibold text-sm border-0 shadow-glow-teal"
                             >
                                 <FileText className="w-4 h-4 mr-2" />
@@ -366,6 +355,7 @@ export default function ResearchPage() {
             </header>
 
             <main className="max-w-[1800px] mx-auto px-6 py-8">
+                {sessionMessage && <div className="mb-4 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-100" role="alert">{sessionMessage}</div>}
                 <div className="grid grid-cols-12 gap-8 h-[calc(100vh-140px)]">
 
                     {/* Left Panel - Story Queue + Manual Input */}

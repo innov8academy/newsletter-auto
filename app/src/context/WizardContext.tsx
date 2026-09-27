@@ -1,10 +1,11 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef, ReactNode } from 'react';
 import { ResearchReport } from '@/lib/types';
 import type { StoryBlock } from '@/lib/draft-generator';
-import { loadResearchReports } from '@/lib/storage';
 import { browserStorage as localStorage } from '@/lib/browser-storage';
+import { MAX_NEWSLETTER_STORIES, validResearchReports } from '@/lib/storage';
+import { useSharedSession } from '@/components/SharedSessionProvider';
 
 // Wizard step definitions
 export const WIZARD_STEPS = [
@@ -116,7 +117,7 @@ function isArticleStyleStory(story: unknown): story is StoryBlock {
 }
 
 function isArticleStyleCompleted(completed: Partial<CompletedSections> | undefined): boolean {
-    if (!completed?.stories || completed.stories.length === 0) return true;
+    if (!completed || !Array.isArray(completed.stories) || completed.stories.length === 0) return true;
     return completed.stories.every(story => !story || isArticleStyleStory(story));
 }
 
@@ -159,99 +160,85 @@ const WizardContext = createContext<WizardContextValue | undefined>(undefined);
 
 // Provider component
 export function WizardProvider({ children }: { children: ReactNode }) {
+    const { client: sharedClient, snapshot: sharedSnapshot } = useSharedSession();
     const [state, setState] = useState<WizardState>(initialState);
     const [hasRestored, setHasRestored] = useState(false);
+    const [stateSessionId, setStateSessionId] = useState<string | null>(null);
+    const [stateWizardVersion, setStateWizardVersion] = useState('null');
+    const appliedSessionId = useRef<string | null>(null);
+    const appliedWizard = useRef<string | null>(null);
 
-    // Load state from localStorage on mount
+    // Restore the exact report subset and order saved with this shared session.
     useEffect(() => {
-        const timeoutId = window.setTimeout(() => {
-            try {
-                const currentReports = loadResearchReports();
-                const currentSignature = getReportSignature(currentReports);
-                const saved = localStorage.getItem(STORAGE_KEY);
-
-                if (saved) {
-                    const parsed = JSON.parse(saved);
-                    const savedReports: ResearchReport[] = parsed.selectedReports ?? [];
-                    const savedSignature = parsed.reportSignature ?? getReportSignature(savedReports);
-                    const savedVersion = parsed.schemaVersion ?? 1;
-                    const hasOldStoryShape = !isArticleStyleCompleted(parsed.completed);
-
-                    if (
-                        currentReports.length > 0 &&
-                        (
-                            currentSignature !== savedSignature ||
-                            savedVersion !== STORAGE_SCHEMA_VERSION ||
-                            hasOldStoryShape
-                        )
-                    ) {
-                        localStorage.removeItem(STORAGE_KEY);
-                        // A new research selection must not erase the saved Studio draft.
-                        const previousDraft = localStorage.getItem('currentDraft');
-                        if (previousDraft) localStorage.setItem('studio_previous_draft_backup', previousDraft);
-                        setState({
-                            ...initialState,
-                            selectedReports: currentReports,
-                            completed: createInitialCompletedSections(),
-                        });
-                        return;
-                    }
-
-                    const selectedReports = savedReports.length > 0 ? savedReports : currentReports;
+        const session = sharedSnapshot.state;
+        if (!session) return;
+        const serialized = JSON.stringify(session.wizardState);
+        if (appliedSessionId.current === session.sessionId && appliedWizard.current === serialized) return;
+        const currentReports = validResearchReports(session.researchReports);
+        let next: WizardState = {
+            ...initialState, selectedReports: currentReports,
+            completed: createInitialCompletedSections(),
+        };
+        try {
+            const parsed = session.wizardState as Record<string, unknown> | null;
+            if (parsed && typeof parsed === 'object') {
+                const savedReports = validResearchReports(parsed.selectedReports);
+                const available = new Map(currentReports.map(report => [report.story.id, report]));
+                const chosen = savedReports.map(report => available.get(report.story.id));
+                const completed = parsed.completed as Partial<CompletedSections> | undefined;
+                const valid = parsed.schemaVersion === STORAGE_SCHEMA_VERSION &&
+                    Array.isArray(parsed.selectedReports) && savedReports.length === parsed.selectedReports.length &&
+                    chosen.every(Boolean) && isArticleStyleCompleted(completed) &&
+                    (!completed?.stories || Array.isArray(completed.stories));
+                if (valid) {
+                    const selectedReports = chosen as ResearchReport[];
                     const maxStoryIndex = Math.max(0, selectedReports.length - 1);
-
-                    // Don't restore isGenerating or error state
-                    setState(prev => ({
-                        ...prev,
-                        currentStep: clampStep(parsed.currentStep ?? 0),
-                        currentStoryIndex: Math.max(0, Math.min(parsed.currentStoryIndex ?? 0, maxStoryIndex)),
+                    next = {
+                        ...initialState,
+                        currentStep: clampStep(Number(parsed.currentStep ?? 0)),
+                        currentStoryIndex: Math.max(0, Math.min(Number(parsed.currentStoryIndex ?? 0), maxStoryIndex)),
                         selectedReports,
-                        completed: {
-                            ...createInitialCompletedSections(),
-                            ...parsed.completed,
-                        },
-                    }));
-                    return;
+                        completed: { ...createInitialCompletedSections(), ...completed },
+                    };
+                } else {
+                    localStorage.setItem('studio_invalid_wizard_backup', JSON.stringify(parsed));
                 }
-
-                if (currentReports.length > 0) {
-                    setState(prev => ({
-                        ...prev,
-                        selectedReports: currentReports,
-                    }));
-                }
-            } catch (e) {
-                console.error('[Wizard] Failed to restore state:', e);
-            } finally {
-                setHasRestored(true);
             }
-        }, 0);
+        } catch (error) {
+            console.error('[Wizard] Failed to restore shared state:', error);
+        }
+        appliedSessionId.current = session.sessionId;
+        appliedWizard.current = serialized;
+        setState(next);
+        setStateSessionId(session.sessionId);
+        setStateWizardVersion(serialized);
+        setHasRestored(true);
+    }, [sharedSnapshot.state]);
 
-        return () => window.clearTimeout(timeoutId);
-    }, []);
-
-    // Save state to localStorage on changes (debounced)
+    // Local cache and server write are both tied to the session revision.
     useEffect(() => {
-        if (!hasRestored) return;
-
-        const timeoutId = setTimeout(() => {
-            try {
-                const toSave = {
-                    currentStep: state.currentStep,
-                    currentStoryIndex: state.currentStoryIndex,
-                    selectedReports: state.selectedReports,
-                    schemaVersion: STORAGE_SCHEMA_VERSION,
-                    reportSignature: getReportSignature(state.selectedReports),
-                    completed: state.completed,
-                };
-                localStorage.setItem(STORAGE_KEY, JSON.stringify(toSave));
-            } catch (e) {
-                console.error('[Wizard] Failed to save state:', e);
-            }
-        }, 300);
-
-        return () => clearTimeout(timeoutId);
-    }, [hasRestored, state.currentStep, state.currentStoryIndex, state.selectedReports, state.completed]);
+        if (!hasRestored || stateSessionId !== sharedSnapshot.state?.sessionId ||
+            stateWizardVersion !== JSON.stringify(sharedSnapshot.state?.wizardState)) return;
+        if (!state.selectedReports.length && !sharedSnapshot.state.researchReports.length && !sharedSnapshot.state.wizardState) return;
+        const toSave = {
+            currentStep: state.currentStep,
+            currentStoryIndex: state.currentStoryIndex,
+            selectedReports: state.selectedReports,
+            schemaVersion: STORAGE_SCHEMA_VERSION,
+            reportSignature: getReportSignature(state.selectedReports),
+            completed: state.completed,
+        };
+        const serialized = JSON.stringify(toSave);
+        if (serialized === appliedWizard.current) return;
+        try {
+            localStorage.setItem(STORAGE_KEY, serialized);
+            sharedClient.mutate({ wizardState: toSave });
+            appliedWizard.current = serialized;
+            setStateWizardVersion(serialized);
+        } catch (error) {
+            console.error('[Wizard] Failed to save state:', error);
+        }
+    }, [hasRestored, stateSessionId, stateWizardVersion, sharedSnapshot.state, state.currentStep, state.currentStoryIndex, state.selectedReports, state.completed]);
 
     // Navigation
     const goToStep = useCallback((step: number) => {
@@ -296,18 +283,23 @@ export function WizardProvider({ children }: { children: ReactNode }) {
 
     // Report management
     const setSelectedReports = useCallback((reports: ResearchReport[]) => {
-        setState(prev => ({
-            ...prev,
-            currentStoryIndex: Math.min(prev.currentStoryIndex, Math.max(0, reports.length - 1)),
-            selectedReports: reports,
-            completed: reconcileCompletedStories(prev.completed, prev.selectedReports, reports),
-        }));
+        setState(prev => reports.length > MAX_NEWSLETTER_STORIES
+            ? { ...prev, error: `A newsletter can contain at most ${MAX_NEWSLETTER_STORIES} stories.` }
+            : {
+                ...prev,
+                currentStoryIndex: Math.min(prev.currentStoryIndex, Math.max(0, reports.length - 1)),
+                selectedReports: reports,
+                completed: reconcileCompletedStories(prev.completed, prev.selectedReports, reports),
+            });
     }, []);
 
     const addReport = useCallback((report: ResearchReport) => {
         setState(prev => {
             if (prev.selectedReports.find(r => r.story.id === report.story.id)) {
                 return prev;
+            }
+            if (prev.selectedReports.length >= MAX_NEWSLETTER_STORIES) {
+                return { ...prev, error: `A newsletter can contain at most ${MAX_NEWSLETTER_STORIES} stories.` };
             }
             const selectedReports = [...prev.selectedReports, report];
             return {

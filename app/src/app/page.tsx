@@ -22,21 +22,15 @@ import {
 } from "@/components/ui/dialog";
 import { ResearchPanel } from '@/components/ResearchPanel';
 import BeehiveImporter from '@/components/BeehiveImporter';
+import { useSharedSession } from '@/components/SharedSessionProvider';
 
 import {
-  saveCuratedStories,
-  loadCuratedStories,
-  saveSelectedIds,
-  loadSelectedIds,
-  loadResearchReports,
   getApiKey,
   saveApiKey,
-  getLastUpdated,
-  clearPersistedState,
+  clearShownHeadlines,
+  MAX_NEWSLETTER_STORIES,
   loadCustomFeeds,
   saveCustomFeeds,
-  loadSharedSelection,
-  saveSharedSelection,
 } from '@/lib/storage';
 import { addCost } from '@/lib/cost-tracker';
 import { MoveRight, Sparkles, Check, Play, Search, Clock, ExternalLink, BarChart3, Layers, FileText, ListChecks, ArrowRight, RefreshCw, Trash2, Plus, Settings2, X, Heart, Repeat2 } from 'lucide-react';
@@ -65,6 +59,7 @@ interface RSSFeed {
 
 export default function Home() {
   const router = useRouter();
+  const { client: sharedClient, snapshot: sharedSnapshot } = useSharedSession();
   const [stories, setStories] = useState<CuratedStory[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -78,7 +73,6 @@ export default function Home() {
   const [researchReports, setResearchReports] = useState<ResearchReport[]>([]);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
-  const [sharedSelectionLoaded, setSharedSelectionLoaded] = useState(false);
 
   // X/Twitter News State
   const [xNews, setXNews] = useState<any[]>([]);
@@ -100,20 +94,9 @@ export default function Home() {
   // Load persisted state on mount
   useEffect(() => {
     const savedKey = getApiKey();
-    const savedStories = loadCuratedStories();
-    const savedIds = loadSelectedIds();
-    const savedReports = loadResearchReports();
-    const savedTime = getLastUpdated();
     const savedFeeds = loadCustomFeeds();
 
     if (savedKey) setApiKey(savedKey);
-    if (savedStories.length > 0) {
-      setStories(currentNews(savedStories, savedIds));
-      setHasSearched(true);
-    }
-    if (savedIds.length > 0) setSelectedIds(new Set(savedIds));
-    if (savedReports.length > 0) setResearchReports(savedReports);
-    if (savedTime) setLastUpdated(savedTime);
     if (savedFeeds.length > 0) setCustomFeeds(savedFeeds);
 
     // Check if server has API key configured
@@ -126,26 +109,20 @@ export default function Home() {
       })
       .catch(err => console.error('Failed to check server status', err));
 
-    // Load shared selected-news queue so another browser can continue the workflow
-    loadSharedSelection()
-      .then(shared => {
-        if (!shared) return;
-        const hasSharedState = shared.curatedStories.length > 0 || shared.selectedIds.length > 0;
-        if (!hasSharedState) return;
-
-        setStories(currentNews(shared.curatedStories, shared.selectedIds));
-        setSelectedIds(new Set(shared.selectedIds));
-        setHasSearched(shared.curatedStories.length > 0);
-        if (shared.updatedAt) setLastUpdated(new Date(shared.updatedAt));
-
-        saveCuratedStories(currentNews(shared.curatedStories, shared.selectedIds));
-        saveSelectedIds(shared.selectedIds);
-      })
-      .finally(() => setSharedSelectionLoaded(true));
-
     // Load X news from Supabase
     fetchXNews();
   }, []);
+
+  // The server session, including an empty one, is authoritative for this page.
+  useEffect(() => {
+    const shared = sharedSnapshot.state;
+    if (!shared) return;
+    setStories(currentNews(shared.curatedStories, shared.selectedIds));
+    setSelectedIds(new Set(shared.selectedIds));
+    setResearchReports(shared.researchReports);
+    setHasSearched(shared.curatedStories.length > 0);
+    setLastUpdated(shared.updatedAt ? new Date(shared.updatedAt) : null);
+  }, [sharedSnapshot.state]);
 
   async function fetchXNews(refresh = false) {
     setXLoading(true);
@@ -175,28 +152,6 @@ export default function Home() {
       setXLoading(false);
     }
   }
-
-  // Persist stories when they change
-  useEffect(() => {
-    if (stories.length > 0) {
-      saveCuratedStories(stories);
-    }
-  }, [stories]);
-
-  // Persist selected IDs when they change
-  useEffect(() => {
-    saveSelectedIds(Array.from(selectedIds));
-  }, [selectedIds]);
-
-  // Keep the shared handoff queue synced for the single shared account
-  useEffect(() => {
-    if (!sharedSelectionLoaded) return;
-
-    saveSharedSelection({
-      curatedStories: stories,
-      selectedIds: Array.from(selectedIds),
-    });
-  }, [stories, selectedIds, sharedSelectionLoaded]);
 
   // Persist custom feeds
   useEffect(() => {
@@ -249,14 +204,23 @@ export default function Home() {
     // We allow empty apiKey here because the server might have it in env vars
 
     // RESET STATE: Clear previous session data (Drafts, Reports, Selections) for a fresh start
-    clearPersistedState();
+    let startedSessionId: string;
+    try {
+      sharedClient.reset();
+      startedSessionId = sharedClient.getSnapshot().state!.sessionId;
+      if (!await sharedClient.waitForSaved()) {
+        setProgress('Save or resolve the shared newsletter warning before finding news.');
+        return;
+      }
+    } catch (error) {
+      setProgress(error instanceof Error ? error.message : 'Could not start a new newsletter.');
+      return;
+    }
     setSelectedIds(new Set());
     setResearchReports([]);
     setStories([]);
     setCurationStats(null);
     setLastUpdated(null);
-    // also clear "currentDraft" from localStorage if manually accessible, 
-    // but clearPersistedState() should handle the bulk of it.
 
     setLoading(true);
     setProgress('Starting curation engine...');
@@ -277,6 +241,11 @@ export default function Home() {
       const data = await response.json();
 
       if (data.success) {
+        if (sharedClient.getSnapshot().state?.sessionId !== startedSessionId) {
+          setProgress('The shared newsletter changed while news was being found. Start again from the latest session.');
+          return;
+        }
+        sharedClient.mutate({ curatedStories: data.stories });
         setStories(data.stories);
         if (data.stats) setCurationStats(data.stats);
         setProgress(`Curated ${data.stories.length} high-impact stories`);
@@ -297,7 +266,7 @@ export default function Home() {
         setProgress(`Error: ${data.error}`);
       }
     } catch (error) {
-      setProgress('Failed to connect to curation engine');
+      setProgress(error instanceof Error ? error.message : 'Failed to connect to curation engine');
     } finally {
       setLoading(false);
     }
@@ -321,34 +290,46 @@ export default function Home() {
       boosts: [],
     };
 
-    // Add to stories if not already there
-    setStories(prev => {
-      if (prev.find(s => s.id === xStory.id)) return prev;
-      return [xStory, ...prev];
-    });
-
-    // Toggle selection
-    setSelectedIds(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has(xStory.id)) {
-        newSet.delete(xStory.id);
-      } else {
-        newSet.add(xStory.id);
+    const current = sharedClient.getSnapshot().state;
+    if (!current) return;
+    const nextIds = new Set(current.selectedIds);
+    if (nextIds.has(xStory.id)) nextIds.delete(xStory.id);
+    else {
+      if (nextIds.size >= MAX_NEWSLETTER_STORIES) {
+        setProgress(`A newsletter can contain at most ${MAX_NEWSLETTER_STORIES} stories.`);
+        return;
       }
-      return newSet;
-    });
+      nextIds.add(xStory.id);
+    }
+    const nextStories = current.curatedStories.some(story => story.id === xStory.id)
+      ? current.curatedStories : [xStory, ...current.curatedStories];
+    try {
+      sharedClient.mutate({ curatedStories: nextStories, selectedIds: [...nextIds] });
+      setStories(nextStories);
+      setSelectedIds(nextIds);
+    } catch (error) {
+      setProgress(error instanceof Error ? error.message : 'Could not update the shared queue.');
+    }
   }
 
   function toggleSelect(story: CuratedStory) {
-    setSelectedIds(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has(story.id)) {
-        newSet.delete(story.id);
-      } else {
-        newSet.add(story.id);
+    const current = sharedClient.getSnapshot().state;
+    if (!current) return;
+    const nextIds = new Set(current.selectedIds);
+    if (nextIds.has(story.id)) nextIds.delete(story.id);
+    else {
+      if (nextIds.size >= MAX_NEWSLETTER_STORIES) {
+        setProgress(`A newsletter can contain at most ${MAX_NEWSLETTER_STORIES} stories.`);
+        return;
       }
-      return newSet;
-    });
+      nextIds.add(story.id);
+    }
+    try {
+      sharedClient.mutate({ selectedIds: [...nextIds] });
+      setSelectedIds(nextIds);
+    } catch (error) {
+      setProgress(error instanceof Error ? error.message : 'Could not update the shared queue.');
+    }
   }
 
   function handleSaveApiKey() {
@@ -356,15 +337,20 @@ export default function Home() {
     setShowApiInput(false);
   }
 
-  function goToResearchPage() {
-    // Persist current state before navigating
-    saveCuratedStories(stories);
-    saveSelectedIds(Array.from(selectedIds));
-    router.push('/research');
+  async function goToResearchPage() {
+    const saved = await sharedClient.waitForSaved();
+    if (saved) router.push('/research');
+    else setProgress('Save the shared newsletter or resolve its warning before continuing.');
   }
 
   function handleClearAll() {
-    clearPersistedState({ includeShownHeadlines: true });
+    try {
+      sharedClient.reset();
+    } catch (error) {
+      setProgress(error instanceof Error ? error.message : 'Could not clear the shared newsletter.');
+      return;
+    }
+    clearShownHeadlines();
     setStories([]);
     setSelectedIds(new Set());
     setResearchReports([]);
@@ -372,11 +358,15 @@ export default function Home() {
     setLastUpdated(null);
     setHasSearched(false);
     setShowClearConfirm(false);
-    void saveSharedSelection({ curatedStories: [], selectedIds: [] });
   }
 
   // Find MORE news without clearing existing selections
   async function findMoreNews() {
+    if (!await sharedClient.waitForSaved()) {
+      setProgress('Save or resolve the shared newsletter warning before finding more news.');
+      return;
+    }
+    const startedSessionId = sharedClient.getSnapshot().state?.sessionId;
     setLoading(true);
     setProgress('Finding more stories...');
 
@@ -393,27 +383,37 @@ export default function Home() {
       const data = await response.json();
 
       if (data.success) {
+        const current = sharedClient.getSnapshot().state;
+        if (!current || current.sessionId !== startedSessionId) {
+          setProgress('The shared newsletter changed while news was being found. Start again from the latest session.');
+          return;
+        }
+        const currentStories = currentNews(current.curatedStories, current.selectedIds);
         // Merge new stories with existing, avoiding duplicates by ID
-        const existingIds = new Set(stories.map(s => s.id));
+        const existingIds = new Set(currentStories.map(s => s.id));
         const newStories = data.stories.filter((s: CuratedStory) => !existingIds.has(s.id));
 
         if (newStories.length > 0) {
           // Also filter by headline similarity to avoid near-duplicates
-          const existingHeadlines = stories.map(s => s.headline.toLowerCase());
+          const existingHeadlines = currentStories.map(s => s.headline.toLowerCase());
           const trulyNew = newStories.filter((s: CuratedStory) => {
             const normalized = s.headline.toLowerCase();
             const url = canonicalNewsUrl(s.originalUrl);
-            if (url && stories.some(existing => canonicalNewsUrl(existing.originalUrl) === url)) return false;
+            if (url && currentStories.some(existing => canonicalNewsUrl(existing.originalUrl) === url)) return false;
             return !existingHeadlines.some(h => {
               const similarity = calculateHeadlineSimilarity(normalized, h);
               return similarity > 0.6;
             });
           });
 
-          setStories(prev => currentNews([...prev, ...trulyNew], Array.from(selectedIds)));
+          const merged = currentNews([...currentStories, ...trulyNew], current.selectedIds);
+          sharedClient.mutate({ curatedStories: merged });
+          setStories(merged);
           setProgress(`Found ${trulyNew.length} new stories`);
         } else {
-          setStories(prev => currentNews(prev, Array.from(selectedIds)));
+          const fresh = currentNews(currentStories, current.selectedIds);
+          sharedClient.mutate({ curatedStories: fresh });
+          setStories(fresh);
           setProgress('No new stories found');
         }
 
@@ -422,7 +422,7 @@ export default function Home() {
         setProgress(`Error: ${data.error}`);
       }
     } catch (error) {
-      setProgress('Failed to find more news');
+      setProgress(error instanceof Error ? error.message : 'Failed to find more news');
     } finally {
       setLoading(false);
     }
@@ -763,7 +763,7 @@ export default function Home() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-white/5">
-                      {curationStats?.breakdown.map((item: any, i: number) => (
+                      {curationStats?.breakdown?.map((item: any, i: number) => (
                         <tr key={i} className="hover:bg-white/5">
                           <td className="px-4 py-3 font-medium text-white/80">{item.sourceName}</td>
                           <td className="px-4 py-3 text-white/50">{item.found}</td>

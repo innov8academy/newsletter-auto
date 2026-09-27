@@ -4,6 +4,8 @@ import { DEFAULT_PRESET } from './models';
 import { StudioError } from './errors';
 import { createUuid } from '../uuid';
 
+export const MAX_STUDIO_STORIES = 30;
+
 function validId(value: unknown): value is string {
   return (
     typeof value === 'string' &&
@@ -17,16 +19,22 @@ export function upgradeDraft(input: NewsletterDraft): StudioDraft {
     !input ||
     !Array.isArray(input.stories) ||
     !input.stories.length ||
-    input.stories.length > 30 ||
     typeof input.title !== 'string'
   )
     throw new StudioError(
       'invalid_draft',
       'Open a newsletter draft containing at least one story.',
     );
+  if (input.stories.length > MAX_STUDIO_STORIES)
+    throw new StudioError(
+      'too_many_stories',
+      `Studio supports up to ${MAX_STUDIO_STORIES} stories. Remove stories from the selection before opening this draft.`,
+    );
   const ids = new Set<string>();
   const stories = input.stories.map((story) => {
     if (
+      !story ||
+      typeof story !== 'object' ||
       typeof story.title !== 'string' ||
       typeof story.hookParagraph !== 'string' ||
       !Array.isArray(story.bulletPoints) ||
@@ -63,12 +71,17 @@ export function reconcileDraft(
   previous?: NewsletterDraft | null,
 ): StudioDraft {
   const used = new Set<string>();
+  const previousStories = Array.isArray(previous?.stories)
+    ? previous.stories.filter((story): story is typeof input.stories[number] =>
+        Boolean(story && typeof story === 'object'),
+      )
+    : [];
   const sourceOverlap =
     previous &&
     input.stories.some(
       (story) =>
         story.sourceStoryId &&
-        previous.stories.some(
+        previousStories.some(
           (old) => old.sourceStoryId === story.sourceStoryId,
         ),
     );
@@ -80,7 +93,7 @@ export function reconcileDraft(
         (input.title === previous.title || sourceOverlap));
   const stories = input.stories.map((story) => {
     const match = sameDraft
-      ? previous.stories.find(
+      ? previousStories.find(
           (old) =>
             old.studioStoryId &&
             !used.has(old.studioStoryId) &&

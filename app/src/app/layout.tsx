@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import BrowserStorageNotice from "@/components/BrowserStorageNotice";
+import SharedSessionProvider from "@/components/SharedSessionProvider";
 import { 
   Playfair_Display, 
   Plus_Jakarta_Sans, 
@@ -94,7 +95,7 @@ export default function RootLayout({
         className={`${playfair.variable} ${jakarta.variable} ${jetbrains.variable} ${anton.variable} ${oswald.variable} ${bebasNeue.variable} ${bangers.variable} ${permanentMarker.variable} ${passionOne.variable} ${blackOpsOne.variable} ${creepster.variable} ${bungee.variable} ${russoOne.variable} ${righteous.variable} ${pressStart2P.variable} ${titanOne.variable} ${luckiestGuy.variable} font-sans antialiased bg-[#0B0B0F] text-white selection:bg-amber-500/20 selection:text-amber-200`}
       >
         <BrowserStorageNotice />
-        {children}
+        <SharedSessionProvider>{children}</SharedSessionProvider>
       </body>
     </html>
   );

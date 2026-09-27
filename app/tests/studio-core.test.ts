@@ -52,6 +52,31 @@ test('v2 migration keeps content and IDs stable, including after reordering', ()
   assert.equal(reordered.studioDraftId, draft.studioDraftId);
 });
 
+test('invalid saved story reports a recoverable Studio error instead of a TypeError', () => {
+  assert.throws(
+    () => upgradeDraft({ ...oldDraft, stories: [null] } as unknown as typeof oldDraft),
+    (cause: unknown) =>
+      cause instanceof Error &&
+      'code' in cause &&
+      cause.code === 'invalid_draft' &&
+      /story text repaired/i.test(cause.message),
+  );
+});
+
+test('reconciliation tolerates a previous draft with missing or null stories', () => {
+  const missing = reconcileDraft(oldDraft, {
+    ...oldDraft,
+    stories: undefined,
+  } as unknown as typeof oldDraft);
+  const withNull = reconcileDraft(oldDraft, {
+    ...oldDraft,
+    stories: [null],
+  } as unknown as typeof oldDraft);
+
+  assert.equal(missing.stories.length, 1);
+  assert.equal(withNull.stories.length, 1);
+});
+
 test('input signature includes the full story, direction, roles, and style version', () => {
   const draft = upgradeDraft(oldDraft);
   const work = emptyWorkspace(

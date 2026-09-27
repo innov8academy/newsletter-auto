@@ -44,6 +44,7 @@ import {
     Palette,
 } from 'lucide-react';
 import Link from 'next/link';
+import { useSharedSession } from '@/components/SharedSessionProvider';
 
 function saveWizardStateToCurrentDraft(completed: WizardSections, selectedReports: ResearchReport[] = []) {
     return saveWizardDraft(completed, selectedReports, getCurrentDateContext());
@@ -53,14 +54,22 @@ function saveWizardStateToCurrentDraft(completed: WizardSections, selectedReport
 function SkipToStudioButton() {
     const router = useRouter();
     const { completed, selectedReports } = useWizard();
+    const { client: sharedClient } = useSharedSession();
+    const [error, setError] = useState('');
 
-    const handleSkipToStudio = () => {
-        // Save current state to localStorage before navigating
-        saveWizardStateToCurrentDraft(completed, selectedReports);
-        router.push('/studio');
+    const handleSkipToStudio = async () => {
+        try {
+            const draft = saveWizardStateToCurrentDraft(completed, selectedReports);
+            sharedClient.mutate({ currentDraft: draft });
+            if (await sharedClient.waitForSaved()) router.push('/studio');
+            else setError('Save or resolve the shared newsletter warning before opening Studio.');
+        } catch (cause) {
+            setError(cause instanceof Error ? cause.message : 'Could not save this draft.');
+        }
     };
 
     return (
+        <div>
         <Button
             variant="ghost"
             size="sm"
@@ -70,6 +79,8 @@ function SkipToStudioButton() {
             <ImageIcon className="w-4 h-4 mr-2" />
             Advanced images
         </Button>
+        {error && <p className="mt-1 text-xs text-coral-300" role="alert">{error}</p>}
+        </div>
     );
 }
 
@@ -259,6 +270,7 @@ function GenerationStep({ title, sectionType, content, onSave, onConfirm, nextLa
     const [hasGenerated, setHasGenerated] = useState(false);
     const [selectedModel, setSelectedModel] = useState<DraftModelId>('anthropic/claude-sonnet-4.5');
     const [copied, setCopied] = useState(false);
+    const autoAttempted = useRef<string | null>(null);
 
     const parseSectionContent = useCallback((value: string): GeneratedSectionContent => {
         if (sectionType === 'title') {
@@ -359,8 +371,10 @@ function GenerationStep({ title, sectionType, content, onSave, onConfirm, nextLa
 
     // Auto-generate on mount if no content
     useEffect(() => {
-        if (!content && !hasGenerated && !isGenerating && selectedReports.length > 0) {
-            generateContent();
+        const key = `${sectionType}:${selectedReports.map(report => report.story.id).join('|')}`;
+        if (!content && !hasGenerated && !isGenerating && selectedReports.length > 0 && autoAttempted.current !== key) {
+            autoAttempted.current = key;
+            void generateContent();
         }
     }, [content, hasGenerated, isGenerating, selectedReports.length, generateContent]);
 
@@ -1035,6 +1049,8 @@ ${(localStory.bulletPoints || []).map(p => `• ${p}`).join('\n')}
 // Main content component that renders based on current step
 function WizardContent() {
     const [reviewing, setReviewing] = useState(false);
+    const [saveError, setSaveError] = useState('');
+    const { client: sharedClient } = useSharedSession();
     const { currentStep, selectedReports, completed, saveHook, saveIntro, saveToc, saveSummary } = useWizard();
 
     if (reviewing) return <DraftReview onBack={() => setReviewing(false)} />;
@@ -1090,9 +1106,14 @@ function WizardContent() {
 
                             // Save with the new summary value (completed.summary won't have it yet)
                             const updatedCompleted = { ...completed, summary };
-                            saveWizardStateToCurrentDraft(updatedCompleted, selectedReports);
-
-                            setReviewing(true);
+                            try {
+                                const draft = saveWizardStateToCurrentDraft(updatedCompleted, selectedReports);
+                                sharedClient.mutate({ currentDraft: draft });
+                                setSaveError('');
+                                setReviewing(true);
+                            } catch (cause) {
+                                setSaveError(cause instanceof Error ? cause.message : 'Could not save this draft.');
+                            }
                         }}
                         nextLabel="Review newsletter"
                         placeholder="### 🚀 Quick L8R Summary..."
@@ -1105,6 +1126,7 @@ function WizardContent() {
 
     return (
         <div className="flex-1 overflow-hidden">
+            {saveError && <p className="mb-3 rounded-xl border border-coral-500/30 bg-coral-500/10 p-3 text-sm text-coral-300" role="alert">{saveError}</p>}
             {renderStep()}
         </div>
     );
