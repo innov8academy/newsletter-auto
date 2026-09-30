@@ -77,7 +77,13 @@ function parseSharedState(value: unknown): SharedSelectionState {
         !Array.isArray(state.researchReports)) {
         throw new SharedSelectionError('The shared newsletter has invalid data. Retry or contact the site owner.', 500, 'invalid_state');
     }
+    const choices = state.draftChoices ?? [];
+    if (!Array.isArray(choices) || !choices.every(choice => choice && typeof choice === 'object' &&
+        typeof choice.id === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(choice.id) &&
+        typeof choice.source === 'string' && typeof choice.updatedAt === 'string'))
+        throw new SharedSelectionError('Saved newsletter recovery information is invalid. Retry or contact the site owner.', 500, 'invalid_state');
     return {
+        draftChoices: choices,
         sessionId: state.sessionId,
         revision: state.revision as number,
         curatedStories: (state.curatedStories as unknown[]).filter((story): story is CuratedStory =>

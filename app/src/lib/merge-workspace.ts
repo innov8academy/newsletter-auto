@@ -34,3 +34,15 @@ export function mergeWorkspace(base: SharedSelectionState, local: SharedSelectio
       revision: remote.revision, updatedAt: remote.updatedAt };
   } catch { return null; }
 }
+
+/** Ignore save bookkeeping, but compare every user-editable field and stable identity. */
+export function sameWorkspaceContent(left: SharedSelectionState, right: SharedSelectionState): boolean {
+  if (left.resolveVersion || right.resolveVersion) return false;
+  const comparable = (state: SharedSelectionState) => JSON.stringify(state, (key, value) => {
+    if (['revision','updatedAt','draftChoices','studioServerRevision'].includes(key)) return undefined;
+    if (value && typeof value === 'object' && !Array.isArray(value))
+      return Object.fromEntries(Object.keys(value).sort().map(name => [name, value[name]]));
+    return value;
+  });
+  return comparable(left) === comparable(right);
+}

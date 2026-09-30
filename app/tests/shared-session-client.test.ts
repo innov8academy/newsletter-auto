@@ -40,7 +40,10 @@ function fakeApi(t: TestContext, initial = empty()) {
     if (body.expectedRevision !== api.state.revision) {
       return Response.json({ success: false, code: 'conflict', error: 'Changed elsewhere', state: structuredClone(api.state) }, { status: 409 });
     }
-    const { expectedRevision: _revision, ...content } = body;
+    if (api.state.draftChoices?.length && !body.resolveVersion)
+      return Response.json({success:false,code:'recovery_required',error:'Review preserved newsletter',state:structuredClone(api.state)},{status:409});
+    const { expectedRevision: _revision, resolveVersion: _choice, ...content } = body;
+    if (_choice) content.draftChoices = [];
     api.state = { ...content, revision: api.state.revision + 1,
       updatedAt: new Date().toISOString() } as SharedSelectionState;
     return Response.json({ success: true, state: structuredClone(api.state) });
@@ -174,4 +177,58 @@ test('malformed legacy report is backed up, and the 30 story boundary rejects wi
   const thirtyOne = Array.from({ length: 31 }, (_, index) => `id-${index}`);
   assert.throws(() => client.mutate({ selectedIds: thirtyOne }), /at most 30/);
   assert.deepEqual(client.getSnapshot().state?.selectedIds, []);
+});
+
+const choices = [{id:'11111111-1111-4111-8111-111111111111',source:'Writing',updatedAt:'2026-09-30T00:00:00Z'}];
+const pendingKey = (tab: string) => 'newsletter_shared_pending_' + tab;
+const recoveryCopies = (local: Storage) => Array.from({length:local.length},(_,i)=>local.key(i)).filter(key=>key?.startsWith('newsletter_recovery_'));
+
+test('a leftover pending marker with only revision differences loads cloud without a false conflict or PUT', async t => {
+  const server={...empty(),revision:4};const api=fakeApi(t,server);
+  const local=memoryStorage({[pendingKey('old-marker')]:JSON.stringify({baseSessionId:'session-one',expectedRevision:0,state:empty()})});
+  const client=new SharedSessionClient(local,'old-marker');await client.load();
+  assert.equal(client.getSnapshot().phase,'ready');assert.equal(client.getSnapshot().pending,false);
+  assert.equal(local.getItem(pendingKey('old-marker')),null);assert.equal(api.puts,0);
+  assert.equal(recoveryCopies(local).length,1);
+});
+
+test('a pending copy with no user edits adopts a newer cloud newsletter without overwriting it', async t => {
+  const base=empty(),server={...empty(),sessionId:'new-session',revision:5,selectedIds:['new'],curatedStories:[story('new')]};
+  const api=fakeApi(t,server);const local=memoryStorage({[pendingKey('unchanged')]:JSON.stringify({base,baseSessionId:base.sessionId,expectedRevision:0,state:base})});
+  const client=new SharedSessionClient(local,'unchanged');await client.load();
+  assert.equal(client.getSnapshot().phase,'ready');assert.equal(client.getSnapshot().state?.sessionId,'new-session');
+  assert.equal(api.puts,0);assert.deepEqual(api.state.selectedIds,['new']);
+});
+
+test('migration choices pause old pending saves and preserve unsent edits until an explicit choice', async t => {
+  const base=empty(),localState={...empty(),selectedIds:['local'],curatedStories:[story('local')]};
+  const api=fakeApi(t,{...empty(),draftChoices:choices});
+  const local=memoryStorage({[pendingKey('migration')]:JSON.stringify({base,baseSessionId:base.sessionId,expectedRevision:0,state:localState})});
+  const client=new SharedSessionClient(local,'migration');await client.load();await client.flush();
+  assert.equal(client.getSnapshot().phase,'recovery');assert.equal(api.puts,0);
+  assert.match(client.pendingCopy()!,/Story local/);assert.deepEqual(client.getSnapshot().state?.draftChoices,choices);
+  assert.throws(()=>client.mutate({selectedIds:[]}),/Load the latest/);
+  assert.throws(()=>client.resolveDraftChoice('unknown'),/Choose an available/);
+  client.resolveDraftChoice(choices[0].id);assert.equal(await client.waitForSaved(),true);
+  assert.equal(api.puts,1);assert.equal(recoveryCopies(local).length,1);
+  assert.match(local.getItem(recoveryCopies(local)[0]!)!,/Story local/);
+  assert.deepEqual(api.state.draftChoices,[]);
+});
+
+test('a recovery response is never retried as an ordinary merge conflict', async t => {
+  const api=fakeApi(t);const client=new SharedSessionClient(memoryStorage(),'recovery-race');await client.load();
+  client.mutate({selectedIds:['local'],curatedStories:[story('local')]});api.state={...api.state,draftChoices:choices};
+  assert.equal(await client.waitForSaved(),false);assert.equal(client.getSnapshot().phase,'recovery');
+  await client.retry();await client.flush();assert.equal(api.puts,1);
+  assert.match(client.pendingCopy()!,/Story local/);
+});
+
+test('loading latest backs up genuine local changes and does not reset or write cloud data', async t => {
+  const api=fakeApi(t,{...empty(),sessionId:'cloud-session',revision:5});
+  const localState={...empty(),selectedIds:['local'],curatedStories:[story('local')]};
+  const local=memoryStorage({[pendingKey('genuine')]:JSON.stringify({baseSessionId:'session-one',expectedRevision:0,state:localState})});
+  const client=new SharedSessionClient(local,'genuine');await client.load();
+  assert.equal(client.getSnapshot().phase,'conflict');assert.doesNotMatch(client.getSnapshot().message,/another device/i);
+  client.useLatest();assert.equal(client.getSnapshot().phase,'ready');assert.equal(api.puts,0);
+  assert.equal(api.state.sessionId,'cloud-session');assert.match(local.getItem(recoveryCopies(local)[0]!)!,/Story local/);
 });

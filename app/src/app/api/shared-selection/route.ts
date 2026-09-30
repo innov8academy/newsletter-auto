@@ -191,8 +191,8 @@ export async function PUT(request: NextRequest) {
         const latest = await loadRow();
         return NextResponse.json({
             success: false,
-            code: 'conflict',
-            error: 'The shared newsletter changed on another device. Reload before saving.',
+            code: data?.choiceRequired ? 'recovery_required' : 'conflict',
+            error: data?.choiceRequired ? 'Review the preserved newsletter before saving.' : 'The saved newsletter changed. Review it before saving.',
             state: latest ? toState(latest) : null,
         }, { status: 409 });
     } catch (error) {

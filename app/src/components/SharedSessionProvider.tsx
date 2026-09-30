@@ -68,13 +68,14 @@ export default function SharedSessionProvider({ children }: { children: ReactNod
           <section className="max-w-md rounded-2xl border border-white/10 bg-white/5 p-8 text-center shadow-2xl">
             <h1 className="font-display text-2xl">Current newsletter</h1>
             <p className="mt-3 text-sm text-white/65">
-              {choices.length ? 'Two saved draft versions were preserved. Review each copy, then choose the version to continue. Both remain in cloud history.' : snapshot.phase === 'loading' ? 'Loading the latest newsletter...' : snapshot.message}
+              {choices.length ? 'Two saved draft versions were preserved. Review each copy, then choose the version to continue. Both remain in cloud history. Any pending browser copy is kept on this device.' : snapshot.phase === 'loading' ? 'Loading the latest newsletter...' : snapshot.message}
             </p>
             {choices.length > 0 && <div className="mt-5 space-y-3">{choices.map(choice => <div key={choice.id} className="rounded-lg border border-white/20 p-3">
               <p>{choice.source} · {new Date(choice.updatedAt).toLocaleString()}</p>
               <a href={'/api/newsletter/versions/' + choice.id} target="_blank" rel="noopener noreferrer" className="mr-4 underline">Review saved copy</a>
-              <button onClick={() => { if (window.confirm('Continue with ' + choice.source + '? Both versions remain in cloud history.')) { client.mutate({ resolveVersion: choice.id }); void client.flush(); } }} className="mt-2 rounded bg-amber-400 px-3 py-2 text-black">Continue with this version</button>
+              <button onClick={() => { if (window.confirm('Continue with ' + choice.source + '? Both versions remain in cloud history.')) { client.resolveDraftChoice(choice.id); } }} className="mt-2 rounded bg-amber-400 px-3 py-2 text-black">Continue with this version</button>
             </div>)}</div>}
+            {choices.length > 0 && client.pendingCopy() && <button onClick={() => download('newsletter-unsaved-copy.json', client.pendingCopy()!)} className="mt-4 text-sm underline">Download my local copy</button>}
             {!choices.length && snapshot.phase !== 'loading' && (
               <div className="mt-6 flex justify-center gap-3">
                 <button onClick={() => void client.retry()} className="rounded-lg bg-amber-400 px-4 py-2 text-sm font-semibold text-black">Retry</button>
@@ -109,7 +110,7 @@ export default function SharedSessionProvider({ children }: { children: ReactNod
             }}>Restore this version</button>}
           </div>)}
       </DialogContent></Dialog>
-      {sessionSurface && snapshot.state && (issue || snapshot.legacyAvailable) && (
+      {sessionSurface && snapshot.state && !choices.length && (issue || snapshot.legacyAvailable) && (
         <div className="fixed top-3 left-1/2 z-[160] w-[min(95vw,800px)] -translate-x-1/2 rounded-xl border border-amber-400/30 bg-[#251e14]/95 p-4 text-sm text-amber-50 shadow-2xl backdrop-blur" role="alert">
           {issue ? <p>{snapshot.message}</p> : <p>Older local work was saved on this browser. {snapshot.legacyReports > 0 || snapshot.legacyDraft ? `You can import matching research${snapshot.legacyDraft ? ' and draft progress' : ''}.` : 'Download the backup if you need it.'}</p>}
           <div className="mt-3 flex flex-wrap gap-2">

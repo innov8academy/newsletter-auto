@@ -1,4 +1,4 @@
-import { mergeWorkspace } from './merge-workspace';
+import { mergeWorkspace, sameWorkspaceContent } from './merge-workspace';
 import type { NewsletterDraft } from './draft-generator';
 import type { ResearchReport } from './types';
 import { browserStorage } from './browser-storage';
@@ -14,7 +14,7 @@ import {
 
 type SessionContent = Omit<SharedSelectionState, 'revision' | 'updatedAt'>;
 type SessionPatch = Partial<SessionContent>;
-type Phase = 'loading' | 'ready' | 'saving' | 'load_error' | 'save_error' | 'auth' | 'conflict';
+type Phase = 'loading' | 'ready' | 'saving' | 'load_error' | 'save_error' | 'auth' | 'conflict' | 'recovery';
 
 interface PendingChange {
   base?: SharedSelectionState;
@@ -210,6 +210,16 @@ export class SharedSessionClient {
         const server = validatedState(result.state);
         this.backupLegacy();
         const pending = this.pending ?? this.readPending();
+        if (pending) this.pending = pending;
+        if (server.draftChoices?.length && !pending?.state.resolveVersion) {
+          this.emit({ state: server, phase: 'recovery', latest: server, pending: Boolean(pending),
+            message: 'Review the saved newsletter before continuing. Your local copy is kept on this device.' });
+          return;
+        }
+        if (pending && (sameWorkspaceContent(pending.state, server) ||
+            (pending.base && sameWorkspaceContent(pending.base, pending.state)))) {
+          this.acceptLatest(server); return;
+        }
         if (pending) {
           this.pending = pending;
           if (pending.expectedRevision !== server.revision || pending.baseSessionId !== server.sessionId) {
@@ -221,7 +231,7 @@ export class SharedSessionClient {
               this.scheduleFlush(0); return;
             }
             this.emit({ state: pending.state, phase: 'conflict', latest: server, pending: true,
-              message: 'Another device changed this newsletter. Your local changes are saved on this device.' });
+              message: 'This browser has changes that differ from the saved newsletter. Your local copy is kept on this device.' });
             return;
           }
           this.mirror(pending.state);
@@ -245,7 +255,7 @@ export class SharedSessionClient {
 
   mutate(change: SessionPatch | ((state: SharedSelectionState) => SessionPatch)) {
     const current = this.snapshot.state;
-    if (!current || this.snapshot.phase === 'loading' || this.snapshot.phase === 'load_error' || this.snapshot.phase === 'conflict') {
+    if (!current || this.snapshot.phase === 'loading' || this.snapshot.phase === 'load_error' || this.snapshot.phase === 'conflict' || this.snapshot.phase === 'recovery') {
       throw new Error('Load the latest shared newsletter before changing it.');
     }
     const patch = typeof change === 'function' ? change(current) : change;
@@ -271,7 +281,7 @@ export class SharedSessionClient {
   }
 
   async flush(): Promise<void> {
-    if (this.saving || !this.pending || this.snapshot.phase === 'conflict') return;
+    if (this.saving || !this.pending || ['conflict', 'recovery'].includes(this.snapshot.phase)) return;
     this.saving = true;
     const sending = this.pending;
     const sentVersion = this.version;
@@ -296,6 +306,11 @@ export class SharedSessionClient {
       }
     } catch (cause) {
       const error = cause instanceof SharedSelectionError ? cause : null;
+      if (error?.status === 409 && error.latest?.draftChoices?.length) {
+        this.emit({ state: error.latest, phase: 'recovery', latest: error.latest, pending: true,
+          message: 'Review the saved newsletter before continuing. Your local copy is kept on this device.' });
+        return;
+      }
       if (error?.status === 409 && error.latest) {
         const merged = this.pending?.base ? mergeWorkspace(this.pending.base, this.pending.state, error.latest) : null;
         if (merged && this.pending) {
@@ -305,7 +320,7 @@ export class SharedSessionClient {
           return;
         }
         this.emit({ phase: 'conflict', latest: error.latest, pending: true,
-          message: 'Another device changed this newsletter. Your local changes are saved on this device.' });
+          message: 'This browser has changes that differ from the saved newsletter. Your local copy is kept on this device.' });
       } else {
         this.emit({ phase: error?.status === 401 ? 'auth' : 'save_error', pending: true,
           message: error?.message || 'Could not save the shared newsletter. Your changes remain on this device.' });
@@ -330,7 +345,7 @@ export class SharedSessionClient {
       };
       const unsubscribe = this.subscribe(() => {
         if (this.snapshot.phase === 'ready' && !this.pending) finish(true);
-        else if (['save_error', 'auth', 'conflict', 'load_error'].includes(this.snapshot.phase)) finish(false);
+        else if (['save_error', 'auth', 'conflict', 'recovery', 'load_error'].includes(this.snapshot.phase)) finish(false);
       });
       const timeout = setTimeout(() => finish(false), 20000);
     });
@@ -340,15 +355,30 @@ export class SharedSessionClient {
     await this.load();
   }
 
-  useLatest() {
-    const latest = this.snapshot.latest;
-    if (!latest) return;
-    if (this.pending) this.storage.setItem(`newsletter_recovery_${Date.now()}`, JSON.stringify(this.pending.state));
+  private acceptLatest(latest: SharedSelectionState) {
+    if (this.pending) this.storage.setItem(`newsletter_recovery_${Date.now()}_${createUuid()}`, JSON.stringify(this.pending.state));
     this.pending = null;
     this.writePending();
     this.version++;
     this.mirror(latest);
-    this.emit({ state: latest, phase: 'ready', pending: false, latest: null, message: '' });
+    const legacy = this.legacyFor(latest);
+    this.emit({ state: latest, phase: latest.draftChoices?.length ? 'recovery' : 'ready', pending: false,
+      latest: null, message: '', legacyReports: legacy.count, legacyDraft: legacy.draft, legacyAvailable: legacy.available });
+  }
+
+  useLatest() {
+    const latest = this.snapshot.latest;
+    if (latest) this.acceptLatest(latest);
+  }
+
+  resolveDraftChoice(id: string) {
+    const latest = this.snapshot.latest ?? this.snapshot.state;
+    if (!latest?.draftChoices?.some(choice => choice.id === id)) throw new Error('Choose an available saved copy.');
+    this.acceptLatest(latest);
+    // This explicit choice is the only write allowed while recovery is pending.
+    this.emit({ phase: 'ready' });
+    this.mutate({ resolveVersion: id });
+    void this.flush();
   }
 
   replaceShared() {
