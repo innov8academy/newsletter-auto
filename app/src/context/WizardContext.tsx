@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef, ReactNode } from 'react';
 import { ResearchReport } from '@/lib/types';
+import { saveWizardDraft } from '@/lib/studio/wizard-draft';
 import type { StoryBlock } from '@/lib/draft-generator';
 import { browserStorage as localStorage } from '@/lib/browser-storage';
 import { MAX_NEWSLETTER_STORIES, validResearchReports } from '@/lib/storage';
@@ -232,7 +233,10 @@ export function WizardProvider({ children }: { children: ReactNode }) {
         if (serialized === appliedWizard.current) return;
         try {
             localStorage.setItem(STORAGE_KEY, serialized);
-            sharedClient.mutate({ wizardState: toSave });
+            const currentDraft = state.selectedReports.length
+                ? saveWizardDraft(state.completed, state.selectedReports, getCurrentDateContext())
+                : null;
+            sharedClient.mutate({ wizardState: toSave, currentDraft });
             appliedWizard.current = serialized;
             setStateWizardVersion(serialized);
         } catch (error) {

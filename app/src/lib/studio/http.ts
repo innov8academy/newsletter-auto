@@ -69,6 +69,7 @@ export function studioError(error: unknown) {
       success: false,
       code: error instanceof StudioError ? error.code : 'studio_error',
       error: safeMessage(error),
+      diagnostic: error instanceof StudioError ? error.diagnostic : undefined,
     },
     {
       status: error instanceof StudioError ? error.status : 500,

@@ -1,8 +1,13 @@
+export interface ProviderDiagnostic {
+  upstreamStatus: number; requestId?: string; retryAfterSeconds?: number;
+  limitSource?: 'account' | 'key' | 'provider' | 'unknown';
+}
 export class StudioError extends Error {
   constructor(
     public code: string,
     message: string,
     public status = 400,
+    public diagnostic?: ProviderDiagnostic,
   ) {
     super(message);
   }

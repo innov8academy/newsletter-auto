@@ -93,6 +93,7 @@ export default function LoginPage() {
                     <div className="relative">
                         <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40" />
                         <Input
+                            aria-label="Workspace password" autoComplete="current-password" name="password" aria-invalid={Boolean(error)} aria-describedby={error ? 'login-error' : undefined}
                             type="password"
                             value={password}
                             onChange={(e) => setPassword(e.target.value)}
@@ -103,7 +104,7 @@ export default function LoginPage() {
                     </div>
 
                     {error && (
-                        <div className="text-coral-400 text-sm text-center bg-coral-500/10 border border-coral-500/20 rounded-lg p-3">
+                        <div id="login-error" role="alert" className="text-coral-400 text-sm text-center bg-coral-500/10 border border-coral-500/20 rounded-lg p-3">
                             {error}
                         </div>
                     )}

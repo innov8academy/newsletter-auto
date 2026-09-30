@@ -29,6 +29,8 @@ export interface PersistedState {
 }
 
 export interface SharedSelectionState {
+    draftChoices?: Array<{ id: string; source: string; updatedAt: string }>;
+    resolveVersion?: string;
     sessionId: string;
     revision: number;
     curatedStories: CuratedStory[];

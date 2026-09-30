@@ -1,12 +1,13 @@
+import { sameRequestOrigin } from '@/lib/site-session';
 import { NextRequest, NextResponse } from 'next/server';
+import { hydrateWizard, metadataOnly } from '@/lib/canonical-draft';
+import type { NewsletterDraft } from '@/lib/draft-generator';
 import { isSupabaseConfigured, supabaseAdmin } from '@/lib/supabase';
 
-const SHARED_SELECTION_ID = 'default';
 const MAX_NEWSLETTER_STORIES = 30;
 const MAX_REVISION = 2_147_483_646; // PostgreSQL integer must fit the increment.
 const MAX_SESSION_ID_LENGTH = 128;
 const MAX_BODY_BYTES = 16 * 1024 * 1024;
-const SELECTION_COLUMNS = 'session_id, revision, curated_stories, selected_ids, research_reports, wizard_state, current_draft, updated_at';
 
 type JsonObject = Record<string, unknown>;
 
@@ -19,10 +20,12 @@ interface SharedSelectionRow {
     wizard_state: JsonObject | null;
     current_draft: JsonObject | null;
     updated_at: string;
+    draft_choices?: Array<{ id: string; source: string; updatedAt: string }>;
 }
 
 interface SharedSelectionPayload {
     expectedRevision: number;
+    resolveVersion?: string;
     sessionId: string;
     curatedStories: unknown[];
     selectedIds: string[];
@@ -95,6 +98,14 @@ function validatePayload(value: unknown): { payload?: SharedSelectionPayload; er
             !value.currentDraft.stories.every(story => isObject(story) && typeof story.title === 'string'))) {
         return { error: `currentDraft.stories must contain at most ${MAX_NEWSLETTER_STORIES} titled stories.` };
     }
+    if (isObject(value.currentDraft)) {
+        const draft = value.currentDraft;
+        if (typeof draft.studioDraftId !== 'string' || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(draft.studioDraftId))
+            return { error: 'currentDraft requires a stable cloud draft ID.' };
+        if (draft.studioServerRevision !== undefined && (!Number.isSafeInteger(draft.studioServerRevision) || (draft.studioServerRevision as number) < 0 || (draft.studioServerRevision as number) > MAX_REVISION))
+            return { error: 'Invalid cloud draft revision.' };
+    }
+    if (value.resolveVersion !== undefined && (typeof value.resolveVersion !== 'string' || !/^[0-9a-f-]{36}$/i.test(value.resolveVersion))) return { error: 'Invalid recovery version.' };
     return { payload: value as unknown as SharedSelectionPayload };
 }
 
@@ -116,18 +127,15 @@ function toState(row: SharedSelectionRow) {
         curatedStories: row.curated_stories,
         selectedIds: row.selected_ids,
         researchReports: row.research_reports,
-        wizardState: row.wizard_state,
+        wizardState: hydrateWizard(row.wizard_state, row.current_draft as unknown as NewsletterDraft | null),
+        draftChoices: row.draft_choices ?? [],
         currentDraft: row.current_draft,
         updatedAt: row.updated_at,
     };
 }
 
 async function loadRow(): Promise<SharedSelectionRow | null> {
-    const { data, error } = await supabaseAdmin
-        .from('shared_news_selection')
-        .select(SELECTION_COLUMNS)
-        .eq('id', SHARED_SELECTION_ID)
-        .maybeSingle();
+    const { data, error } = await supabaseAdmin.rpc('newsletter_state');
     if (error) throw error;
     return data as SharedSelectionRow | null;
 }
@@ -138,14 +146,16 @@ export async function GET() {
     }
     try {
         const row = await loadRow();
-        return NextResponse.json({ success: true, initialized: row !== null, state: row ? toState(row) : null });
+        return NextResponse.json({ success: true, initialized: row !== null, state: row ? toState(row) : null }, { headers: { 'Cache-Control': 'no-store' } });
     } catch (error) {
-        console.error('[SharedSelection] GET failed:', error);
-        return NextResponse.json({ success: false, code: 'load_failed', error: 'Failed to load shared newsletter state.' }, { status: 500 });
+        console.error('[SharedSelection] GET failed:', error instanceof Error ? error.name : 'storage error');
+        return NextResponse.json({ success: false, code: 'load_failed', error: 'Failed to load shared newsletter state.' }, { status: 503 });
     }
 }
 
 export async function PUT(request: NextRequest) {
+    if (!sameRequestOrigin(request.headers.get('origin'), request.url, request.headers.get('host')))
+        return NextResponse.json({ success: false, code: 'invalid_origin', error: 'Save from the newsletter app.' }, { status: 403 });
     if (!isSupabaseConfigured()) {
         return NextResponse.json({ success: false, code: 'configuration_error', error: 'Shared newsletter storage is unavailable.' }, { status: 503 });
     }
@@ -170,27 +180,14 @@ export async function PUT(request: NextRequest) {
     }
 
     try {
-        // The revision predicate is part of the database UPDATE. Concurrent or stale
-        // requests cannot both replace the row, including when one request resets it.
-        const { data, error } = await supabaseAdmin
-            .from('shared_news_selection')
-            .update({
-                session_id: payload.sessionId,
-                revision: payload.expectedRevision + 1,
-                curated_stories: payload.curatedStories,
-                selected_ids: payload.selectedIds,
-                research_reports: payload.researchReports,
-                wizard_state: payload.wizardState,
-                current_draft: payload.currentDraft,
-                updated_at: new Date().toISOString(),
-            })
-            .eq('id', SHARED_SELECTION_ID)
-            .eq('revision', payload.expectedRevision)
-            .select(SELECTION_COLUMNS)
-            .maybeSingle();
+        const { data, error } = await supabaseAdmin.rpc('newsletter_save', {
+            expected_revision: payload.expectedRevision,
+            content: { ...payload, wizardState: metadataOnly(payload.wizardState) },
+            resolve_version: payload.resolveVersion ?? null,
+        });
         if (error) throw error;
-        if (data) return NextResponse.json({ success: true, state: toState(data as SharedSelectionRow) });
-
+        if (!data?.conflict && !data?.choiceRequired && data?.state)
+            return NextResponse.json({ success: true, state: toState(data.state) }, { headers: { 'Cache-Control': 'no-store' } });
         const latest = await loadRow();
         return NextResponse.json({
             success: false,
@@ -199,7 +196,7 @@ export async function PUT(request: NextRequest) {
             state: latest ? toState(latest) : null,
         }, { status: 409 });
     } catch (error) {
-        console.error('[SharedSelection] PUT failed:', error);
-        return NextResponse.json({ success: false, code: 'save_failed', error: 'Failed to save shared newsletter state.' }, { status: 500 });
+        console.error('[SharedSelection] PUT failed:', error instanceof Error ? error.name : 'storage error');
+        return NextResponse.json({ success: false, code: 'save_failed', error: 'Failed to save shared newsletter state.' }, { status: 503 });
     }
 }

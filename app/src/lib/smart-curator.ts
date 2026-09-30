@@ -1,3 +1,4 @@
+import { baseScore as normalizeBaseScore } from './news-score';
 import { NewsItem, CuratedStory, CurationProgress } from './types';
 import { defaultConfig, SCORING_CONFIG, SMART_CURATION_PROMPT } from './config';
 import { fetchAllNews } from './news-fetcher';
@@ -369,6 +370,7 @@ export async function curateNews(
                     const existing = stories.get(matchedKey)!;
                     if (!existing.sources.includes(item.sourceName)) {
                         existing.sources.push(item.sourceName);
+                        existing.primaryLinks = [...new Set([...(existing.primaryLinks ?? []), ...(item.primaryLinks ?? [])])];
                         existing.crossSourceCount++;
                     }
 
@@ -391,11 +393,12 @@ export async function curateNews(
                         headline: raw.headline,
                         summary: raw.summary,
                         category: raw.category || 'other',
-                        baseScore: raw.baseScore || 5,
+                        baseScore: normalizeBaseScore(raw.baseScore),
                         finalScore: 0, // Calculate later
                         entities: raw.entities || [],
                         originalUrl: raw.originalUrl,
                         sources: [item.sourceName],
+                        primaryLinks: item.primaryLinks ?? [],
                         publishedAt,
                         dateBasis: raw.dateBasis || 'source',
                         crossSourceCount: 1,

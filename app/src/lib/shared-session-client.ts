@@ -1,3 +1,4 @@
+import { mergeWorkspace } from './merge-workspace';
 import type { NewsletterDraft } from './draft-generator';
 import type { ResearchReport } from './types';
 import { browserStorage } from './browser-storage';
@@ -16,6 +17,7 @@ type SessionPatch = Partial<SessionContent>;
 type Phase = 'loading' | 'ready' | 'saving' | 'load_error' | 'save_error' | 'auth' | 'conflict';
 
 interface PendingChange {
+  base?: SharedSelectionState;
   baseSessionId: string;
   expectedRevision: number;
   state: SharedSelectionState;
@@ -211,6 +213,13 @@ export class SharedSessionClient {
         if (pending) {
           this.pending = pending;
           if (pending.expectedRevision !== server.revision || pending.baseSessionId !== server.sessionId) {
+            const merged = pending.base ? mergeWorkspace(pending.base, pending.state, server) : null;
+            if (merged) {
+              pending.state = merged; pending.base = server; pending.expectedRevision = server.revision;
+              this.writePending(); this.mirror(merged);
+              this.emit({ state: merged, phase: 'saving', latest: null, pending: true, message: '' });
+              this.scheduleFlush(0); return;
+            }
             this.emit({ state: pending.state, phase: 'conflict', latest: server, pending: true,
               message: 'Another device changed this newsletter. Your local changes are saved on this device.' });
             return;
@@ -243,7 +252,7 @@ export class SharedSessionClient {
     const next = validatedState({ ...current, ...patch });
     if (JSON.stringify(next) === JSON.stringify(current)) return;
     this.version++;
-    if (!this.pending) this.pending = { baseSessionId: current.sessionId, expectedRevision: current.revision, state: next };
+    if (!this.pending) this.pending = { base: current, baseSessionId: current.sessionId, expectedRevision: current.revision, state: next };
     else this.pending.state = next;
     this.writePending();
     this.mirror(next);
@@ -276,6 +285,9 @@ export class SharedSessionClient {
         this.mirror(saved);
         this.emit({ state: saved, phase: 'ready', pending: false, message: '', latest: null });
       } else {
+        this.pending.base = saved;
+        if (this.pending.state.currentDraft && saved.currentDraft?.studioDraftId === this.pending.state.currentDraft.studioDraftId)
+          this.pending.state = { ...this.pending.state, currentDraft: { ...this.pending.state.currentDraft, studioServerRevision: saved.currentDraft?.studioServerRevision } };
         this.pending.expectedRevision = saved.revision;
         this.pending.baseSessionId = saved.sessionId;
         this.pending.state = { ...this.pending.state, revision: saved.revision, updatedAt: saved.updatedAt };
@@ -285,6 +297,13 @@ export class SharedSessionClient {
     } catch (cause) {
       const error = cause instanceof SharedSelectionError ? cause : null;
       if (error?.status === 409 && error.latest) {
+        const merged = this.pending?.base ? mergeWorkspace(this.pending.base, this.pending.state, error.latest) : null;
+        if (merged && this.pending) {
+          this.pending.state = merged; this.pending.base = error.latest; this.pending.expectedRevision = error.latest.revision;
+          this.writePending(); this.mirror(merged);
+          this.emit({ state: merged, phase: 'saving', pending: true, latest: null });
+          return;
+        }
         this.emit({ phase: 'conflict', latest: error.latest, pending: true,
           message: 'Another device changed this newsletter. Your local changes are saved on this device.' });
       } else {
@@ -335,6 +354,9 @@ export class SharedSessionClient {
   replaceShared() {
     const latest = this.snapshot.latest;
     if (!latest || !this.pending || latest.sessionId !== this.pending.baseSessionId) return;
+    this.pending.base = latest;
+    if (this.pending.state.currentDraft && latest.currentDraft?.studioDraftId === this.pending.state.currentDraft.studioDraftId)
+      this.pending.state = { ...this.pending.state, currentDraft: { ...this.pending.state.currentDraft, studioServerRevision: latest.currentDraft?.studioServerRevision } };
     this.pending.expectedRevision = latest.revision;
     this.pending.baseSessionId = latest.sessionId;
     this.writePending();

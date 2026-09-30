@@ -40,7 +40,6 @@ import {
     ChevronUp,
     ChevronDown,
     Copy,
-    History,
     Palette,
 } from 'lucide-react';
 import Link from 'next/link';
@@ -60,7 +59,7 @@ function SkipToStudioButton() {
     const handleSkipToStudio = async () => {
         try {
             const draft = saveWizardStateToCurrentDraft(completed, selectedReports);
-            sharedClient.mutate({ currentDraft: draft });
+            sharedClient.mutate(current => ({ currentDraft: draft, wizardState: { ...(current.wizardState as Record<string, unknown> ?? {}), completed } }));
             if (await sharedClient.waitForSaved()) router.push('/studio');
             else setError('Save or resolve the shared newsletter warning before opening Studio.');
         } catch (cause) {
@@ -270,7 +269,6 @@ function GenerationStep({ title, sectionType, content, onSave, onConfirm, nextLa
     const [hasGenerated, setHasGenerated] = useState(false);
     const [selectedModel, setSelectedModel] = useState<DraftModelId>('anthropic/claude-sonnet-4.5');
     const [copied, setCopied] = useState(false);
-    const autoAttempted = useRef<string | null>(null);
 
     const parseSectionContent = useCallback((value: string): GeneratedSectionContent => {
         if (sectionType === 'title') {
@@ -294,7 +292,6 @@ function GenerationStep({ title, sectionType, content, onSave, onConfirm, nextLa
     }, [sectionType]);
 
     const saveCurrentContent = useCallback((value: string) => {
-        if (!value.trim()) return;
         onSave(parseSectionContent(value));
     }, [onSave, parseSectionContent]);
 
@@ -369,14 +366,7 @@ function GenerationStep({ title, sectionType, content, onSave, onConfirm, nextLa
         }
     }, [selectedReports, sectionType, selectedModel, setIsGenerating, setError, saveCurrentContent]);
 
-    // Auto-generate on mount if no content
-    useEffect(() => {
-        const key = `${sectionType}:${selectedReports.map(report => report.story.id).join('|')}`;
-        if (!content && !hasGenerated && !isGenerating && selectedReports.length > 0 && autoAttempted.current !== key) {
-            autoAttempted.current = key;
-            void generateContent();
-        }
-    }, [content, hasGenerated, isGenerating, selectedReports.length, generateContent]);
+    // Loading a saved or empty section never invokes a provider. Generate on an explicit click.
 
     const handleConfirm = () => {
         if (!localContent.trim()) return;
@@ -399,9 +389,9 @@ function GenerationStep({ title, sectionType, content, onSave, onConfirm, nextLa
 
     return (
         <div className="bg-surface/80 backdrop-blur-xl border border-white/10 rounded-2xl p-6 h-full flex flex-col">
-            <div className="flex items-center justify-between mb-6">
+            <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
                 <h2 className="font-display text-xl text-white/90">{title}</h2>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                     <Select value={selectedModel} onValueChange={(v) => setSelectedModel(v as DraftModelId)}>
                         <SelectTrigger className="w-[180px] bg-black/30 border-white/10 text-white text-sm h-8">
                             <SelectValue placeholder="Select model" />
@@ -464,6 +454,7 @@ function GenerationStep({ title, sectionType, content, onSave, onConfirm, nextLa
                     </div>
                 ) : (
                     <Textarea
+                        aria-label={title}
                         value={localContent}
                         onChange={(e) => handleContentChange(e.target.value)}
                         placeholder={placeholder}
@@ -1108,7 +1099,7 @@ function WizardContent() {
                             const updatedCompleted = { ...completed, summary };
                             try {
                                 const draft = saveWizardStateToCurrentDraft(updatedCompleted, selectedReports);
-                                sharedClient.mutate({ currentDraft: draft });
+                                sharedClient.mutate(current => ({ currentDraft: draft, wizardState: { ...(current.wizardState as Record<string, unknown> ?? {}), completed: updatedCompleted } }));
                                 setSaveError('');
                                 setReviewing(true);
                             } catch (cause) {
@@ -1161,15 +1152,6 @@ function WizardDraftPage() {
                             </h1>
                         </div>
                         <div className="flex items-center gap-2">
-                            <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => router.push('/draft-classic')}
-                                className="text-white/40 hover:text-white/60"
-                            >
-                                <History className="w-4 h-4 mr-1" />
-                                Classic View
-                            </Button>
                             <SkipToStudioButton />
                         </div>
                     </div>

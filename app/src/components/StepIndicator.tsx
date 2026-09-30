@@ -34,7 +34,7 @@ export function StepIndicator({ className, showLabels = true }: StepIndicatorPro
                         const isComplete = isStepComplete(index);
                         const isCurrent = index === currentStep;
                         const isPast = index < currentStep;
-                        const isClickable = isPast || (index === currentStep);
+                        const isClickable = selectedReports.length > 0 || index === 0;
 
                         // Special case: Stories step shows story count
                         const isStoriesStep = step.id === 'stories';
@@ -43,6 +43,8 @@ export function StepIndicator({ className, showLabels = true }: StepIndicatorPro
                         return (
                             <button
                                 key={step.id}
+                                aria-current={isCurrent ? 'step' : undefined}
+                                aria-label={step.label + (isComplete ? ', complete' : '')}
                                 onClick={() => isClickable && goToStep(index)}
                                 disabled={!isClickable}
                                 className={cn(
@@ -63,7 +65,7 @@ export function StepIndicator({ className, showLabels = true }: StepIndicatorPro
                                 >
                                     {isComplete && isPast ? (
                                         <Check className="w-4 h-4" />
-                                    ) : isStoriesStep && storyCount > 0 ? (
+                                    ) : isStoriesStep && storyCount > 0 && isCurrent ? (
                                         <span className="text-xs">{storyCount}</span>
                                     ) : (
                                         <span>{index + 1}</span>

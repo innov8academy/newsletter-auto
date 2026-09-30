@@ -56,6 +56,7 @@ export const defaultConfig: NewsletterConfig = {
   `,
     // Expanded RSS feeds - newsletters and news sources
     rssFeeds: [
+        { name: 'HuggingNews', url: 'https://api.huggingnews.com/api/stories', category: 'ai_news', tier: 2, format: 'huggingnews' },
         // =====================
         // TIER 1: AI NEWSLETTERS (contain multiple stories - need extraction)
         // =====================

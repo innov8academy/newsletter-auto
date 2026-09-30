@@ -37,7 +37,7 @@ const payload = (expectedRevision = 0, sessionId = 'session-one') => ({
   selectedIds: ['curated-1'],
   researchReports: [{ story: { id: 'custom-1', headline: 'Custom research' }, deepResearch: 'Findings' }],
   wizardState: { selectedReports: [], completed: { stories: [] } },
-  currentDraft: { title: 'Draft', stories: [{ title: 'Story 1' }] },
+  currentDraft: { studioDraftId: '11111111-1111-4111-8111-111111111111', title: 'Draft', stories: [{ title: 'Story 1' }] },
 });
 
 function mockStore(t: TestContext, initial: Row | null) {
@@ -48,28 +48,21 @@ function mockStore(t: TestContext, initial: Row | null) {
   };
   t.mock.method(globalThis, 'fetch', async (input: string | URL | Request, init?: RequestInit) => {
     const url = new URL(typeof input === 'string' ? input : input instanceof URL ? input.href : input.url);
-    if (url.pathname !== '/rest/v1/shared_news_selection') throw new Error(`Unexpected URL: ${url.pathname}`);
-    const method = init?.method ?? (input instanceof Request ? input.method : 'GET');
-    if (method === 'GET') {
-      if (store.failLoad) return Response.json({ code: 'fixture_error', message: 'Unavailable' }, { status: 503 });
+    const body = JSON.parse(String(init?.body ?? '{}'));
+    if (url.pathname === '/rest/v1/rpc/newsletter_state') {
+      if (store.failLoad) return Response.json({ code: 'fixture_error' }, { status: 503 });
       return Response.json(store.row);
     }
-    if (method === 'PATCH') {
-      store.patches.push(url);
-      const update = JSON.parse(String(init?.body)) as Partial<Row>;
-      if (store.row && url.searchParams.get('id') === 'eq.default' &&
-          url.searchParams.get('revision') === `eq.${store.row.revision}` &&
-          update.revision === store.row.revision + 1) {
-        store.row = { ...store.row, ...update };
-        return Response.json(store.row);
-      }
-      return Response.json({
-        code: 'PGRST116',
-        details: 'The result contains 0 rows',
-        message: 'Cannot coerce the result to a single JSON object',
-      }, { status: 406 });
+    if (url.pathname === '/rest/v1/rpc/newsletter_save') {
+      url.searchParams.set('revision', 'eq.' + body.expected_revision); store.patches.push(url);
+      if (!store.row || store.row.revision !== body.expected_revision) return Response.json({ conflict: true, state: store.row });
+      const c = body.content;
+      store.row = { ...store.row, session_id:c.sessionId, revision:store.row.revision+1,
+        curated_stories:c.curatedStories,selected_ids:c.selectedIds,research_reports:c.researchReports,
+        wizard_state:c.wizardState,current_draft:c.currentDraft,updated_at:'2026-09-30T00:00:00.000Z' };
+      return Response.json({state:store.row});
     }
-    throw new Error(`Unexpected method: ${method}`);
+    throw new Error('Unexpected URL: ' + url.pathname);
   });
   return store;
 }
@@ -95,7 +88,7 @@ test('GET distinguishes an initialized empty session, missing row, and load fail
     success: true, initialized: true,
     state: {
       sessionId: 'session-one', revision: 0, curatedStories: [], selectedIds: [],
-      researchReports: [], wizardState: null, currentDraft: null,
+      researchReports: [], wizardState: null, currentDraft: null, draftChoices: [],
       updatedAt: '2026-09-27T00:00:00.000Z',
     },
   });
@@ -106,11 +99,11 @@ test('GET distinguishes an initialized empty session, missing row, and load fail
 
   store.failLoad = true;
   const failed = await GET();
-  assert.equal(failed.status, 500);
+  assert.equal(failed.status, 503);
   assert.equal((await failed.json()).code, 'load_failed');
 });
 
-test('every PUT uses the revision in the database UPDATE; a stale writer receives the latest full state', async t => {
+test('every PUT passes the expected revision to the database transaction; a stale writer receives the latest full state', async t => {
   const store = mockStore(t, initialRow());
   const { put } = await route();
 

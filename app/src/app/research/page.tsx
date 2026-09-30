@@ -290,7 +290,7 @@ export default function ResearchPage() {
 
             {/* Header */}
             <header className="sticky top-0 z-50 bg-[#0B0B0F]/80 backdrop-blur-xl border-b border-white/5">
-                <div className="max-w-[1800px] mx-auto px-6 py-4 flex items-center justify-between">
+                <div className="max-w-[1800px] mx-auto px-4 sm:px-6 py-4 flex flex-wrap gap-3 items-center justify-between">
                     <div className="flex items-center gap-4">
                         <Button
                             variant="ghost"
@@ -354,12 +354,12 @@ export default function ResearchPage() {
                 </div>
             </header>
 
-            <main className="max-w-[1800px] mx-auto px-6 py-8">
+            <main className="max-w-[1800px] mx-auto px-4 sm:px-6 py-6 sm:py-8">
                 {sessionMessage && <div className="mb-4 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-100" role="alert">{sessionMessage}</div>}
-                <div className="grid grid-cols-12 gap-8 h-[calc(100vh-140px)]">
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 lg:gap-8 lg:h-[calc(100vh-140px)]">
 
                     {/* Left Panel - Story Queue + Manual Input */}
-                    <div className="col-span-4 flex flex-col h-full">
+                    <div className="lg:col-span-4 min-w-0 flex flex-col h-full">
                         <div className="bg-surface/80 backdrop-blur-xl border border-white/10 rounded-2xl p-6 flex flex-col h-full deco-corner-tl">
 
                             {/* Manual Topic Input */}
@@ -591,7 +591,7 @@ export default function ResearchPage() {
                     </div>
 
                     {/* Right Panel - Research Report View */}
-                    <div className="col-span-8 flex flex-col h-full">
+                    <div className="lg:col-span-8 min-w-0 flex flex-col h-full">
                         <div className="bg-surface/80 backdrop-blur-xl border border-white/10 rounded-2xl flex flex-col h-full overflow-hidden deco-corner-br">
 
                             {activeReport ? (

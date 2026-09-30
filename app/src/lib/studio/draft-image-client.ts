@@ -27,6 +27,7 @@ export class DraftImageClient {
   constructor(
     private storage: LocalDraftStorage,
     private api: Api,
+    private canonical?: () => Promise<DraftRecord>,
   ) {}
 
   draft(): StudioDraft | null {
@@ -38,6 +39,7 @@ export class DraftImageClient {
       : null;
   }
   sync(): Promise<DraftRecord> {
+    if (this.canonical) return this.canonical();
     const result = this.saveTail
       .catch(() => undefined)
       .then(async () => {

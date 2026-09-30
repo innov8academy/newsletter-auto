@@ -1,3 +1,4 @@
+import { fetchHuggingNews } from './huggingnews';
 import { NewsItem, RSSFeed, FeedHealth } from './types';
 import { XMLParser } from 'fast-xml-parser';
 import * as cheerio from 'cheerio';
@@ -69,6 +70,7 @@ async function fetchAnthropicNews(feed: RSSFeed): Promise<NewsItem[]> {
 }
 
 async function parseRSSFeed(feed: RSSFeed): Promise<NewsItem[]> {
+    if (feed.format === 'huggingnews') return fetchHuggingNews(fetch, '', process.env.HUGGINGNEWS_API_KEY ?? '');
     if (feed.format === 'anthropic-news') return fetchAnthropicNews(feed);
 
     try {

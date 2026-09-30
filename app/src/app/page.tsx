@@ -1,4 +1,5 @@
 'use client';
+import { scoreLabel } from '@/lib/news-score';
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
@@ -203,25 +204,10 @@ export default function Home() {
   async function findNews() {
     // We allow empty apiKey here because the server might have it in env vars
 
-    // RESET STATE: Clear previous session data (Drafts, Reports, Selections) for a fresh start
-    let startedSessionId: string;
-    try {
-      sharedClient.reset();
-      startedSessionId = sharedClient.getSnapshot().state!.sessionId;
-      if (!await sharedClient.waitForSaved()) {
-        setProgress('Save or resolve the shared newsletter warning before finding news.');
-        return;
-      }
-    } catch (error) {
-      setProgress(error instanceof Error ? error.message : 'Could not start a new newsletter.');
-      return;
+    const startedSessionId = sharedClient.getSnapshot().state?.sessionId;
+    if (!startedSessionId || !await sharedClient.waitForSaved()) {
+      setProgress('Save or resolve the cloud warning before finding news.'); return;
     }
-    setSelectedIds(new Set());
-    setResearchReports([]);
-    setStories([]);
-    setCurationStats(null);
-    setLastUpdated(null);
-
     setLoading(true);
     setProgress('Starting curation engine...');
     setHasSearched(true);
@@ -245,8 +231,19 @@ export default function Home() {
           setProgress('The shared newsletter changed while news was being found. Start again from the latest session.');
           return;
         }
-        sharedClient.mutate({ curatedStories: data.stories });
-        setStories(data.stories);
+        const current = sharedClient.getSnapshot().state!;
+        const existing = currentNews(current.curatedStories, current.selectedIds);
+        const added: CuratedStory[] = [];
+        for (const candidate of data.stories as CuratedStory[]) {
+          const url = canonicalNewsUrl(candidate.originalUrl);
+          if ([...existing, ...added].some(saved => saved.id === candidate.id ||
+              (url && canonicalNewsUrl(saved.originalUrl) === url) ||
+              newsSimilarity(saved.headline, candidate.headline) > 0.6)) continue;
+          added.push(candidate);
+        }
+        const merged = currentNews([...existing, ...added], current.selectedIds);
+        sharedClient.mutate({ curatedStories: merged });
+        setStories(merged);
         if (data.stats) setCurationStats(data.stats);
         setProgress(`Curated ${data.stories.length} high-impact stories`);
 
@@ -469,19 +466,19 @@ export default function Home() {
                   <div className="flex gap-2">
                     <div className="flex-1 space-y-2">
                       <Input
-                        placeholder="URL (e.g. reddit.com/r/LocalLLaMA)"
+                        aria-label="Source feed URL" placeholder="URL (e.g. reddit.com/r/LocalLLaMA)"
                         value={newFeedUrl}
                         onChange={(e) => setNewFeedUrl(e.target.value)}
                         className="bg-white/5 border-white/10"
                       />
                       <Input
-                        placeholder="Name (Optional)"
+                        aria-label="Source name (optional)" placeholder="Name (Optional)"
                         value={newFeedName}
                         onChange={(e) => setNewFeedName(e.target.value)}
                         className="bg-white/5 border-white/10"
                       />
                     </div>
-                    <Button onClick={addCustomFeed} className="bg-amber-500 text-black h-auto">
+                    <Button aria-label="Add news source" onClick={addCustomFeed} className="bg-amber-500 text-black h-auto">
                       <Plus className="w-4 h-4" />
                     </Button>
                   </div>
@@ -515,7 +512,7 @@ export default function Home() {
             {(apiKey || serverHasKey) ? (
               <div className="flex items-center gap-2 text-xs text-teal-400 bg-teal-400/10 border border-teal-400/20 px-3 py-1.5 rounded-full">
                 <div className="w-1.5 h-1.5 rounded-full bg-teal-400 animate-pulse"></div>
-                System Online
+                Provider key configured
               </div>
             ) : (
               <Button
@@ -574,9 +571,9 @@ export default function Home() {
           </h1>
 
           <p className="text-lg md:text-xl text-white/40 max-w-2xl mx-auto mb-12 leading-relaxed font-light animate-in-up" style={{ animationDelay: '0.3s' }}>
-            Analyze thousands of newsletters and articles instantly.
+            Find recent stories across your configured news sources.
             <br className="hidden md:block" />
-            Curate high-impact stories with human-level understanding.
+            Review the signals, choose stories, then hand off the saved draft.
           </p>
 
           <div className="animate-in-up" style={{ animationDelay: '0.4s' }}>
@@ -623,26 +620,26 @@ export default function Home() {
     <div className="min-h-screen bg-[#0B0B0F] text-white selection:bg-amber-500/20 font-sans noise-overlay">
       {/* Header */}
       <header className="sticky top-0 z-40 border-b border-white/5 bg-[#0B0B0F]/80 backdrop-blur-xl">
-        <div className="container flex h-16 items-center justify-between px-6">
-          <div className="flex items-center gap-4">
+        <div className="container flex flex-wrap min-h-16 items-center justify-between gap-3 px-4 sm:px-6 py-3">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-4">
             <div className="h-9 w-9 rounded-lg overflow-hidden">
               <Image src="/logo.jpg" alt="Innov8 AI" width={36} height={36} className="object-cover" />
             </div>
             <span className="font-display text-lg text-white/90">Innov8 AI</span>
           </div>
 
-          <div className="flex items-center gap-4">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-4">
             <button
               onClick={() => setShowApiInput(true)}
               className="flex items-center gap-2 text-xs text-white/40 px-3 py-1.5 rounded-full bg-white/5 border border-white/5 hover:border-amber-500/30 hover:text-amber-400 transition-all cursor-pointer"
             >
               <span className={`w-2 h-2 rounded-full ${(apiKey || serverHasKey) ? 'bg-teal-400 animate-pulse' : 'bg-coral-400'}`}></span>
-              {(apiKey || serverHasKey) ? 'API Connected' : 'Connect API'}
+              {(apiKey || serverHasKey) ? 'Key configured' : 'Connect API'}
             </button>
 
             <Dialog open={showSourcesDialog} onOpenChange={setShowSourcesDialog}>
               <DialogTrigger asChild>
-                <Button variant="ghost" size="sm" className="text-white/40 hover:text-white hover:bg-white/5">
+                <Button aria-label="Manage news sources" variant="ghost" size="sm" className="text-white/60 hover:text-white hover:bg-white/5">
                   <Settings2 className="w-4 h-4" />
                 </Button>
               </DialogTrigger>
@@ -656,13 +653,13 @@ export default function Home() {
                   <div className="flex gap-2">
                     <div className="flex-1 space-y-2">
                       <Input
-                        placeholder="URL (e.g. reddit.com/r/LocalLLaMA)"
+                        aria-label="Source feed URL" placeholder="URL (e.g. reddit.com/r/LocalLLaMA)"
                         value={newFeedUrl}
                         onChange={(e) => setNewFeedUrl(e.target.value)}
                         className="bg-white/5 border-white/10"
                       />
                       <Input
-                        placeholder="Name (Optional)"
+                        aria-label="Source name (optional)" placeholder="Name (Optional)"
                         value={newFeedName}
                         onChange={(e) => setNewFeedName(e.target.value)}
                         className="bg-white/5 border-white/10"
@@ -837,7 +834,7 @@ export default function Home() {
               className="text-white/40 hover:text-coral-400 hover:bg-coral-500/10"
             >
               <Trash2 className="w-4 h-4 mr-2" />
-              Clear All
+              New newsletter
             </Button>
             {stories.length > 0 && (
               <Button
@@ -881,9 +878,9 @@ export default function Home() {
           </div>
         ) : (
           <div className="container px-6 py-8">
-            <div className="grid grid-cols-12 gap-8 h-[calc(100vh-140px)]">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 lg:gap-8 lg:h-[calc(100vh-140px)]">
               {/* Main Feed */}
-              <div className="col-span-8 flex flex-col h-full">
+              <div className="lg:col-span-8 min-w-0 flex flex-col h-full">
                 {/* X/Twitter AI News Section — always show so Refresh is accessible */}
                 <div className="mb-6">
                     <div className="flex items-center gap-3 mb-4">
@@ -912,7 +909,7 @@ export default function Home() {
                         </p>
                       </div>
                     ) : (
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       {xNews.map((item: any) => {
                         const isSelected = selectedIds.has(`x_${item.id}`);
                         return (
@@ -993,7 +990,7 @@ export default function Home() {
                     {/* All X items shown */}
                 </div>
 
-                <div className="flex items-center justify-between mb-6">
+                <div className="flex flex-wrap items-start justify-between gap-4 mb-6">
                   <div>
                     <h2 className="font-display text-2xl text-white tracking-tight flex items-center gap-3">
                       Top Stories
@@ -1002,16 +999,17 @@ export default function Home() {
                       </span>
                     </h2>
                     <p className="text-xs text-white/40 mt-2">News from the last 24 hours, extending to 36 hours when quiet. Older selected stories stay in your queue.</p>
+                    <details className="mt-2 text-xs text-white/60"><summary className="cursor-pointer text-amber-300">How priority scores work</summary><p className="mt-2 max-w-xl leading-relaxed">Scores combine the model's base importance, source coverage and recency, capped at 10. They guide selection; they are not confidence or fact checks. Stories sort by freshness bucket first, then score. Several strong recent stories can share 10/10.</p></details>
                     {curationStats?.feedHealth?.some((feed: { status: string; fallbackUsed?: boolean }) => feed.status === 'failed' || feed.fallbackUsed) && (
                       <p className="text-xs text-amber-300 mt-2">Some sources are unavailable or using an index fallback. See Source Stats for coverage.</p>
                     )}
                   </div>
                   <div className="flex gap-4 text-xs text-white/40">
                     <span className="flex items-center gap-1.5 cursor-help hover:text-white transition-colors">
-                      <div className="w-2 h-2 bg-coral-500 rounded-full"></div> Critical
+                      <div className="w-2 h-2 bg-coral-500 rounded-full"></div> Priority 9+
                     </span>
                     <span className="flex items-center gap-1.5 cursor-help hover:text-white transition-colors">
-                      <div className="w-2 h-2 bg-amber-500 rounded-full"></div> Important
+                      <div className="w-2 h-2 bg-amber-500 rounded-full"></div> Priority 7+
                     </span>
                   </div>
                 </div>
@@ -1022,6 +1020,7 @@ export default function Home() {
                       <div
                         key={story.id}
                         onClick={() => setViewingStory(story)}
+
                         className={`group relative overflow-hidden rounded-xl border p-5 transition-all duration-300 cursor-pointer hover-lift ${selectedIds.has(story.id)
                           ? 'bg-amber-500/10 border-amber-500/30 shadow-glow-amber-sm'
                           : 'bg-surface border-white/5 hover:bg-surface-elevated hover:border-white/10'
@@ -1033,21 +1032,21 @@ export default function Home() {
                           <div className="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-amber-400 to-coral-500"></div>
                         )}
 
-                        <div className="flex gap-5">
+                        <div className="flex gap-3 sm:gap-5">
                           {/* Score Indicator */}
                           <div className="shrink-0">
                             <div className={`w-12 h-12 rounded-lg flex flex-col items-center justify-center border font-mono font-bold text-lg ${story.finalScore >= 9 ? 'bg-coral-500/20 border-coral-500/30 text-coral-400' :
                               story.finalScore >= 7 ? 'bg-amber-500/20 border-amber-500/30 text-amber-400' :
                                 'bg-white/5 border-white/10 text-white/60'
                               }`}>
-                              {story.finalScore}
+                              {scoreLabel(story.finalScore)}<span className="text-[10px] font-normal text-white/60">/10</span>
                             </div>
                           </div>
 
                           {/* Content */}
                           <div className="flex-1 min-w-0 pt-0.5">
                             <h3 className="text-base font-semibold text-white/90 leading-snug mb-2 group-hover:text-amber-300 transition-colors">
-                              {story.headline}
+                              <button className="text-left" onClick={event => { event.stopPropagation(); setViewingStory(story); }} aria-label={'Read ' + story.headline}>{story.headline}</button>
                             </h3>
                             <p className="text-sm text-white/50 line-clamp-2 mb-3 font-light leading-relaxed">
                               {story.summary}
@@ -1083,7 +1082,8 @@ export default function Home() {
                             {selectedIds.has(story.id) && (
                               <input
                                 type="text"
-                                placeholder="📐 Add research angle... (e.g. 'focus on the Chinese perspective')"
+                                aria-label={'Research angle for ' + story.headline}
+                                placeholder="Add research angle... (e.g. 'focus on the Chinese perspective')"
                                 value={directions[story.id] || ''}
                                 onChange={(e) => setDirections(prev => ({ ...prev, [story.id]: e.target.value }))}
                                 onClick={(e) => e.stopPropagation()}
@@ -1095,6 +1095,8 @@ export default function Home() {
                           {/* Action Area */}
                           <div className="shrink-0 flex flex-col justify-start items-end gap-2">
                             <Button
+                              aria-label={(selectedIds.has(story.id) ? 'Remove ' : 'Select ') + story.headline}
+                              aria-pressed={selectedIds.has(story.id)}
                               size="icon"
                               variant="ghost"
                               className={`rounded-full w-10 h-10 transition-all duration-300 ${selectedIds.has(story.id)
@@ -1117,7 +1119,7 @@ export default function Home() {
               </div>
 
               {/* Sidebar (Research Queue / Research Panel) */}
-              <div className="col-span-4 h-full flex flex-col pt-14">
+              <div className="lg:col-span-4 min-w-0 h-full flex flex-col lg:pt-14">
                 <div className="sticky top-24 bg-surface/80 backdrop-blur-xl border border-white/10 transition-all duration-300 rounded-2xl flex flex-col p-6 h-[600px] deco-corner-br">
                   {/* Tab Navigation */}
                   <div className="flex gap-1 p-1 bg-black/30 rounded-lg mb-4">
@@ -1272,7 +1274,7 @@ export default function Home() {
                     </p>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-6">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                     <div>
                       <h4 className="text-sm font-medium text-white/60 mb-2">Sources</h4>
                       <ul className="space-y-1">
@@ -1283,9 +1285,11 @@ export default function Home() {
                           </li>
                         ))}
                       </ul>
+                      {(viewingStory.primaryLinks ?? []).map(link => <a key={link} href={link} target="_blank" rel="noopener noreferrer" className="mt-2 block break-all text-xs text-amber-300 underline">Supporting source ↗</a>)}
                     </div>
                     <div>
-                      <h4 className="text-sm font-medium text-white/60 mb-2">Impact Drivers</h4>
+                      <p className="mb-2 text-xs text-white/60">Base {scoreLabel(viewingStory.baseScore)} → priority {scoreLabel(viewingStory.finalScore)}/10</p>
+                      <h4 className="text-sm font-medium text-white/60 mb-2">Score adjustments</h4>
                       <ul className="space-y-1">
                         {viewingStory.boosts.map((b, i) => (
                           <li key={i} className="text-sm text-teal-400/80 flex items-center gap-2">
@@ -1359,7 +1363,7 @@ export default function Home() {
             {serverHasKey && (
               <div className="flex items-center gap-2 text-xs text-teal-400/80 bg-teal-400/5 px-3 py-2 rounded-lg border border-teal-400/10">
                 <span className="w-1.5 h-1.5 rounded-full bg-teal-400"></span>
-                Server has a key configured (your input overrides it)
+                Server key configured for writing. Image Studio uses its server key separately.
               </div>
             )}
             <div className="flex gap-2 justify-end">
@@ -1370,16 +1374,16 @@ export default function Home() {
         </DialogContent>
       </Dialog>
 
-      {/* Clear All Confirmation Dialog */}
+      {/* New newsletter Confirmation Dialog */}
       <Dialog open={showClearConfirm} onOpenChange={setShowClearConfirm}>
         <DialogContent className="max-w-md bg-[#0B0B0F] border border-white/10 text-white">
           <DialogHeader>
             <DialogTitle className="font-display text-xl flex items-center gap-2">
               <Trash2 className="w-5 h-5 text-coral-400" />
-              Clear All Data?
+              Start a new newsletter?
             </DialogTitle>
             <DialogDescription className="text-white/60">
-              This will permanently delete all your curated stories, research reports, and selections. You'll return to the landing page to start fresh.
+              Your current selections, research and draft will be archived in cloud history. Both people will see the new empty newsletter after it saves.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="flex gap-3 mt-4">
@@ -1395,7 +1399,7 @@ export default function Home() {
               className="flex-1 bg-coral-500 hover:bg-coral-600 text-white font-semibold"
             >
               <Trash2 className="w-4 h-4 mr-2" />
-              Yes, Clear Everything
+              Archive & start new
             </Button>
           </DialogFooter>
         </DialogContent>

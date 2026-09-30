@@ -87,19 +87,28 @@ export function useStudioController() {
   const saveRef = useRef<Promise<StoryWorkspace | null> | null>(null);
   const draftRef = useRef<DraftRecord | null>(null);
   const storyRef = useRef('');
+  const archiveView = useRef(false);
   useEffect(() => {
-    const shared = sharedSnapshot.state;
-    if (!shared || !draft || shared.currentDraft?.studioDraftId !== draft.id ||
-        draft.revision <= (shared.currentDraft.studioServerRevision ?? -1)) return;
-    try {
-      sharedClient.mutate({ currentDraft: {
-        ...shared.currentDraft,
-        studioServerRevision: draft.revision,
-      } });
-    } catch {
-      setNotice('Studio saved, but the shared newsletter could not be updated. Resolve the shared-session warning before opening this draft on another device.');
+    const current = sharedSnapshot.state?.currentDraft;
+    const record = draftRef.current;
+    if (archiveView.current || !caps?.storage.ready || actionInFlight.current) return;
+    if (current?.studioDraftId !== record?.id) {
+      if (dirtyRef.current) { setConflict(true); setNotice('The current newsletter changed. Download your unsaved image directions before reopening Studio.'); return; }
+      if (current?.studioDraftId && current.studioServerRevision != null) {
+        void openDraft({id:current.studioDraftId,payload:upgradeDraft(current),revision:current.studioServerRevision,updatedAt:sharedSnapshot.state?.updatedAt??''}).catch(report);
+      } else {
+        draftRef.current=null; workRef.current=null; setDraft(null); setWork(null); setAssets([]); setGenerations([]);
+        setNotice('The current newsletter has no written draft yet. Continue writing, or deliberately open an older saved newsletter below.');
+      }
+      return;
     }
-  }, [draft, sharedClient, sharedSnapshot.state]);
+    if (!current || !record || current.studioServerRevision == null || current.studioServerRevision === record.revision) return;
+    const next = { id: record.id, payload: upgradeDraft(current), revision: current.studioServerRevision, updatedAt: sharedSnapshot.state?.updatedAt ?? '' };
+    draftRef.current = next; setDraft(next);
+    if (!dirtyRef.current && !actionInFlight.current) void loadStory(next, storyRef.current, true).catch(report);
+  // Refresh the body independently of locally edited image directions.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sharedSnapshot.state]);
   function installWork(value: StoryWorkspace) {
     workRef.current = value;
     setWork(value);
@@ -188,6 +197,8 @@ export function useStudioController() {
     }
   }
   async function openDraft(record: DraftRecord) {
+    archiveView.current = record.id !== sharedClient.getSnapshot().state?.currentDraft?.studioDraftId;
+    if (archiveView.current) setNotice('Viewing an older saved newsletter. Its images are separate from the current newsletter.');
     draftRef.current = record;
     setDraft(record);
     cache(record);
@@ -227,7 +238,7 @@ export function useStudioController() {
       parsed = null;
     }
     if (!available.storage.ready) return;
-    const list = await loadLists();
+    await loadLists();
     const requestedDraft = new URLSearchParams(window.location.search).get(
       'draftId',
     );
@@ -243,33 +254,13 @@ export function useStudioController() {
       );
       return;
     }
-    if (parsed?.stories?.length) {
-      try {
-        const migrated = upgradeDraft(parsed);
-        localStorage.setItem('studio_unsynced_draft', JSON.stringify(migrated));
-        const result = await studioApi<{ draft: DraftRecord }>(
-          'drafts',
-          'POST',
-          { draft: migrated, revision: parsed.studioServerRevision ?? null },
-        );
-        localStorage.removeItem('studio_unsynced_draft');
-        setLocalDraft(null);
-        await openDraft(result.draft);
-        await loadLists();
-        return;
-      } catch (cause) {
-        setNotice(
-          'The local draft was retained separately because it could not be synchronized. Open the saved draft or import the local version as a copy.',
-        );
-        report(cause);
-      }
+    const current = sharedClient.getSnapshot().state?.currentDraft;
+    if (current?.studioDraftId) {
+      setLocalDraft(null);
+      const result = await studioApi<{ draft: DraftRecord }>('drafts/' + current.studioDraftId);
+      await openDraft(result.draft); return;
     }
-    const preferred = localStorage.getItem('studio_last_draft');
-    const first = list.find((item) => item.id === preferred) || list[0];
-    if (first)
-      await openDraft(
-        (await studioApi<{ draft: DraftRecord }>(`drafts/${first.id}`)).draft,
-      );
+    setNotice('The current newsletter has no written draft yet. Continue writing, or deliberately open an older saved newsletter below.');
   }
   useEffect(() => {
     void task(
@@ -325,10 +316,10 @@ export function useStudioController() {
     (run) => run.status === 'running',
   );
   useEffect(() => {
-    if (!draft || !storyId || (!pendingId && !hasRunningGeneration)) return;
+    if (!draft || !storyId) return;
     const timer = setInterval(() => {
       const record = draftRef.current;
-      if (record) void loadStory(record, storyRef.current, true).catch(report);
+      if (record && document.visibilityState === 'visible') void loadStory(record, storyRef.current, true).catch(report);
     }, 5000);
     return () => clearInterval(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps

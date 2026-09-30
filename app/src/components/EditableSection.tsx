@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { DRAFT_MODELS, DraftModelId } from '@/lib/draft-generator';
+import { browserStorage } from '@/lib/browser-storage';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import {
@@ -50,6 +51,13 @@ export function EditableSection({
     const [regeneratePrompt, setRegeneratePrompt] = useState('');
     const [selectedModel, setSelectedModel] = useState<DraftModelId>('anthropic/claude-sonnet-4.5');
     const [popoverOpen, setPopoverOpen] = useState(false);
+    const [remoteChanged, setRemoteChanged] = useState(false);
+    const [regenerateError, setRegenerateError] = useState('');
+    const published = useRef(new Set<string>());
+    const backupKey = 'newsletter_edit_' + title + '_' + Array.from(storyContext).reduce((hash, character) => ((hash << 5) - hash + character.charCodeAt(0)) | 0, 0);
+    useEffect(() => {
+        if (isEditing && !published.current.has(content)) setRemoteChanged(true);
+    }, [content, isEditing]);
     const containerRef = useRef<HTMLDivElement>(null);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -59,7 +67,7 @@ export function EditableSection({
 
         function handleClickOutside(event: MouseEvent) {
             if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
-                cancelEdit();
+                setIsEditing(false);
             }
         }
 
@@ -76,14 +84,19 @@ export function EditableSection({
 
     // Start editing
     function startEdit() {
-        setEditValue(content);
+        published.current = new Set([content]); setRemoteChanged(false);
+        const backup = browserStorage.getItem(backupKey);
+        try { const saved = backup ? JSON.parse(backup) : null;
+            setEditValue(saved?.value ?? content);
+            if (saved && saved.value !== content) setRemoteChanged(true);
+        } catch { setEditValue(content); }
         setIsEditing(true);
         setTimeout(() => textareaRef.current?.focus(), 50);
     }
 
     // Save edit
     function saveEdit() {
-        onUpdate(editValue);
+        if (!remoteChanged) { onUpdate(editValue); browserStorage.removeItem(backupKey); }
         setIsEditing(false);
     }
 
@@ -97,14 +110,14 @@ export function EditableSection({
     async function handleRegenerate() {
         if (!regeneratePrompt.trim()) return;
 
-        setIsRegenerating(true);
+        setIsRegenerating(true); setRegenerateError('');
         try {
             const newContent = await onRegenerate(regeneratePrompt, selectedModel);
             onUpdate(newContent);
             setPopoverOpen(false);
             setRegeneratePrompt('');
         } catch (error) {
-            console.error('Regeneration failed:', error);
+            setRegenerateError('Regeneration failed. Your current text is retained. Retry when connected.');
         } finally {
             setIsRegenerating(false);
         }
@@ -127,13 +140,13 @@ export function EditableSection({
             {/* Section Header */}
             <div className="flex items-center justify-between mb-2">
                 <h3 className="text-sm font-semibold text-amber-400/80">{title}</h3>
-                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                <div className="flex items-center gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
                     {!isEditing && (
                         <>
                             <button
                                 onClick={startEdit}
                                 className="p-1.5 rounded-lg hover:bg-white/10 text-white/40 hover:text-amber-400 transition-colors"
-                                title="Edit"
+                                aria-label={'Edit ' + title} title="Edit"
                             >
                                 <Edit3 className="w-3.5 h-3.5" />
                             </button>
@@ -141,7 +154,7 @@ export function EditableSection({
                                 <PopoverTrigger asChild>
                                     <button
                                         className="p-1.5 rounded-lg hover:bg-white/10 text-white/40 hover:text-amber-400 transition-colors"
-                                        title="Regenerate with prompt"
+                                        aria-label={'Regenerate ' + title} title="Regenerate with prompt"
                                     >
                                         <Sparkles className="w-3.5 h-3.5" />
                                     </button>
@@ -229,18 +242,26 @@ export function EditableSection({
                 </div>
             </div>
 
+            {regenerateError && <p role="alert" className="mb-2 text-sm text-amber-200">{regenerateError}</p>}
             {/* Content Area */}
             {isEditing ? (
                 <div className="space-y-2">
                     <Textarea
                         ref={textareaRef}
                         value={editValue}
-                        onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setEditValue(e.target.value)}
+                        aria-label={title}
+                        onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => {
+                            const value = e.target.value; setEditValue(value);
+                            browserStorage.setItem(backupKey, JSON.stringify({ value }));
+                            if (!remoteChanged) { published.current.add(value); onUpdate(value); }
+                        }}
                         onKeyDown={handleKeyDown}
                         placeholder={placeholder}
                         className="bg-black/30 border-amber-500/30 text-white text-sm min-h-[100px] resize-y focus:ring-amber-500/30 focus:border-amber-500/50"
                     />
-                    <div className="flex items-center gap-2 justify-between">
+                    {remoteChanged && <p role="alert" className="text-xs text-amber-200">This section changed or has a recovered local copy. Your typing is retained. Resolve the cloud warning, then review the saved text before applying your copy.
+                        <button className="ml-2 underline" onClick={() => { published.current.add(editValue); onUpdate(editValue); setRemoteChanged(false); }}>Apply my copy</button></p>}
+                    <div className="flex flex-wrap items-center gap-2 justify-between">
                         <span className="text-xs text-white/30">Esc to cancel • Ctrl+Enter to save</span>
                         <div className="flex gap-2">
                             <Button
@@ -250,7 +271,7 @@ export function EditableSection({
                                 className="text-white/60 h-8 hover:text-white"
                             >
                                 <X className="w-3.5 h-3.5 mr-1" />
-                                Cancel
+                                Close
                             </Button>
                             <Button
                                 onClick={saveEdit}
@@ -258,7 +279,7 @@ export function EditableSection({
                                 className="bg-teal-500 hover:bg-teal-600 text-[#0B0B0F] font-semibold h-8"
                             >
                                 <Check className="w-3.5 h-3.5 mr-1" />
-                                Save
+                                Done
                             </Button>
                         </div>
                     </div>

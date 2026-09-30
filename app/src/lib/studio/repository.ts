@@ -69,7 +69,7 @@ function fail(error: { code?: string; message?: string } | null) {
   if (['42P01', 'PGRST205', '42883', 'PGRST202'].includes(error.code || ''))
     throw new StudioError(
       'migration_required',
-      'Image Studio storage is not installed. Apply migration 003_image_studio_v2.sql.',
+      'Image Studio storage is not installed. Apply migrations 003_image_studio_v2.sql and 005_canonical_newsletter.sql.',
       503,
     );
   throw new StudioError(
@@ -120,6 +120,7 @@ export class SupabaseStudioRepository implements StudioRepository {
   async checkReady() {
     for (const table of [
       'studio_drafts',
+      'newsletter_versions',
       'studio_assets',
       'studio_style_packs',
       'studio_generations',
@@ -166,27 +167,13 @@ export class SupabaseStudioRepository implements StudioRepository {
     return data ? draftRow(data) : null;
   }
   async saveDraft(draft: StudioDraft, revision: number | null) {
-    const row = {
-      id: draft.studioDraftId,
-      payload: draft,
-      revision: (revision || 0) + 1,
-      updated_at: new Date().toISOString(),
-    };
-    const query =
-      revision === null
-        ? this.db.from('studio_drafts').insert(row)
-        : this.db
-            .from('studio_drafts')
-            .update(row)
-            .eq('id', row.id)
-            .eq('revision', revision);
-    const { data, error } = await query.select('*').maybeSingle();
-    if (error?.code === '23505' || (!error && !data))
-      throw new StudioError(
-        'revision_conflict',
-        'This draft changed in another browser. Reload its saved version before saving again.',
-        409,
-      );
+    const { data, error } = await this.db.rpc('newsletter_studio_save', {
+      body: draft, expected_revision: revision,
+    });
+    if (data?.choiceRequired)
+      throw new StudioError('draft_recovery_required', 'Review the preserved draft versions in Current newsletter before editing images.', 409);
+    if (data?.conflict)
+      throw new StudioError('revision_conflict', 'This draft changed in another browser. Reload its saved version before saving again.', 409);
     fail(error);
     return draftRow(data!);
   }

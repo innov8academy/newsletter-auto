@@ -153,6 +153,8 @@ export interface GenerationRun {
   costs: CostReceipt[];
   quality: QualityCheck | null;
   error: string | null;
+  errorCode?: string;
+  diagnostic?: import('./errors').ProviderDiagnostic;
   startedAt: string;
   finishedAt: string | null;
 }

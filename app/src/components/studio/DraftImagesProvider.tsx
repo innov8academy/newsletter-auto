@@ -8,7 +8,7 @@ import {
   useState,
   type ReactNode,
 } from 'react';
-import { getCurrentDateContext, useWizard } from '@/context/WizardContext';
+import { useWizard } from '@/context/WizardContext';
 import { useSharedSession } from '@/components/SharedSessionProvider';
 import { browserStorage as localStorage } from '@/lib/browser-storage';
 import type { StoryBlock } from '@/lib/draft-generator';
@@ -19,7 +19,7 @@ import {
   DraftImageClient,
   type DraftImageStatus,
 } from '@/lib/studio/draft-image-client';
-import { saveWizardDraft, type WizardSections } from '@/lib/studio/wizard-draft';
+import { type WizardSections } from '@/lib/studio/wizard-draft';
 import { studioApi, StudioClientError } from './client-api';
 import { createUuid } from '@/lib/uuid';
 
@@ -84,28 +84,9 @@ export function DraftImagesProvider({ children }: { children: ReactNode }) {
   const [setupError, setSetupError] = useState('');
   const [draftError, setDraftError] = useState('');
   const active = useRef(new Set<string>());
-  const savedId = useRef<string | null>(null);
   const sessionId = useRef<string | null>(null);
-  const syncedWizard = useRef<{ sessionId: string; signature: string } | null>(null);
   const seenSharedDraft = useRef<string | null>(null);
   const refreshing = useRef(false);
-
-  const shareStudioRevision = useCallback(() => {
-    try {
-      const local = client.current?.draft();
-      const shared = sharedClient.getSnapshot().state;
-      if (!local || !shared || shared.sessionId !== sessionId.current ||
-          shared.currentDraft?.studioDraftId !== local.studioDraftId ||
-          local.studioServerRevision == null ||
-          local.studioServerRevision <= (shared.currentDraft.studioServerRevision ?? -1)) return;
-      sharedClient.mutate({ currentDraft: {
-        ...shared.currentDraft,
-        studioServerRevision: local.studioServerRevision,
-      } });
-    } catch (cause) {
-      setDraftError(cause instanceof Error ? cause.message : 'Could not share the Studio revision.');
-    }
-  }, [sharedClient]);
 
   const refresh = useCallback(async () => {
     const session = client.current;
@@ -134,8 +115,19 @@ export function DraftImagesProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    client.current = new DraftImageClient(localStorage, studioApi);
-    void studioApi<{
+    client.current = new DraftImageClient(localStorage, studioApi, async () => {
+      if (!await sharedClient.waitForSaved()) throw new Error('Save or resolve the cloud warning before generating images. No image request was sent.');
+      const current = sharedClient.getSnapshot().state?.currentDraft;
+      if (!current || current.studioServerRevision == null) throw new Error('The cloud draft is not ready. Retry cloud saving before generating images.');
+      return { id: current.studioDraftId!, payload: upgradeDraft(current), revision: current.studioServerRevision, updatedAt: sharedClient.getSnapshot().state?.updatedAt ?? '' };
+    });
+    void checkSetup();
+  // Stable page coordinator retains in-flight image request identities.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sharedClient]);
+  const authSeen = useRef(false);
+  const checkSetup = useCallback(() => {
+    return studioApi<{
       storage: { ready: boolean; error: string };
       planner: { configured: boolean };
       search: { configured: boolean };
@@ -162,120 +154,40 @@ export function DraftImagesProvider({ children }: { children: ReactNode }) {
         ),
       );
   }, []);
+  useEffect(() => {
+    if (sharedSnapshot.phase === 'auth') authSeen.current = true;
+    if (sharedSnapshot.phase === 'ready' && authSeen.current) {
+      authSeen.current = false; void checkSetup();
+    }
+  }, [sharedSnapshot.phase, checkSetup]);
 
   useEffect(() => {
     const shared = sharedSnapshot.state;
-    if (!shared || sharedSnapshot.phase === 'loading' || sharedSnapshot.phase === 'load_error' || sharedSnapshot.phase === 'conflict') return;
+    if (!shared || sharedSnapshot.phase === 'loading' || sharedSnapshot.phase === 'load_error' || sharedSnapshot.phase === 'conflict' || sharedSnapshot.phase === 'auth') return;
     if (sessionId.current !== shared.sessionId) {
       sessionId.current = shared.sessionId;
-      syncedWizard.current = null;
       seenSharedDraft.current = null;
-      savedId.current = null;
       setDraft(null);
       setStatus({ stories: [], assets: [] });
       setErrors({});
       setBusy({});
     }
-    // The parent restores wizard state after a session switch. Wait until its
-    // reports and completed sections match this session before writing a draft.
-    if (!selectedReports.length) {
-      setDraft(null);
-      setDraftError('');
-      return;
-    }
-    if (!matchesSharedWizard(selectedReports, completed, shared.wizardState)) return;
-    const signature = stableJson({ selectedReports, completed });
-    const sharedDraftJson = stableJson(shared.currentDraft);
-    let existing: StudioDraft | null = null;
-    if (shared.currentDraft) {
-      try {
-        const upgraded = upgradeDraft(shared.currentDraft);
-        if (
-          stableJson(upgraded) === sharedDraftJson &&
-          upgraded.stories.length === selectedReports.length &&
-          upgraded.stories.every(
-            (story, index) => story.sourceStoryId === selectedReports[index].story.id,
-          )
-        ) existing = upgraded;
-      } catch {
-        // saveWizardDraft retains a backup and repairs malformed local drafts.
-      }
-    }
-    if (
-      syncedWizard.current?.sessionId === shared.sessionId &&
-      syncedWizard.current.signature === signature
-    ) {
-      if (seenSharedDraft.current === sharedDraftJson) return;
-      if (existing || !shared.currentDraft) {
-        setDraft(existing);
-        setDraftError('');
-        seenSharedDraft.current = sharedDraftJson;
-        if (existing && savedId.current !== existing.studioDraftId) {
-          savedId.current = existing.studioDraftId;
-        }
-        if (existing) void refresh();
-        return;
-      }
-      syncedWizard.current = null;
-    }
-    if (!syncedWizard.current && existing) {
-      syncedWizard.current = { sessionId: shared.sessionId, signature };
-      seenSharedDraft.current = sharedDraftJson;
-      setDraft(existing);
-      setDraftError('');
-      if (savedId.current !== existing.studioDraftId) {
-        savedId.current = existing.studioDraftId;
+    if (!shared.currentDraft) { setDraft(null); return; }
+    try {
+      const next = upgradeDraft(shared.currentDraft);
+      setDraft(next); setDraftError('');
+      if (seenSharedDraft.current !== stableJson(next)) {
+        seenSharedDraft.current = stableJson(next);
         void refresh();
       }
-      return;
-    }
-    let next: StudioDraft;
-    try {
-      next = saveWizardDraft(
-        completed,
-        selectedReports,
-        getCurrentDateContext(),
-      );
-    } catch (cause) {
-      setDraft(null);
-      savedId.current = null;
-      setDraftError(
-        cause instanceof Error
-          ? cause.message
-          : 'This draft could not be saved. Your writing is still available.',
-      );
-      return;
-    }
-    setDraft(next);
-    setDraftError('');
-    if (savedId.current !== next.studioDraftId) {
-      savedId.current = next.studioDraftId;
-      setStatus({ stories: [], assets: [] });
-      setErrors({});
-      void refresh();
-    }
-    try {
-      if (sharedDraftJson !== stableJson(next))
-        sharedClient.mutate({ currentDraft: next });
-      syncedWizard.current = { sessionId: shared.sessionId, signature };
-      seenSharedDraft.current = stableJson(next);
-    } catch (cause) {
-      setDraftError(
-        cause instanceof Error
-          ? cause.message
-          : 'The shared draft could not be saved. Your writing is still available.',
-      );
-    }
-  }, [completed, selectedReports, refresh, sharedClient, sharedSnapshot]);
+    } catch { setDraftError('The saved draft needs recovery before using images. Your writing is retained.'); }
+  }, [refresh, sharedSnapshot]);
 
-  const polling =
-    Object.values(busy).some(Boolean) ||
-    status.stories.some((story) => story.latest?.status === 'running');
   useEffect(() => {
-    if (!polling) return;
-    const timer = window.setInterval(() => void refresh(), 3000);
+    if (!draft?.studioDraftId) return;
+    const timer = window.setInterval(() => { if (document.visibilityState === 'visible') void refresh(); }, 5000);
     return () => window.clearInterval(timer);
-  }, [polling, refresh]);
+  }, [draft?.studioDraftId, refresh]);
   useEffect(() => {
     const onFocus = () => void refresh();
     window.addEventListener('focus', onFocus);
@@ -305,13 +217,13 @@ export function DraftImagesProvider({ children }: { children: ReactNode }) {
             }));
         })
         .finally(() => {
-          shareStudioRevision();
+          void sharedClient.load();
           active.current.delete(storyId);
           setBusy((old) => ({ ...old, [storyId]: false }));
           void refresh();
         });
     },
-    [refresh, shareStudioRevision],
+    [refresh, sharedClient],
   );
   const generate = useCallback(
     (storyId: string, retry = false) => {
@@ -344,18 +256,26 @@ export function DraftImagesProvider({ children }: { children: ReactNode }) {
             : story,
         ),
       };
-      localStorage.setItem('currentDraft', JSON.stringify(next));
+      const shared = sharedClient.getSnapshot().state;
+      if (!shared) return;
+      const wizard = shared.wizardState as { completed?: WizardSections; selectedReports?: ResearchReport[] } | null;
+      if (!wizard?.completed) return;
+      const stories = [...wizard.completed.stories];
+      const index = wizard.selectedReports?.findIndex(report => report.story.id === sourceId) ?? -1;
+      if (index < 0) return;
+      stories[index] = { ...body, sourceStoryId: sourceId };
+      sharedClient.mutate({ currentDraft: next, wizardState: { ...wizard, completed: { ...wizard.completed, stories } } });
       setDraft(next);
       generate(target.studioStoryId);
     },
-    [generate],
+    [generate, sharedClient],
   );
   const sync = useCallback(async () => {
     if (client.current) {
       await client.current.sync();
-      shareStudioRevision();
+      await sharedClient.load();
     }
-  }, [shareStudioRevision]);
+  }, [sharedClient]);
   const refine = useCallback(
     (storyId: string, source: GenerationRun, instruction: string) => {
       perform(storyId, (session) =>

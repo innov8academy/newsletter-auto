@@ -693,6 +693,7 @@ export class StudioService {
         error instanceof StudioError
           ? error.message
           : 'Generation could not be completed. No automatic rerender was requested.';
+      if (error instanceof StudioError) { run.errorCode = error.code; run.diagnostic = error.diagnostic; }
       run.finishedAt = new Date().toISOString();
       await this.repo.saveGeneration(run).catch(() => undefined);
       return run;

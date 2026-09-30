@@ -1,6 +1,7 @@
 // Types for the newsletter automation system
 
 export interface NewsItem {
+  primaryLinks?: string[];
   id: string;
   title: string;
   url: string;
@@ -16,6 +17,7 @@ export interface NewsItem {
 
 // Curated story after AI processing
 export interface CuratedStory {
+  primaryLinks?: string[];
   id: string;
   headline: string;
   summary: string;
@@ -44,7 +46,7 @@ export interface RSSFeed {
   url: string;
   category: string;
   tier?: number;
-  format?: 'rss' | 'anthropic-news';
+  format?: 'rss' | 'anthropic-news' | 'huggingnews';
   fallbackUrl?: string;
 }
 

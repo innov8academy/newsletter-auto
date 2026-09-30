@@ -98,14 +98,25 @@ async function providerJson(
   try {
     const res = await fetcher(url, { ...init, signal: controller.signal });
     if (!res.ok) {
-      const message =
-        res.status === 401 || res.status === 403
-          ? 'The provider rejected the server credentials or model access.'
+      let detail: Record<string, unknown> = {};
+      try { const raw = await res.json(); detail = raw?.error ?? {}; } catch { /* Body omitted intentionally. */ }
+      const limit = detail.limit_source ?? (detail.metadata as Record<string, unknown> | undefined)?.limit_source;
+      const rawId = res.headers.get('x-request-id');
+      const retry = Number(res.headers.get('retry-after'));
+      const diagnostic = {
+        upstreamStatus: res.status,
+        ...(rawId && /^[a-zA-Z0-9_-]{1,128}$/.test(rawId) ? { requestId: rawId } : {}),
+        ...(res.headers.has('retry-after') && Number.isFinite(retry) && retry >= 0 && retry <= 86400 ? { retryAfterSeconds: retry } : {}),
+        ...(['account', 'key', 'provider'].includes(String(limit)) ? { limitSource: limit as 'account' | 'key' | 'provider' } : {}),
+      };
+      const message = res.status === 401 || res.status === 403
+        ? 'The image provider rejected the server key or model access. Your app login and saved writing are separate; check the configured provider key.'
+        : res.status === 402
+          ? 'The provider could not fund this image request. Check the active key limit, account balance and pending requests; this does not establish an empty account.'
           : res.status === 429
-            ? 'The provider is rate-limited or out of credits. Retry when ready.'
-            : `The provider returned HTTP ${res.status}. No alternate model was requested.`;
-      // Do not reflect upstream response bodies: they can contain credentials or submitted data.
-      throw new StudioError(`provider_${res.status}`, message, 502);
+            ? 'The provider rate limit was reached. Wait before explicitly retrying.'
+            : 'The provider returned HTTP ' + res.status + '. No automatic retry or alternate model was requested.';
+      throw new StudioError('provider_' + res.status, message, 502, diagnostic);
     }
     return {
       data: await res.json(),
