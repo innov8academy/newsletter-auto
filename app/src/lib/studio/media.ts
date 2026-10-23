@@ -246,19 +246,39 @@ export async function prepareOutput(
   bytes: Buffer,
   preset: 'nano-pro-2k' | 'gpt-image-2-high',
 ) {
+  let meta: sharp.Metadata;
   try {
-    const meta = await sharp(bytes, {
+    meta = await sharp(bytes, {
       limitInputPixels: MAX_PIXELS,
     }).metadata();
-    if (!meta.width || !meta.height || Math.max(meta.width, meta.height) < 2048)
-      throw new Error('resolution');
-    if (
-      preset === 'gpt-image-2-high' &&
-      (meta.width !== 2048 || meta.height !== 1152)
-    )
-      throw new Error('resolution');
-    if (Math.abs(meta.width / meta.height - 16 / 9) > 0.05)
-      throw new Error('ratio');
+  } catch {
+    throw new StudioError(
+      'unreadable_output',
+      'The provider returned image data that could not be read within the 40-megapixel limit. No automatic image retry was made.',
+      502,
+    );
+  }
+  const { width, height } = meta;
+  if (!width || !height)
+    throw new StudioError(
+      'unreadable_output',
+      'The provider returned image data whose dimensions could not be read. No automatic image retry was made.',
+      502,
+    );
+  const expected = preset === 'gpt-image-2-high'
+    ? 'a 2048×1152 image'
+    : 'a 2K landscape image (16:9, at least 2048 pixels wide)';
+  if (
+    Math.max(width, height) < 2048 ||
+    (preset === 'gpt-image-2-high' && (width !== 2048 || height !== 1152)) ||
+    Math.abs(width / height - 16 / 9) > 0.05
+  )
+    throw new StudioError(
+      'invalid_output',
+      `The provider returned ${width}×${height}; this preset requires ${expected}. No image was upscaled or automatically regenerated.`,
+      502,
+    );
+  try {
     const original = await sharp(bytes, { limitInputPixels: MAX_PIXELS })
       .png()
       .toBuffer();
@@ -270,11 +290,11 @@ export async function prepareOutput(
       })
       .jpeg({ quality: 88, mozjpeg: true })
       .toBuffer();
-    return { original, delivery, width: meta.width, height: meta.height };
+    return { original, delivery, width, height };
   } catch {
     throw new StudioError(
-      'invalid_output',
-      'The provider output did not match the selected 2K landscape preset. It was not silently upscaled.',
+      'output_processing_failed',
+      `The ${width}×${height} provider image could not be prepared for download. No automatic image retry was made.`,
       502,
     );
   }

@@ -1,6 +1,6 @@
 # Image Studio v2 setup and live test
 
-The default preset is Nano Banana Pro 2K through OpenRouter. GPT Image 2 uses the direct OpenAI Images API at 2048×1152/high. Gemini 3.7 Flash handles planning, reference analysis and advisory QA. No renderer silently falls back to another model.
+The default preset is Nano Banana Pro 2K through OpenRouter Chat Completions with `image_config: { image_size: "2K", aspect_ratio: "16:9" }`. Its dedicated Images API returned 1376×768 despite `resolution: "2K"` in the captured October 23 diagnostic. GPT Image 2 uses the direct OpenAI Images API at 2048×1152/high. Gemini 3.7 Flash handles planning, reference analysis and advisory QA. No renderer silently falls back to another model.
 
 ## Activate the backend
 
@@ -30,6 +30,8 @@ Missing default style now blocks planning/rendering before paid calls. It is dis
 ## Validation
 
 Run `npm run test:studio`, `npx tsc --noEmit --incremental false`, and `npm run build`. Focused tests exercise the actual Studio service and image processing against a memory repository; no provider credentials are required and no paid calls occur.
+
+To inspect a saved failure without generating another image, run `node --conditions=react-server --import tsx scripts/studio-diagnose-output.ts --generation GENERATION_UUID`. Only add `--render` after approval for a paid diagnostic. That flag makes one image request using the saved prompt and references, then saves the raw provider bytes and a safe receipt under `output/studio-image-diagnostics/` before validating the image. It does not update the draft or its image selection. Output errors distinguish unreadable image data, the received dimensions, and a preparation failure.
 
 For a full UI check without touching live data, run `node --conditions=react-server --import tsx scripts/studio-browser-fixture.ts`. It runs the app on port 3001 with a local Supabase-compatible fixture service on 4319. It overrides provider keys with empty values and uses supplied reference images as clearly labelled fixture output. Do not treat fixture screenshots as creative-quality evidence.
 

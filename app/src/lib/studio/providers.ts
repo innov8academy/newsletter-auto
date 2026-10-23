@@ -35,20 +35,24 @@ export function buildImageRequest(
     );
   if (id === 'nano-pro-2k')
     return {
-      url: `${ORIGIN}/images`,
+      url: `${ORIGIN}/chat/completions`,
       init: {
         method: 'POST',
         headers: headers(key),
         body: JSON.stringify({
           model: PRESETS[id].model,
-          prompt,
-          resolution: '2K',
-          aspect_ratio: '16:9',
-          n: 1,
-          input_references: references.map((ref) => ({
-            type: 'image_url',
-            image_url: { url: dataUrl(ref) },
-          })),
+          modalities: ['image', 'text'],
+          image_config: { aspect_ratio: '16:9', image_size: '2K' },
+          messages: [{
+            role: 'user',
+            content: [
+              { type: 'text', text: prompt },
+              ...references.map((ref) => ({
+                type: 'image_url',
+                image_url: { url: dataUrl(ref) },
+              })),
+            ],
+          }],
         }),
       },
     };
@@ -156,24 +160,46 @@ export async function renderImage(
     deadline,
     fetcher,
   );
-  const images = result.data.data as
-    | { b64_json?: string; media_type?: string }[]
-    | undefined;
-  if (!images?.[0]?.b64_json)
-    throw new StudioError(
-      'no_image',
-      'The provider returned no image bytes.',
-      502,
-    );
-  if (images[0].b64_json.length > 48 * 1024 * 1024)
+  let encoded: string;
+  let mimeType: string;
+  if (id === 'nano-pro-2k') {
+    const choices = result.data.choices as
+      | { message?: { images?: { image_url?: { url?: unknown } }[] } }[]
+      | undefined;
+    const imageUrl = choices?.[0]?.message?.images?.[0]?.image_url?.url;
+    if (imageUrl == null)
+      throw new StudioError('no_image', 'The provider returned no image bytes.', 502);
+    if (typeof imageUrl !== 'string')
+      throw new StudioError('unreadable_output', 'The provider returned an unreadable image payload.', 502);
+    const comma = imageUrl.indexOf(',');
+    const header = comma < 0 ? '' : imageUrl.slice(0, comma).toLowerCase();
+    if (!['data:image/png;base64', 'data:image/jpeg;base64', 'data:image/webp;base64'].includes(header))
+      throw new StudioError('unreadable_output', 'The provider returned an unsupported image payload.', 502);
+    mimeType = header.slice('data:'.length, -';base64'.length);
+    encoded = imageUrl.slice(comma + 1);
+  } else {
+    const images = result.data.data as
+      | { b64_json?: string; media_type?: string }[]
+      | undefined;
+    if (!images?.[0]?.b64_json)
+      throw new StudioError('no_image', 'The provider returned no image bytes.', 502);
+    encoded = images[0].b64_json;
+    mimeType = images[0].media_type || 'image/png';
+  }
+  if (encoded.length > 48 * 1024 * 1024)
     throw new StudioError(
       'oversized_output',
       'The provider output exceeded the storage limit.',
       502,
     );
+  if (id === 'nano-pro-2k' && (!/^[A-Za-z0-9+/]+={0,2}$/.test(encoded) || encoded.length % 4 !== 0))
+    throw new StudioError('unreadable_output', 'The provider returned malformed image bytes.', 502);
+  const bytes = Buffer.from(encoded, 'base64');
+  if (id === 'nano-pro-2k' && bytes.toString('base64') !== encoded)
+    throw new StudioError('unreadable_output', 'The provider returned malformed image bytes.', 502);
   return {
-    bytes: Buffer.from(images[0].b64_json, 'base64'),
-    mimeType: images[0].media_type || 'image/png',
+    bytes,
+    mimeType,
     requestId:
       result.requestId ||
       (typeof result.data.id === 'string' ? result.data.id : null),

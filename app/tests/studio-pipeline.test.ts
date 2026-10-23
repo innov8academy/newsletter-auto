@@ -590,7 +590,7 @@ test('missing default style stops both planning and automatic rendering before p
   assert.equal(status.style.configured, false);
 });
 
-test('only the three reviewed style files and two news images reach both native rendering APIs', async () => {
+test('only the three reviewed style files and two news images reach both rendering APIs', async () => {
   const f = await fixture({ withStyle: true });
   const news = await Promise.all([asset(f, 'news'), asset(f, 'news')]);
   await f.service.saveWork(f.draft.studioDraftId, f.storyId, {
@@ -625,11 +625,11 @@ test('only the three reviewed style files and two news images reach both native 
     buildImageRequest('nano-pro-2k', prompt, refs, 'offline').init
       .body as string,
   );
-  assert.equal(nano.input_references.length, 5);
-  assert.ok(
-    nano.input_references.every((ref: { image_url: { url: string } }) =>
-      ref.image_url.url.startsWith('data:image/'),
-    ),
+  const nanoImages = nano.messages[0].content.slice(1);
+  assert.equal(nanoImages.length, 5);
+  assert.deepEqual(
+    nanoImages.map((part: { image_url: { url: string } }) => part.image_url.url),
+    refs.map((ref) => `data:${ref.mimeType};base64,${ref.bytes.toString('base64')}`),
   );
   const gpt = buildImageRequest('gpt-image-2-high', prompt, refs, 'offline')
     .init.body as FormData;

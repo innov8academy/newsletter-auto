@@ -120,7 +120,7 @@ test('clear removes every prompt input while retaining generation selection', ()
   assert.equal(cleared.selectedGenerationId, 'generation');
 });
 
-test('image adapters use native image APIs and correct presets', () => {
+test('image adapters use the Nano chat image config and preserve the direct GPT API', () => {
   const refs = [
     {
       id: 'a',
@@ -132,17 +132,19 @@ test('image adapters use native image APIs and correct presets', () => {
     },
   ];
   const nano = buildImageRequest('nano-pro-2k', 'A device', refs, 'key');
-  assert.equal(nano.url, 'https://openrouter.ai/api/v1/images');
+  assert.equal(nano.url, 'https://openrouter.ai/api/v1/chat/completions');
   const payload = JSON.parse(nano.init.body as string);
   assert.equal(payload.model, 'google/gemini-3-pro-image');
-  assert.equal(payload.resolution, '2K');
-  assert.equal(payload.aspect_ratio, '16:9');
-  assert.equal(payload.n, 1);
+  assert.deepEqual(payload.modalities, ['image', 'text']);
+  assert.deepEqual(payload.image_config, { aspect_ratio: '16:9', image_size: '2K' });
+  assert.deepEqual(payload.messages[0].content[0], { type: 'text', text: 'A device' });
   assert.ok(
-    payload.input_references[0].image_url.url.startsWith(
+    payload.messages[0].content[1].image_url.url.startsWith(
       'data:image/png;base64,',
     ),
   );
+  for (const field of ['prompt', 'resolution', 'aspect_ratio', 'n', 'input_references'])
+    assert.equal(payload[field], undefined);
   const gpt = buildImageRequest('gpt-image-2-high', 'A device', refs, 'key');
   assert.equal(gpt.url, 'https://api.openai.com/v1/images/edits');
   const form = gpt.init.body as FormData;
