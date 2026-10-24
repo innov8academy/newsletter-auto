@@ -2,7 +2,7 @@
 // POST /api/research - Generate comprehensive research report for a story
 
 import { NextRequest, NextResponse } from 'next/server';
-import { generateResearchReport, ResearchModelId } from '@/lib/researcher';
+import { DEFAULT_RESEARCH_MODEL, generateResearchReport, ResearchModelId } from '@/lib/researcher';
 import { CuratedStory } from '@/lib/types';
 import { calculateCost } from '@/lib/cost-tracker';
 
@@ -29,11 +29,11 @@ export async function POST(request: NextRequest) {
             direction?: string;
         };
 
-        const apiKey = clientApiKey || process.env.OPENROUTER_API_KEY || '';
-        const selectedModel = modelId || 'perplexity/sonar';
+        const apiKey = (typeof clientApiKey === 'string' && clientApiKey.trim()) || process.env.OPENROUTER_API_KEY || '';
+        const selectedModel = modelId || DEFAULT_RESEARCH_MODEL;
 
         console.log('[Research API] Using model:', selectedModel);
-        console.log('[Research API] API key present:', !!apiKey, 'length:', apiKey?.length);
+        console.log('[Research API] OpenRouter key present:', !!apiKey);
 
         if (!story) {
             return NextResponse.json(
@@ -44,7 +44,7 @@ export async function POST(request: NextRequest) {
 
         if (!apiKey) {
             return NextResponse.json(
-                { success: false, error: 'API key is required' },
+                { success: false, error: 'Configure an OpenRouter API key to run research.' },
                 { status: 400 }
             );
         }
@@ -53,7 +53,7 @@ export async function POST(request: NextRequest) {
         const startTime = Date.now();
 
         console.log('[Research API] Calling generateResearchReport...');
-        const result = await generateResearchReport(story, apiKey, modelId, direction);
+        const result = await generateResearchReport(story, apiKey, selectedModel, direction);
         console.log('[Research API] generateResearchReport returned:', { success: result.success, hasReport: !!result.report, error: result.error });
 
         const duration = ((Date.now() - startTime) / 1000).toFixed(1);
@@ -62,7 +62,13 @@ export async function POST(request: NextRequest) {
         // Estimate cost: ~1500 input tokens (prompt + story) and ~2000 output tokens (research report)
         const estimatedInputTokens = 1500;
         const estimatedOutputTokens = 2000;
-        const cost = calculateCost(selectedModel, estimatedInputTokens, estimatedOutputTokens);
+        const resolvedModel = result.model || selectedModel;
+        const cost = result.cost === null
+            ? null
+            : result.cost ?? calculateCost(resolvedModel, estimatedInputTokens, estimatedOutputTokens);
+        const costBasis = result.cost === null
+            ? 'unknown'
+            : result.cost !== undefined ? 'provider' : 'estimate';
 
         if (result.success) {
             return NextResponse.json({
@@ -70,8 +76,9 @@ export async function POST(request: NextRequest) {
                 report: result.report,
                 duration: parseFloat(duration),
                 cost,
+                costBasis,
                 costSource: 'research',
-                model: selectedModel,
+                model: resolvedModel,
             });
         } else {
             return NextResponse.json(

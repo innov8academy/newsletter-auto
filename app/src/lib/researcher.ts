@@ -1,18 +1,19 @@
-// Deep Research Agent using OpenRouter + Direct Gemini API
+// Deep Research Agent using OpenRouter
 // Generates newsletter-ready content for news stories
 
 import { CuratedStory, ResearchReport } from './types';
 import { ALEX_VOICE } from './config';
-import { callGemini } from './gemini-client';
 
 const OPENROUTER_API_URL = 'https://openrouter.ai/api/v1/chat/completions';
 
 // Available models for research - user can select from these
-// Updated March 2026: Budget options first, organized by cost
+// Budget options first, organized by cost
+export const BUDGET_RESEARCH_MODEL = 'google/gemini-3.1-flash-lite';
+export const DEFAULT_RESEARCH_MODEL = 'budget/gemini-grounded';
 export const RESEARCH_MODELS = [
-    // Budget Research (FREE or near-free)
-    { id: 'budget/gemini-grounded', name: 'Budget: Gemini + Google Search', description: '💸 FREE! Gemini 3.1 Flash Lite + Google Search grounding', category: 'budget' },
-    { id: 'budget/serper-gemini', name: 'Budget: Serper + Gemini', description: '💸 ~$0.003/story. Serper search + Gemini synthesis', category: 'budget' },
+    // Budget Research
+    { id: 'budget/gemini-grounded', name: 'Budget: Gemini + Google Search', description: 'Gemini 3.1 Flash Lite via OpenRouter. Uses OpenRouter credits.', category: 'budget' },
+    { id: 'budget/serper-gemini', name: 'Budget: Serper + Gemini', description: 'Serper search + Gemini 3.1 Flash Lite via OpenRouter. Uses OpenRouter credits.', category: 'budget' },
 
     // Deep Research Specialists (have web access or agentic research capability)
     { id: 'perplexity/sonar-deep-research', name: 'Perplexity Deep Research', description: '🔬 Best deep research - $0.50-1.00/story', category: 'research' },
@@ -28,25 +29,25 @@ export const RESEARCH_MODELS = [
     { id: 'deepseek/deepseek-r1', name: 'DeepSeek R1', description: 'Powerful reasoning', category: 'general' },
 
     // Fast & Cheap
-    { id: 'google/gemini-3.1-flash-lite-preview', name: 'Gemini 3.1 Flash Lite', description: 'Fast & free tier available', category: 'fast' },
+    { id: 'google/gemini-3.1-flash-lite-preview', name: 'Gemini 3.1 Flash Lite', description: 'Fast, low-cost OpenRouter model', category: 'fast' },
     { id: 'anthropic/claude-3.5-haiku', name: 'Claude 3.5 Haiku', description: 'Fast & cheap', category: 'fast' },
 ] as const;
 
 export type ResearchModelId = typeof RESEARCH_MODELS[number]['id'];
 
-const DEFAULT_MODEL: ResearchModelId = 'budget/gemini-grounded';
-
 interface ResearchResult {
     success: boolean;
     report?: ResearchReport;
     error?: string;
+    model?: string;
+    cost?: number | null;
 }
 
 /**
  * Generate newsletter-ready research content for a curated news story.
  * @param story - The curated story to research
  * @param apiKey - OpenRouter API key
- * @param modelId - Optional model override (defaults to Claude Sonnet 4)
+ * @param modelId - Optional model override (defaults to DEFAULT_RESEARCH_MODEL)
  */
 export async function generateResearchReport(
     story: CuratedStory,
@@ -61,13 +62,13 @@ export async function generateResearchReport(
         hasApiKey: !!apiKey
     });
 
-    const selectedModel = modelId || DEFAULT_MODEL;
+    const selectedModel = modelId || DEFAULT_RESEARCH_MODEL;
     console.log('[generateResearchReport] Selected model:', selectedModel);
 
-    // Budget research modes — use direct Gemini API (free tier)
+    // Budget aliases use one OpenRouter model.
     if (selectedModel.startsWith('budget/')) {
         console.log('[generateResearchReport] Using budget mode:', selectedModel);
-        return await generateBudgetResearch(story, selectedModel, direction);
+        return await generateBudgetResearch(story, apiKey, selectedModel, direction);
     }
 
     // Check model type for specialized handling
@@ -523,13 +524,119 @@ Start by searching for the most relevant and recent information.`;
     return { success: true, report };
 }
 
-/**
- * Budget research using direct Gemini API — FREE tier
- * Option A (gemini-grounded): Gemini 3.1 Flash Lite with Google Search grounding — single API call
- * Option B (serper-gemini): Serper search + Gemini synthesis — more control over queries
- */
+function safeResearchUrl(value: unknown): string | null {
+    if (typeof value !== 'string') return null;
+    try {
+        const url = new URL(value);
+        return (url.protocol === 'http:' || url.protocol === 'https:') && !url.username && !url.password
+            ? url.toString()
+            : null;
+    } catch {
+        return null;
+    }
+}
+
+function addResearchSources(report: ResearchReport, urls: string[]): ResearchReport {
+    const unique = [...new Set(urls.map(safeResearchUrl).filter((url): url is string => !!url))];
+    const sources = [...new Set([...report.sources, ...unique])];
+    const missing = unique.filter(url => !report.deepResearch.includes(url));
+    return {
+        ...report,
+        sources,
+        deepResearch: missing.length
+            ? `${report.deepResearch.trim()}\n\n${/##\s+Sources\b/i.test(report.deepResearch) ? '' : '## Sources\n'}${missing.map(url => `- ${url}`).join('\n')}`
+            : report.deepResearch,
+    };
+}
+
+async function callBudgetOpenRouter(
+    apiKey: string,
+    systemPrompt: string,
+    userPrompt: string,
+    nativeSearch: boolean,
+): Promise<{ content: string; urls: string[]; cost: number | null }> {
+    if (!apiKey) throw new Error('OpenRouter API key is not configured.');
+    let response: Response;
+    try {
+        response = await fetch(OPENROUTER_API_URL, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${apiKey}`,
+                'X-Title': 'Innov8 AI Newsletter - Budget Research',
+            },
+            body: JSON.stringify({
+                model: BUDGET_RESEARCH_MODEL,
+                messages: [
+                    { role: 'system', content: systemPrompt },
+                    { role: 'user', content: nativeSearch
+                        ? `${userPrompt}\n\nSearch current official sources before writing. Cite the URLs that support your factual claims.`
+                        : userPrompt },
+                ],
+                max_tokens: 4000,
+                stream: false,
+                temperature: 0.3,
+                reasoning: { effort: 'low', exclude: true },
+                ...(nativeSearch ? { tools: [{ type: 'openrouter:web_search', parameters: { engine: 'native' } }] } : {}),
+            }),
+            signal: AbortSignal.timeout(240_000),
+        });
+    } catch {
+        throw new Error('OpenRouter research timed out or could not connect. No automatic retry was made.');
+    }
+    if (!response.ok) {
+        const message = response.status === 401 || response.status === 403
+            ? 'OpenRouter rejected the API key or model access. Check the configured OpenRouter key.'
+            : response.status === 402
+                ? 'OpenRouter credits or key limit cannot fund this research request. Check OpenRouter billing and limits.'
+                : response.status === 429
+                    ? 'OpenRouter rate limit reached. Wait before trying again.'
+                    : `OpenRouter returned HTTP ${response.status}. No automatic retry was made.`;
+        throw new Error(message);
+    }
+    let data: {
+        error?: unknown;
+        choices?: Array<{
+            finish_reason?: string;
+            message?: {
+                content?: unknown;
+                annotations?: Array<{ type?: string; url_citation?: { url?: unknown } }>;
+            };
+        }>;
+        usage?: { cost?: unknown };
+    };
+    try {
+        data = await response.json();
+    } catch {
+        throw new Error('OpenRouter returned an unreadable research response.');
+    }
+    if (!data || typeof data !== 'object' || data.error)
+        throw new Error('OpenRouter returned a research error. No report was saved.');
+    if (data.choices?.[0]?.finish_reason === 'length')
+        throw new Error('OpenRouter research reached its output limit. No incomplete report was saved.');
+    const message = data.choices?.[0]?.message;
+    const content = message?.content;
+    if (typeof content !== 'string' || !content.trim())
+        throw new Error('OpenRouter returned no usable research text.');
+    const annotations = Array.isArray(message?.annotations) ? message.annotations : [];
+    const urls = annotations
+        .filter(item => item?.type === 'url_citation')
+        .map(item => safeResearchUrl(item?.url_citation?.url))
+        .filter((url: string | null): url is string => !!url);
+    const reportedCost = data.usage?.cost;
+    return {
+        content,
+        urls,
+        cost: typeof reportedCost === 'number' && Number.isFinite(reportedCost) && reportedCost >= 0
+            ? reportedCost
+            : null,
+    };
+}
+
+/** Both legacy budget IDs use Gemini 3.1 Flash Lite through OpenRouter. */
 async function generateBudgetResearch(
     story: CuratedStory,
+    apiKey: string,
     mode: string,
     direction?: string
 ): Promise<ResearchResult> {
@@ -578,34 +685,13 @@ RULES:
 
     try {
         if (mode === 'budget/gemini-grounded') {
-            // Option A: Single Gemini call with Google Search grounding
-            console.log('[BudgetResearch] Using Gemini + Google Search grounding');
-
-            const response = await callGemini(userPrompt, {
-                model: 'gemini-3.1-flash-lite-preview',
-                systemInstruction: systemPrompt,
-                useGoogleSearch: true,
-                temperature: 0.3,
-                maxOutputTokens: 4000,
-            });
-
-            if (!response.text) {
-                return { success: false, error: 'Gemini returned empty response' };
-            }
-
-            // Log grounding info
-            const searchQueries = response.groundingMetadata?.webSearchQueries || [];
-            const sources = response.groundingMetadata?.groundingChunks
-                ?.map(c => c.web?.title || c.web?.uri)
-                .filter(Boolean) || [];
-            console.log(`[BudgetResearch] Grounding used ${searchQueries.length} searches, ${sources.length} sources`);
-
-            const report = parseResearchContent(story, response.text);
-            return { success: true, report };
+            const response = await callBudgetOpenRouter(apiKey, systemPrompt, userPrompt, true);
+            const report = addResearchSources(parseResearchContent(story, response.content), response.urls);
+            return { success: true, report, model: BUDGET_RESEARCH_MODEL, cost: response.cost };
 
         } else if (mode === 'budget/serper-gemini') {
             // Option B: Serper search + Gemini synthesis
-            console.log('[BudgetResearch] Using Serper + Gemini synthesis');
+            console.log('[BudgetResearch] Using Serper + OpenRouter synthesis');
 
             // Generate search queries from the story
             const queries = generateSearchQueries(story, direction);
@@ -621,20 +707,22 @@ RULES:
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({ query: query.query, num: 5, type: query.type || 'web' }),
                         });
+                        if (!res.ok) return [];
                         const data = await res.json();
-                        return data.success ? data.results : [];
-                    } catch (e) {
-                        console.error(`[BudgetResearch] Search failed for "${query.query}":`, e);
+                        return data.success && Array.isArray(data.results) ? data.results : [];
+                    } catch {
                         return [];
                     }
                 })
             );
 
             // Flatten and format all results
-            const allResults = searchResults.flat();
+            const allResults = searchResults.flat().filter(result => safeResearchUrl(result?.url));
+            if (!allResults.length)
+                return { success: false, error: 'Serper found no usable sources. No OpenRouter synthesis was requested.', model: BUDGET_RESEARCH_MODEL, cost: null };
             const formattedResults = formatSearchResults(allResults);
 
-            // Feed to Gemini for synthesis (no grounding needed — we have the data)
+            // Synthesize the existing Serper results without a second web search.
             const synthesisPrompt = `${userPrompt}
 
 ## RAW SEARCH RESULTS (use these as your source material):
@@ -643,29 +731,22 @@ ${formattedResults}
 
 Based on the search results above, write a comprehensive newsletter-ready report. Cite specific facts and sources.`;
 
-            const response = await callGemini(synthesisPrompt, {
-                model: 'gemini-3.1-flash-lite-preview',
-                systemInstruction: systemPrompt,
-                useGoogleSearch: false,
-                temperature: 0.3,
-                maxOutputTokens: 4000,
-            });
-
-            if (!response.text) {
-                return { success: false, error: 'Gemini synthesis returned empty response' };
-            }
-
-            const report = parseResearchContent(story, response.text);
-            return { success: true, report };
+            const response = await callBudgetOpenRouter(apiKey, systemPrompt, synthesisPrompt, false);
+            const report = addResearchSources(
+                parseResearchContent(story, response.content),
+                [...allResults.map(result => result.url), ...response.urls],
+            );
+            return { success: true, report, model: BUDGET_RESEARCH_MODEL, cost: response.cost };
 
         } else {
             return { success: false, error: `Unknown budget mode: ${mode}` };
         }
     } catch (error) {
-        console.error('[BudgetResearch] Error:', error);
         return {
             success: false,
-            error: error instanceof Error ? error.message : 'Budget research failed',
+            error: error instanceof Error ? error.message : 'OpenRouter budget research failed.',
+            model: BUDGET_RESEARCH_MODEL,
+            cost: null,
         };
     }
 }

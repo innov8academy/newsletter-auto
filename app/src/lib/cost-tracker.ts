@@ -30,11 +30,13 @@ export type CostSource =
 // OpenRouter model pricing (per 1M tokens for text, per image for image models)
 // Updated pricing as of 2024 - verify at openrouter.ai/docs
 export const MODEL_PRICING: Record<string, { input: number; output: number; perImage?: number }> = {
-    // Budget research (Gemini free tier)
-    'budget/gemini-grounded': { input: 0, output: 0 }, // Free tier
-    'budget/serper-gemini': { input: 0, output: 0 },   // ~$0.003 (Serper) + free Gemini
+    // Budget synthesis token estimates only. Research uses provider-reported cost,
+    // including native search when reported; external Serper charges are separate.
+    'budget/gemini-grounded': { input: 0.25, output: 1.50 },
+    'budget/serper-gemini': { input: 0.25, output: 1.50 },
 
     // Google models
+    'google/gemini-3.1-flash-lite': { input: 0.25, output: 1.50 },
     'google/gemini-3.1-flash-lite-preview': { input: 0.25, output: 1.50 }, // Free tier available
     'google/gemini-3-flash-preview': { input: 0.50, output: 3.00 },
     'google/gemini-2.5-flash': { input: 0.30, output: 2.50 },

@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { CuratedStory, ResearchReport } from '@/lib/types';
-import { RESEARCH_MODELS, ResearchModelId } from '@/lib/researcher';
+import { DEFAULT_RESEARCH_MODEL, RESEARCH_MODELS, ResearchModelId } from '@/lib/researcher';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -73,7 +73,7 @@ export default function ResearchPage() {
     const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
     // Model selection
-    const [selectedModel, setSelectedModel] = useState<ResearchModelId>('x-ai/grok-4.1-fast');
+    const [selectedModel, setSelectedModel] = useState<ResearchModelId>(DEFAULT_RESEARCH_MODEL);
 
     // Manual topic input
     const [customTopic, setCustomTopic] = useState('');
@@ -175,7 +175,7 @@ export default function ResearchPage() {
                 setActiveReportId(story.id);
 
                 // Track cost
-                if (data.cost) {
+                if (typeof data.cost === 'number' && Number.isFinite(data.cost) && data.cost >= 0) {
                     addCost({
                         source: data.costSource || 'research',
                         model: data.model || selectedModel,
