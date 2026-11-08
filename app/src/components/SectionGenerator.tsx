@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { DRAFT_MODELS, DraftModelId, DEFAULT_DRAFT_MODEL, DEFAULT_INTRO_MODEL } from '@/lib/draft-generator';
+import { DRAFT_MODELS, DraftModelId, DEFAULT_DRAFT_MODEL, DEFAULT_INTRO_MODEL } from '@/lib/draft-models';
 import { ResearchReport } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';

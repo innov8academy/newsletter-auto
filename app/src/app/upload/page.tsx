@@ -5,13 +5,6 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Upload, CheckCircle2, FileText, AlertCircle, Loader2, ArrowLeft } from 'lucide-react';
-import { createClient } from '@supabase/supabase-js';
-
-// Initialize Client (Client-side safe with anon key)
-const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
 
 export default function UploadPage() {
     const router = useRouter();
@@ -45,23 +38,13 @@ export default function UploadPage() {
                 throw new Error('This does not look like an HTML file.');
             }
 
-            // Convert HTML to simple text for RAG (Naive strip tags for now, or just store raw)
-            // For RAG, we ideally want the text content.
-            const parser = new DOMParser();
-            const doc = parser.parseFromString(text, 'text/html');
-            const cleanText = doc.body.textContent || "";
-
-            // Save to Supabase
-            const { error } = await supabase
-                .from('past_newsletters')
-                .insert({
-                    file_name: file.name,
-                    content_html: text,
-                    content_text: cleanText,
-                    imported_at: new Date().toISOString()
-                });
-
-            if (error) throw error;
+            const form = new FormData();
+            form.set('file', file);
+            const response = await fetch('/api/upload-history', { method: 'POST', body: form });
+            if (!response.ok) {
+                const result = await response.json().catch(() => ({}));
+                throw new Error(result.error || 'Upload failed');
+            }
 
             setStatus('success');
             setFile(null);

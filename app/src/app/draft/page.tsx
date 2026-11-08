@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { ResearchReport } from '@/lib/types';
-import { DRAFT_MODELS, DraftModelId } from '@/lib/draft-generator';
+import { DRAFT_MODELS, DraftModelId } from '@/lib/draft-models';
 import type { StoryBlock } from '@/lib/draft-generator';
 import { WizardProvider, useWizard, getCurrentDateContext } from '@/context/WizardContext';
 import { StepIndicator, WizardNavigation } from '@/components/StepIndicator';

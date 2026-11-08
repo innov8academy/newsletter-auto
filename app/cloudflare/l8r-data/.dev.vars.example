@@ -1,0 +1,2 @@
+# For local tests only. Set a fresh 32+ character random value using Wrangler secrets before deployment.
+INTERNAL_SECRET=replace-with-a-random-32-plus-character-secret

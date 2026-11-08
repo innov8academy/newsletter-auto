@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { cloudflareSelected } from '@/lib/cloudflare-data';
+import { R2ObjectStore } from '@/lib/studio/r2-object-store';
 
 // KIE API endpoints
 const KIE_CREATE_URL = 'https://api.kie.ai/api/v1/jobs/createTask';
@@ -15,6 +17,23 @@ function getSupabase() {
 
 // Upload base64 image to Supabase and return public URL
 async function uploadImageToSupabase(base64Data: string, filename: string): Promise<string | null> {
+  if (cloudflareSelected()) {
+    try {
+      const matches = base64Data.match(/^data:(image\/(?:png|jpeg|webp));base64,([A-Za-z0-9+/=]+)$/);
+      if (!matches) return null;
+      const buffer = Buffer.from(matches[2], 'base64');
+      if (!buffer.length || buffer.length > 15_000_000) return null;
+      const ext = matches[1] === 'image/jpeg' ? 'jpg' : matches[1].split('/')[1];
+      const path = `meme-editor/${crypto.randomUUID()}-${filename}.${ext}`;
+      const store = new R2ObjectStore();
+      // The provider needs temporary access to the input, not a permanent public URL.
+      await store.putObject(path, buffer, matches[1]);
+      return await store.signObject(path);
+    } catch (error) {
+      console.error('[meme-generate] R2 upload error:', error);
+      return null;
+    }
+  }
   const supabase = getSupabase();
   if (!supabase) {
     console.error('[meme-generate] Supabase not configured');
@@ -101,12 +120,12 @@ export async function POST(request: NextRequest) {
     }
 
     // Step 1: Upload image to Supabase
-    console.log('[meme-generate] Uploading image to Supabase...');
+    console.log('[meme-generate] Uploading image...');
     const canvasUrl = await uploadImageToSupabase(canvasImage, 'canvas');
     
     if (!canvasUrl) {
       return NextResponse.json(
-        { success: false, error: 'Failed to upload image. Check Supabase config and temp-images bucket.' },
+        { success: false, error: 'Failed to upload image. Check image storage configuration.' },
         { status: 500 }
       );
     }

@@ -7,7 +7,8 @@ import {
   verifySession,
 } from '../site-session';
 import { StudioError, record, safeMessage, string, uuid } from './errors';
-import { SupabaseStudioRepository } from './repository';
+import type { StudioRepository } from './repository';
+import { createStudioRepository } from './repository-factory';
 import { StudioService, recoverStatus } from './service';
 import { capabilities, verifyNanoCapabilities } from './capabilities';
 import { presetId, PRESETS } from './models';
@@ -85,13 +86,13 @@ export async function studioRoute(
     await requireStudioSession(request);
     const route = segments.join('/');
     if (route === 'capabilities' && request.method === 'GET') {
-      let repo: SupabaseStudioRepository | null = null;
+      let repo: StudioRepository | null = null;
       try {
-        repo = new SupabaseStudioRepository();
+        repo = createStudioRepository();
       } catch {}
       return success(await capabilities(repo));
     }
-    const repo = new SupabaseStudioRepository();
+    const repo = createStudioRepository();
     const service = new StudioService(repo);
     if (request.method === 'GET') {
       if (route === 'drafts')

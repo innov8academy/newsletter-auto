@@ -2,7 +2,7 @@ import { sameRequestOrigin } from '@/lib/site-session';
 import { NextRequest, NextResponse } from 'next/server';
 import { hydrateWizard, metadataOnly } from '@/lib/canonical-draft';
 import type { NewsletterDraft } from '@/lib/draft-generator';
-import { isSupabaseConfigured, supabaseAdmin } from '@/lib/supabase';
+import { callL8RData, cloudflareConfigured, cloudflareSelected } from '@/lib/cloudflare-data';
 
 const MAX_NEWSLETTER_STORIES = 30;
 const MAX_REVISION = 2_147_483_646; // PostgreSQL integer must fit the increment.
@@ -135,13 +135,15 @@ function toState(row: SharedSelectionRow) {
 }
 
 async function loadRow(): Promise<SharedSelectionRow | null> {
+    if (cloudflareSelected()) return callL8RData<SharedSelectionRow>({ op: 'newsletter_state' });
+    const { supabaseAdmin } = await import('@/lib/supabase');
     const { data, error } = await supabaseAdmin.rpc('newsletter_state');
     if (error) throw error;
     return data as SharedSelectionRow | null;
 }
 
 export async function GET() {
-    if (!isSupabaseConfigured()) {
+    if (cloudflareSelected() ? !cloudflareConfigured() : !supabaseConfigured()) {
         return NextResponse.json({ success: false, code: 'configuration_error', error: 'Shared newsletter storage is unavailable.' }, { status: 503 });
     }
     try {
@@ -156,7 +158,7 @@ export async function GET() {
 export async function PUT(request: NextRequest) {
     if (!sameRequestOrigin(request.headers.get('origin'), request.url, request.headers.get('host')))
         return NextResponse.json({ success: false, code: 'invalid_origin', error: 'Save from the newsletter app.' }, { status: 403 });
-    if (!isSupabaseConfigured()) {
+    if (cloudflareSelected() ? !cloudflareConfigured() : !supabaseConfigured()) {
         return NextResponse.json({ success: false, code: 'configuration_error', error: 'Shared newsletter storage is unavailable.' }, { status: 503 });
     }
     let raw: string;
@@ -180,12 +182,22 @@ export async function PUT(request: NextRequest) {
     }
 
     try {
-        const { data, error } = await supabaseAdmin.rpc('newsletter_save', {
-            expected_revision: payload.expectedRevision,
-            content: { ...payload, wizardState: metadataOnly(payload.wizardState) },
-            resolve_version: payload.resolveVersion ?? null,
-        });
-        if (error) throw error;
+        const content = { ...payload, wizardState: metadataOnly(payload.wizardState) };
+        let data: { conflict?: boolean; choiceRequired?: boolean; state?: SharedSelectionRow } | null;
+        if (cloudflareSelected()) {
+            data = await callL8RData<typeof data>({ op: 'newsletter_save',
+                expectedRevision: payload.expectedRevision, content,
+                resolveVersion: payload.resolveVersion ?? null });
+        } else {
+            const { supabaseAdmin } = await import('@/lib/supabase');
+            const result = await supabaseAdmin.rpc('newsletter_save', {
+                expected_revision: payload.expectedRevision,
+                content,
+                resolve_version: payload.resolveVersion ?? null,
+            });
+            if (result.error) throw result.error;
+            data = result.data;
+        }
         if (!data?.conflict && !data?.choiceRequired && data?.state)
             return NextResponse.json({ success: true, state: toState(data.state) }, { headers: { 'Cache-Control': 'no-store' } });
         const latest = await loadRow();
@@ -199,4 +211,8 @@ export async function PUT(request: NextRequest) {
         console.error('[SharedSelection] PUT failed:', error instanceof Error ? error.name : 'storage error');
         return NextResponse.json({ success: false, code: 'save_failed', error: 'Failed to save shared newsletter state.' }, { status: 503 });
     }
+}
+
+function supabaseConfigured(): boolean {
+    return !!(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY && process.env.SUPABASE_SERVICE_ROLE_KEY);
 }

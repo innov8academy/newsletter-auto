@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { buildBeehiivDraftPayload, parseNewsletterDraftInput } from '@/lib/beehiiv-export';
 import { requireStudioSession, studioError } from '@/lib/studio/http';
 import { StudioService } from '@/lib/studio/service';
-import { SupabaseStudioRepository } from '@/lib/studio/repository';
+import { createStudioRepository } from '@/lib/studio/repository-factory';
 import { StudioError, uuid } from '@/lib/studio/errors';
 
 const BEEHIIV_API_BASE = 'https://api.beehiiv.com/v2';
@@ -66,7 +66,7 @@ export async function POST(request: NextRequest) {
         }
 
         const body = await request.json();
-        const saved = body.studioDraftId ? await new StudioService(new SupabaseStudioRepository()).exportImages(uuid(body.studioDraftId)) : null;
+        const saved = body.studioDraftId ? await new StudioService(createStudioRepository()).exportImages(uuid(body.studioDraftId)) : null;
         const draft = saved?.draft || parseNewsletterDraftInput(body?.draft);
         const imageUrls = saved?.imageUrls || (body?.imageUrls && typeof body.imageUrls === 'object' ? body.imageUrls : {});
         const { payload, skippedImages } = buildBeehiivDraftPayload(draft, imageUrls);

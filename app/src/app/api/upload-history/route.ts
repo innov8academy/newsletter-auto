@@ -1,17 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabaseAdmin } from '@/lib/supabase';
+import { insertNewsletter } from '@/lib/legacy-data';
 import * as cheerio from 'cheerio';
 
 export async function POST(req: NextRequest) {
     try {
+        const origin = req.headers.get('origin');
+        if (origin && origin !== req.nextUrl.origin) {
+            return NextResponse.json({ error: 'Origin not allowed' }, { status: 403 });
+        }
         const formData = await req.formData();
-        const file = formData.get('file') as File;
+        const file = formData.get('file');
 
-        if (!file) {
-            return NextResponse.json({ error: 'No file uploaded' }, { status: 400 });
+        if (!(file instanceof File) || !/\.html?$/i.test(file.name) || file.size > 1_000_000) {
+            return NextResponse.json({ error: 'Choose an HTML file under 1 MB.' }, { status: 400 });
         }
 
         const htmlConfig = await file.text();
+        if (!/<(?:html|!doctype html)\b/i.test(htmlConfig)) {
+            return NextResponse.json({ error: 'This does not look like an HTML file.' }, { status: 400 });
+        }
         const $ = cheerio.load(htmlConfig);
 
         // CLEANING STRATEGY:
@@ -29,19 +36,13 @@ export async function POST(req: NextRequest) {
         // But let's try to keep meaningful whitespace.
         const textContent = $('body').text().replace(/\s+/g, ' ').trim();
 
-        // Save to Supabase
-        const { error } = await supabaseAdmin.from('past_newsletters').insert({
+        await insertNewsletter({
             title: file.name.replace('.html', '').replace(/[-_]/g, ' '),
             file_name: file.name,
             content_html: htmlConfig.substring(0, 100000), // Cap just in case
             content_text: textContent.substring(0, 50000), // Cap for token limits later
             imported_at: new Date().toISOString() // Required for RAG ordering
         });
-
-        if (error) {
-            console.error('Supabase error:', error);
-            return NextResponse.json({ error: error.message }, { status: 500 });
-        }
 
         return NextResponse.json({ success: true, message: 'Newsletter imported into knowledge base.' });
 

@@ -3,23 +3,14 @@
 // Target: 18-40 year olds in Kerala who want to stay updated on AI
 
 import { ResearchReport } from './types';
-import { supabaseAdmin } from './supabase'; // RAG Support
+import { recentNewsletters, legacyDataConfigured } from './legacy-data'; // RAG Support
+import { cloudflareSelected } from './cloudflare-data';
 import { callGemini } from './gemini-client';
+import { DEFAULT_DRAFT_MODEL, DEFAULT_INTRO_MODEL, type DraftModelId } from './draft-models';
+export { DRAFT_MODELS, DEFAULT_DRAFT_MODEL, DEFAULT_INTRO_MODEL } from './draft-models';
+export type { DraftModelId } from './draft-models';
 
 const OPENROUTER_API_URL = 'https://openrouter.ai/api/v1/chat/completions';
-
-// Available models for draft generation
-export const DRAFT_MODELS = [
-    { id: 'anthropic/claude-sonnet-4.5', name: 'Claude Sonnet 4.5', description: 'Best writing quality' },
-    { id: 'google/gemini-3.1-pro-preview', name: 'Gemini 3.1 Pro', description: 'Google flagship' },
-    { id: 'openai/gpt-4o', name: 'GPT-4o', description: 'OpenAI flagship' },
-    { id: 'deepseek/deepseek-r1', name: 'DeepSeek R1', description: 'Powerful reasoning' },
-    { id: 'google/gemini-2.0-flash-001', name: 'Gemini Flash', description: 'Fast & reliable' },
-] as const;
-
-export type DraftModelId = typeof DRAFT_MODELS[number]['id'];
-export const DEFAULT_DRAFT_MODEL: DraftModelId = 'google/gemini-3.1-pro-preview';
-export const DEFAULT_INTRO_MODEL: DraftModelId = 'anthropic/claude-sonnet-4.5';
 
 // Newsletter draft structure
 export interface NewsletterDraft {
@@ -192,20 +183,13 @@ ${content}
     let ragContext = "";
     let ragInfo = { used: false, newslettersFound: 0, newsletterNames: [] as string[] };
 
-    console.log('[RAG] Attempting to fetch past newsletters from Supabase...');
+    console.log('[RAG] Attempting to fetch past newsletters...');
 
-    if (supabaseAdmin) {
+    if (legacyDataConfigured()) {
         try {
             // First try ordering by imported_at, fallback to created_at or id
-            const { data: pastExamples, error: ragError } = await supabaseAdmin
-                .from('past_newsletters')
-                .select('content_text, file_name, imported_at')
-                .order('imported_at', { ascending: false, nullsFirst: false })
-                .limit(2);
-
-            if (ragError) {
-                console.error('[RAG] Supabase query error:', ragError);
-            } else if (pastExamples && pastExamples.length > 0) {
+            const pastExamples = await recentNewsletters(2);
+            if (pastExamples.length > 0) {
                 console.log(`[RAG] ✅ Found ${pastExamples.length} past newsletters to use as examples!`);
                 pastExamples.forEach((ex: any, i: number) => {
                     console.log(`[RAG]   ${i + 1}. ${ex.file_name} (imported: ${ex.imported_at || 'NO DATE'})`);
@@ -229,10 +213,11 @@ ${pastExamples.map((ex: any, i: number) => `--- EXAMPLE ${i + 1} ---\n${ex.conte
                 console.warn('[RAG] ⚠️ No past newsletters found in database!');
             }
         } catch (e) {
+            if (cloudflareSelected()) throw e;
             console.error('[RAG] Failed to fetch past newsletters:', e);
         }
     } else {
-        console.warn('[RAG] ⚠️ supabaseAdmin not configured - skipping RAG');
+        console.warn('[RAG] ⚠️ Storage not configured - skipping RAG');
     }
 
     const finalSystemPrompt = systemPrompt + ragContext;

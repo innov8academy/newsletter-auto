@@ -1,5 +1,6 @@
 import TwitterApi from 'twitter-api-v2';
-import { supabaseAdmin, isSupabaseConfigured } from './supabase';
+import { legacyDataConfigured, replaceXCache, cachedXRows } from './legacy-data';
+import { cloudflareSelected } from './cloudflare-data';
 import { callGemini } from './gemini-client';
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
@@ -502,15 +503,9 @@ export async function fetchAllXContent(): Promise<XFetchResult> {
 // ─── Supabase Caching ──────────────────────────────────────────────────────────
 
 async function cacheToSupabase(tweets: XTweet[]): Promise<void> {
-    if (!isSupabaseConfigured() || tweets.length === 0) return;
+    if (!legacyDataConfigured() || tweets.length === 0) return;
 
     try {
-        // Delete old X news items
-        await supabaseAdmin
-            .from('news_items')
-            .delete()
-            .eq('source_id', X_SOURCE_ID);
-
         // Insert new items — ensure every row has a unique URL
         const seenUrls = new Set<string>();
         const rows = tweets
@@ -542,32 +537,19 @@ async function cacheToSupabase(tweets: XTweet[]): Promise<void> {
                 };
             });
 
-        const { error } = await supabaseAdmin
-            .from('news_items')
-            .upsert(rows, { onConflict: 'url', ignoreDuplicates: true });
-
-        if (error) {
-            console.error('[X API] Supabase insert error:', error);
-        } else {
-            console.log(`[X API] Cached ${rows.length} tweets to Supabase`);
-        }
+        await replaceXCache(X_SOURCE_ID, rows);
+        console.log(`[X API] Cached ${rows.length} tweets`);
     } catch (error) {
+        if (cloudflareSelected()) throw error;
         console.error('[X API] Cache error:', error);
     }
 }
 
 export async function getCachedXNews(): Promise<XTweet[]> {
-    if (!isSupabaseConfigured()) return [];
+    if (!legacyDataConfigured()) return [];
 
     try {
-        const { data, error } = await supabaseAdmin
-            .from('news_items')
-            .select('*')
-            .eq('source_id', X_SOURCE_ID)
-            .order('created_at', { ascending: false })
-            .limit(20);
-
-        if (error || !data) return [];
+        const data = await cachedXRows(X_SOURCE_ID, 20);
 
         return data.map((item: any) => {
             // Parse rich engagement data from raw_summary JSON
@@ -601,28 +583,24 @@ export async function getCachedXNews(): Promise<XTweet[]> {
             };
         });
     } catch (error) {
+        if (cloudflareSelected()) throw error;
         console.error('[X API] getCachedXNews error:', error);
         return [];
     }
 }
 
 export async function isCacheFresh(maxAgeMinutes: number = CACHE_TTL_MINUTES): Promise<boolean> {
-    if (!isSupabaseConfigured()) return false;
+    if (!legacyDataConfigured()) return false;
 
     try {
-        const { data, error } = await supabaseAdmin
-            .from('news_items')
-            .select('created_at')
-            .eq('source_id', X_SOURCE_ID)
-            .order('created_at', { ascending: false })
-            .limit(1);
-
-        if (error || !data?.length) return false;
+        const data = await cachedXRows(X_SOURCE_ID, 1);
+        if (!data.length) return false;
 
         const lastUpdate = new Date(data[0].created_at);
         const ageMinutes = (Date.now() - lastUpdate.getTime()) / (1000 * 60);
         return ageMinutes < maxAgeMinutes;
-    } catch {
+    } catch (error) {
+        if (cloudflareSelected()) throw error;
         return false;
     }
 }

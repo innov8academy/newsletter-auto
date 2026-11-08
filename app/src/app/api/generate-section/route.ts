@@ -5,7 +5,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { DraftModelId, DEFAULT_DRAFT_MODEL, DEFAULT_INTRO_MODEL } from '@/lib/draft-generator';
 import { ResearchReport } from '@/lib/types';
 import { calculateCost } from '@/lib/cost-tracker';
-import { supabaseAdmin } from '@/lib/supabase';
+import { recentNewsletters, legacyDataConfigured } from '@/lib/legacy-data';
+import { cloudflareSelected } from '@/lib/cloudflare-data';
 
 const OPENROUTER_API_URL = 'https://openrouter.ai/api/v1/chat/completions';
 
@@ -180,16 +181,11 @@ function normalizeStorySection(candidate: unknown): StorySectionResponse | null 
 }
 
 async function getSectionRAG(sectionType: SectionType): Promise<string> {
-    if (!supabaseAdmin) return '';
+    if (!legacyDataConfigured()) return '';
 
     try {
-        const { data: pastNewsletters, error } = await supabaseAdmin
-            .from('past_newsletters')
-            .select('content_text, file_name')
-            .order('imported_at', { ascending: false, nullsFirst: false })
-            .limit(2);
-
-        if (error || !pastNewsletters?.length) return '';
+        const pastNewsletters = await recentNewsletters(2);
+        if (!pastNewsletters.length) return '';
 
         const extractedSections = pastNewsletters
             .map((newsletter: { content_text?: string }) => {
@@ -231,6 +227,7 @@ async function getSectionRAG(sectionType: SectionType): Promise<string> {
             .map((section, index) => `--- Example ${index + 1} ---\n${section}`)
             .join('\n\n')}\n`;
     } catch (error) {
+        if (cloudflareSelected()) throw error;
         console.error('[Section RAG] Error:', error);
         return '';
     }

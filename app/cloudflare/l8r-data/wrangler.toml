@@ -1,0 +1,12 @@
+name = "l8r-data"
+main = "worker.mjs"
+compatibility_date = "2026-11-08"
+workers_dev = true
+
+[[durable_objects.bindings]]
+name = "L8R_DATA"
+class_name = "L8RData"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["L8RData"]

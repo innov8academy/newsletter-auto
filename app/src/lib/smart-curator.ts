@@ -2,7 +2,8 @@ import { baseScore as normalizeBaseScore } from './news-score';
 import { NewsItem, CuratedStory, CurationProgress } from './types';
 import { defaultConfig, SCORING_CONFIG, SMART_CURATION_PROMPT } from './config';
 import { fetchAllNews } from './news-fetcher';
-import { supabaseAdmin, isSupabaseConfigured } from './supabase';
+import { legacyDataConfigured, usedHeadlines } from './legacy-data';
+import { cloudflareSelected } from './cloudflare-data';
 import { callGemini } from './gemini-client';
 import { isFreshNews, normalizeNewsDate, selectNewsCandidates } from './news-freshness';
 import { newsSimilarity, canonicalNewsUrl } from './news-identity';
@@ -68,8 +69,8 @@ export function filterExcludedStories<T extends Pick<CuratedStory, 'headline'>>(
 
 // Fetch previously used story headlines from Supabase (last 30 days)
 async function fetchUsedStoryHeadlines(): Promise<string[]> {
-    if (!isSupabaseConfigured()) {
-        console.log('[Duplicate Check] Supabase not configured, skipping');
+    if (!legacyDataConfigured()) {
+        console.log('[Duplicate Check] Storage not configured, skipping');
         return [];
     }
 
@@ -77,20 +78,11 @@ async function fetchUsedStoryHeadlines(): Promise<string[]> {
         const sevenDaysAgo = new Date();
         sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
-        const { data, error } = await supabaseAdmin
-            .from('used_stories')
-            .select('headline')
-            .gte('used_at', sevenDaysAgo.toISOString())
-            .order('used_at', { ascending: false });
-
-        if (error) {
-            console.error('[Duplicate Check] Error fetching used stories:', error);
-            return [];
-        }
-
-        console.log(`[Duplicate Check] Found ${data?.length || 0} previously used stories`);
-        return (data || []).map(s => s.headline);
+        const data = await usedHeadlines(sevenDaysAgo.toISOString());
+        console.log(`[Duplicate Check] Found ${data.length} previously used stories`);
+        return data;
     } catch (e) {
+        if (cloudflareSelected()) throw e;
         console.error('[Duplicate Check] Exception:', e);
         return [];
     }

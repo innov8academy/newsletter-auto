@@ -2,13 +2,13 @@
 // POST /api/mark-used - Save selected story headlines to prevent duplicates
 
 import { NextRequest, NextResponse } from 'next/server';
-import { supabaseAdmin, isSupabaseConfigured } from '@/lib/supabase';
+import { legacyDataConfigured, insertUsedStories } from '@/lib/legacy-data';
 
 export async function POST(request: NextRequest) {
     try {
-        if (!isSupabaseConfigured()) {
+        if (!legacyDataConfigured()) {
             return NextResponse.json(
-                { success: false, error: 'Supabase not configured' },
+                { success: false, error: 'Storage not configured' },
                 { status: 500 }
             );
         }
@@ -22,6 +22,9 @@ export async function POST(request: NextRequest) {
                 { status: 400 }
             );
         }
+        if (stories.length > 100 || stories.some(story => !story || typeof story.headline !== 'string' || !story.headline.trim() || story.headline.length > 1000 || (story.url !== undefined && (typeof story.url !== 'string' || story.url.length > 2000)))) {
+            return NextResponse.json({ success: false, error: 'Invalid stories' }, { status: 400 });
+        }
 
         // Insert stories into used_stories table
         const toInsert = stories.map(story => ({
@@ -30,24 +33,12 @@ export async function POST(request: NextRequest) {
             used_at: new Date().toISOString(),
         }));
 
-        const { data, error } = await supabaseAdmin
-            .from('used_stories')
-            .insert(toInsert)
-            .select();
-
-        if (error) {
-            console.error('[Mark Used] Supabase error:', error);
-            return NextResponse.json(
-                { success: false, error: 'Failed to save used stories' },
-                { status: 500 }
-            );
-        }
-
-        console.log(`[Mark Used] Saved ${data?.length || 0} stories as used`);
+        const count = await insertUsedStories(toInsert);
+        console.log(`[Mark Used] Saved ${count} stories as used`);
 
         return NextResponse.json({
             success: true,
-            count: data?.length || 0,
+            count,
         });
 
     } catch (error) {

@@ -63,9 +63,14 @@ export async function uploadReference(
     'POST',
     { draftId, role, name: file.name, size: file.size, mimeType: file.type },
   );
+  const signedHeaders = new URL(ticket.signedUrl).searchParams
+    .get('X-Amz-SignedHeaders')?.toLowerCase().split(';') || [];
+  const createOnce = signedHeaders.includes('if-none-match');
   const upload = await fetch(ticket.signedUrl, {
     method: 'PUT',
-    headers: { 'Content-Type': file.type, 'x-upsert': 'false' },
+    headers: createOnce
+      ? { 'Content-Type': file.type, 'If-None-Match': '*' }
+      : { 'Content-Type': file.type, 'x-upsert': 'false' },
     body: file,
   });
   if (!upload.ok)
