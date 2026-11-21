@@ -22,7 +22,7 @@ Every successful response is `{ "ok": true, "result": ... }`. Failures are `{ "o
 
 Alarm scheduling queries the `newsletter_versions_expiry_idx` index for one unprotected timestamp. Recovery choices are excluded in SQLite with `json_each`, so autosaves do not transfer the full history into Worker memory.
 
-`query` and `batch` are administrative primitives for trusted server code only. They accept positional SQLite scalar parameters (`string`, finite `number`, `null`). JSON columns must be JSON encoded on write and decoded on read. They reject transaction control and `PRAGMA`; use `batch` for atomic groups. SQL responses return rows and `rowsWritten` as `changes`. The app server must enforce table and field level business validation before calling these primitives. The generic API is intentionally capable of changing or deleting rows, so only the app server may hold the bearer secret.
+`query` and `batch` are administrative primitives for trusted server code only. They accept positional SQLite scalar parameters (`string`, finite `number`, `null`). JSON columns must be JSON encoded on write and decoded on read. They reject transaction control and `PRAGMA`; use `batch` for atomic groups. SQL responses return rows and `changes`: the number of rows the statement affected (SQLite `changes()`), not `rowsWritten`, which also counts index entries. The app server must enforce table and field level business validation before calling these primitives. The generic API is intentionally capable of changing or deleting rows, so only the app server may hold the bearer secret.
 
 ## Fresh-start migration
 

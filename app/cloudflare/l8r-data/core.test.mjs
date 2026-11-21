@@ -5,7 +5,7 @@ import { initialize, execute, nextHistoryExpiry, pruneExpiredHistory } from './c
 import { authorized, dispatch } from './gateway.mjs';
 import { ensureHistoryAlarm } from './history-alarm.mjs';
 
-function storage() {
+function storage({ indexWrites = 0 } = {}) {
   const sqlite = new DatabaseSync(':memory:');
   const sql = {
     calls: [],
@@ -14,7 +14,9 @@ function storage() {
       const before = sqlite.prepare('SELECT total_changes() AS n').get().n;
       const rows = sqlite.prepare(statement).all(...args);
       const after = sqlite.prepare('SELECT total_changes() AS n').get().n;
-      return { toArray: () => rows, rowsWritten: after - before };
+      // Durable Object rowsWritten also counts index entries for each written row.
+      const written = after - before;
+      return { toArray: () => rows, rowsWritten: written ? written * (1 + indexWrites) : 0 };
     },
   };
   initialize(sql);
@@ -164,3 +166,13 @@ test('mandatory token guards worker before Durable Object access', async () => {
 });
 
 function now() { return new Date().toISOString(); }
+
+test('query reports affected rows, not index writes, so generation claims succeed once', () => {
+  const s = storage({ indexWrites: 1 });
+  const draftId = '22222222-2222-4222-8222-222222222222';
+  call(s, 'query', { sql: 'INSERT INTO studio_drafts(id,payload,revision,updated_at) VALUES(?,?,?,?)', params: [draftId, '{}', 1, 'now'] });
+  const claim = { sql: 'INSERT OR IGNORE INTO studio_generations(id,draft_id,story_id,request_hash,status,payload,started_at) VALUES(?,?,?,?,?,?,?)', params: ['run', draftId, 'story', 'hash', 'running', '{}', 'now'] };
+  assert.equal(call(s, 'query', claim).changes, 1);
+  assert.equal(call(s, 'query', claim).changes, 0);
+  assert.equal(call(s, 'query', { sql: 'SELECT * FROM studio_generations', params: [] }).changes, 0);
+});

@@ -65,7 +65,7 @@ export class CloudflareStudioRepository implements StudioRepository {
     const result = revision === null
       ? await this.query('INSERT OR IGNORE INTO studio_story_workspaces(draft_id,story_id,payload,revision,updated_at) VALUES(?,?,?,?,?)', [work.draftId, work.storyId, JSON.stringify(next), next.revision, now])
       : await this.query('UPDATE studio_story_workspaces SET payload=?,revision=?,updated_at=? WHERE draft_id=? AND story_id=? AND revision=?', [JSON.stringify(next), next.revision, now, work.draftId, work.storyId, revision]);
-    if (result.changes !== 1) throw new StudioError('revision_conflict', 'This story changed in another browser. Reload it to resolve the conflict; your local edits are retained.', 409);
+    if (result.changes < 1) throw new StudioError('revision_conflict', 'This story changed in another browser. Reload it to resolve the conflict; your local edits are retained.', 409);
     return next;
   }
   async getAssets(ids: string[]): Promise<StudioAsset[]> {
@@ -94,7 +94,7 @@ export class CloudflareStudioRepository implements StudioRepository {
   }
   async insertStyle(pack: StylePack): Promise<void> {
     const result = await this.query('INSERT OR IGNORE INTO studio_style_packs(id,slug,version,payload,active,created_at) VALUES(?,?,?,?,0,?)', [pack.id, pack.slug, pack.version, JSON.stringify(pack), pack.createdAt]);
-    if (result.changes !== 1) throw new StudioError('style_version_conflict', 'This style version already exists. Reload the library and try again.', 409);
+    if (result.changes < 1) throw new StudioError('style_version_conflict', 'This style version already exists. Reload the library and try again.', 409);
   }
   async activateStyle(id: string): Promise<void> {
     try { await this.data({ op: 'activate_style', packId: id }); }
@@ -110,7 +110,7 @@ export class CloudflareStudioRepository implements StudioRepository {
   }
   async claimGeneration(run: GenerationRun): Promise<{ claimed: boolean; run: GenerationRun }> {
     const result = await this.query('INSERT OR IGNORE INTO studio_generations(id,draft_id,story_id,request_hash,status,payload,started_at) VALUES(?,?,?,?,?,?,?)', [run.id, run.draftId, run.storyId, run.requestHash, run.status, JSON.stringify(run), run.startedAt]);
-    if (result.changes === 1) return { claimed: true, run };
+    if (result.changes > 0) return { claimed: true, run };
     const existing = await this.getGeneration(run.id);
     if (!existing || existing.requestHash !== run.requestHash)
       throw new StudioError('request_conflict', 'This request ID belongs to a different generation.', 409);

@@ -148,7 +148,10 @@ function sqlCall(db, command) {
       /;\s*\S/.test(command.sql) || /\b(?:attach|detach|pragma|vacuum|begin|commit|rollback|savepoint|release)\b/i.test(command.sql)) throw new Error('invalid_query');
   const cursor = db.exec(command.sql, ...command.params);
   const rows = cursor.toArray();
-  return { rows, changes: cursor.rowsWritten };
+  // rowsWritten also counts index entries, so an INSERT into an indexed table
+  // reports 2+. Callers need affected rows, which SQLite's changes() gives.
+  const changes = cursor.rowsWritten > 0 ? Number(db.exec('SELECT changes() AS n').toArray()[0]?.n ?? 0) : 0;
+  return { rows, changes };
 }
 
 export function execute(storage, request) {

@@ -94,3 +94,16 @@ test('asset lookups split more than 100 IDs into bounded SQL queries', async () 
   assert.deepEqual(requests.map((request) => (request.params as string[]).length), [100, 100, 5]);
   assert.deepEqual(requests.flatMap((request) => request.params as string[]), ids);
 });
+
+test('writes that also update indexes still count as claimed or saved', async () => {
+  const { repo, replies } = harness();
+  const run = { id: 'run', draftId: 'draft', storyId: 'story', requestHash: 'hash', status: 'running', startedAt: 'now' } as GenerationRun;
+  replies.push({ rows: [], changes: 2 });
+  assert.deepEqual(await repo.claimGeneration(run), { claimed: true, run });
+  const work = { draftId: 'draft', storyId: 'story', revision: 1, references: [] } as unknown as StoryWorkspace;
+  replies.push({ rows: [], changes: 2 });
+  assert.equal((await repo.saveWorkspace(work, 1)).revision, 2);
+  const pack = { id: 'pack', slug: 'test', version: 1, createdAt: 'now', active: false } as StylePack;
+  replies.push({ rows: [], changes: 3 });
+  await repo.insertStyle(pack);
+});
